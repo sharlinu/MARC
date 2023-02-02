@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 
 
 colours = {
-    100: [255,255,255],  # gem colour
+    1: [255,255,255],  # gem colour
     2: [128,128,117],
     3: [255, 250, 200],
     4: [255, 216, 177],
