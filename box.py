@@ -291,11 +291,11 @@ class BoxWorldEnv(Env):
 
     def spawn_boxes(self):
         if self.simple:
-            self.field[1, 1] = 2
-            self.objects[(1, 1)] = Object(x=1, y=1, colour=2, unlocked=True)
+            self.field[0,0] = 2
+            self.objects[(0,0)] = Object(x=0, y=0, colour=2, unlocked=True)
 
-            self.field[4, 4] = 2
-            self.objects[(4, 4)] = Object(x=4, y=4, colour=2, unlocked=True)
+            self.field[3,3] = 2
+            self.objects[(3,3)] = Object(x=3, y=3, colour=2, unlocked=True)
         elif self.relational:
             self.key_colour = np.random.randint(2, self.num_colours)
             # TODO any need for key colour as class object?
@@ -394,7 +394,7 @@ class BoxWorldEnv(Env):
                 self.field_size,
             )
             self.players[1].setup(
-                (3, 3),
+                (1,1),
                 self.field_size,
             )
         elif self.deterministic:

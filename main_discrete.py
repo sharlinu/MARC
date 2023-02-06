@@ -9,7 +9,8 @@ from tensorboardX import SummaryWriter
 from utils.make_env import make_env
 from utils.buffer import ReplayBuffer
 from utils.env_wrappers import SubprocVecEnv, DummyVecEnv
-from algorithms.attention_sac import AttentionSAC
+from algorithms.attention_sac import AttentionSAC, RelationalSAC
+from utils.rel_wrappers import AbsoluteVKBWrapper
 import gym
 def make_parallel_env(env_id, n_rollout_threads, seed):
     def get_env_fn(rank):
@@ -23,11 +24,12 @@ def make_parallel_env(env_id, n_rollout_threads, seed):
                 goal_length=2,
                 sight=4,
                 max_episode_steps=500,
-                grid_observation=False,
+                grid_observation=True,
                 simple=True,
                 relational=False,
                 #deterministic=True,
             )
+            env = AbsoluteVKBWrapper(env,num_colours=env.num_colours)
             env.agents = [None] * len(env.action_space)
             env.seed(seed + rank * 1000)
             np.random.seed(seed + rank * 1000)
@@ -67,16 +69,43 @@ def run(config, configvar):
 
     torch.manual_seed(configvar['random_seed'])
     np.random.seed(configvar['random_seed'])
-    env = make_parallel_env(config.env_id, config.n_rollout_threads, run_num)
-    model = AttentionSAC.init_from_env(env,
+    #env = make_parallel_env(config.env_id, config.n_rollout_threads, run_num)
+    from r_maac.box import BoxWorldEnv
+    env = BoxWorldEnv(
+        players=2,
+        field_size=(4, 4),
+        num_colours=2,
+        goal_length=2,
+        sight=4,
+        max_episode_steps=500,
+        grid_observation=True,
+        simple=True,
+        relational=False,
+        # deterministic=True,
+    )
+    env = AbsoluteVKBWrapper(env, num_colours=env.num_colours)
+    env.agents = [None] * len(env.action_space)
+    env.seed(seed)
+    np.random.seed(seed)
+
+    # model = AttentionSAC.init_from_env(env,
+    #                                    tau=config.tau,
+    #                                    pi_lr=config.pi_lr,
+    #                                    q_lr=config.q_lr,
+    #                                    gamma=config.gamma,
+    #                                    pol_hidden_dim=config.pol_hidden_dim,
+    #                                    critic_hidden_dim=config.critic_hidden_dim,
+    #                                    attend_heads=config.attend_heads,
+    #                                    reward_scale=config.reward_scale)
+    model = RelationalSAC.init_from_env(env,
                                        tau=config.tau,
                                        pi_lr=config.pi_lr,
                                        q_lr=config.q_lr,
                                        gamma=config.gamma,
                                        pol_hidden_dim=config.pol_hidden_dim,
                                        critic_hidden_dim=config.critic_hidden_dim,
-                                       attend_heads=config.attend_heads,
                                        reward_scale=config.reward_scale)
+
     replay_buffer = ReplayBuffer(config.buffer_length, model.nagents,
                                  [obsp.shape[0] for obsp in env.observation_space],
                                  [acsp.shape[0] if isinstance(acsp, Box) else acsp.n
