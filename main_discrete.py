@@ -14,7 +14,21 @@ import gym
 def make_parallel_env(env_id, n_rollout_threads, seed):
     def get_env_fn(rank):
         def init_env():
-            env = gym.make("Foraging-8x8-2p-1f-v0")
+            #env = gym.make("Foraging-8x8-2p-1f-v0")
+            from r_maac.box import BoxWorldEnv
+            env = BoxWorldEnv(
+                players=2,
+                field_size=(4,4),
+                num_colours=2,
+                goal_length=2,
+                sight=4,
+                max_episode_steps=500,
+                grid_observation=False,
+                simple=True,
+                relational=False,
+                #deterministic=True,
+            )
+            env.agents = [None] * len(env.action_space)
             env.seed(seed + rank * 1000)
             np.random.seed(seed + rank * 1000)
             return env
@@ -199,7 +213,7 @@ if __name__ == '__main__':
     config = parser.parse_args()
     args   = vars(config)
 
-    env_id = 'spread_collect'
+    env_id = 'Boxworld'
     agent_alg = 'MAAC'
 
     exp_id = 'std'

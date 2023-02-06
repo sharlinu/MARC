@@ -1,16 +1,18 @@
-from Aurora.agent.util import rotate_vec2d
-from Aurora.environment.box.boxworld_gen import all_colors
-from gym_minigrid.minigrid import * # imports DIR_TO_VEC as [array([1, 0]), array([0, 1]), array([-1,  0]), array([ 0, -1])]
+import numpy as np
 
+from Aurora.agent.util import rotate_vec2d
+from gym_minigrid.minigrid import * # imports DIR_TO_VEC as [array([1, 0]), array([0, 1]), array([-1,  0]), array([ 0, -1])]
+import time
+import pygame
 #OBJECTS = ind_dict2list(OBJECT_TO_IDX)
 
 class GridObject():
     "object is specified by its location"
-    def __init__(self, x, y, object_type=[]):
+    def __init__(self, x, y, type=[], attribute=[]):
         self.x = x
         self.y = y
-        self.type = object_type
-        self.attributes = object_type
+        self.type = type
+        self.attributes = attribute
 
     @property
     def pos(self):
@@ -21,7 +23,7 @@ class GridObject():
         return str(self.type)+"_"+str(self.x)+str(self.y)
 
 
-def parse_object(x:int, y:int, feature)->GridObject:
+def parse_object(x:int, y:int, feature: np.array)->GridObject:
     """
     :param x: column position
     :param y: row position
@@ -30,8 +32,11 @@ def parse_object(x:int, y:int, feature)->GridObject:
     """
     # TODO this needs to change as we currently already have the color index
     #obj_type = [str(color2index[tuple(feature)])] # takes in RBG color from pixel and returns color index
-    obj_type = [str(feature)] #now it should just be the index of the color that the object has
-    obj = GridObject(x, y, object_type=obj_type)
+    ##obj_type = [str(feature)] #now it should just be the index of the color that the object has
+    assert (feature[0] in [0,1])
+    type = feature[0]
+    attribute = [str(feature[1])]
+    obj = GridObject(x, y, type=type, attribute=attribute)
     return obj
 
 
@@ -41,11 +46,12 @@ class AbsoluteVKBWrapper(gym.core.ObservationWrapper):
     Add a vkb key-value pair, which represents the state as a vectorised knowledge base.
     Entities are objects in the gird-world, predicates represents the properties of them and relations between them.
     """
-    def __init__(self, env, background_id="b3"):
+    def __init__(self, env, num_colours, background_id="b3"):
         super().__init__(env)
 
+        self.num_colours = num_colours
         background_id = background_id[:2]
-        self.attributes = [str(i) for i in range(len(all_colors))]
+        self.attributes = [str(i) for i in range(self.num_colours + 1 )]
         self.env_type = "boxworld"
         self.nullary_predicates = []
         self.unary_predicates = self.attributes
@@ -85,7 +91,7 @@ class AbsoluteVKBWrapper(gym.core.ObservationWrapper):
                                    down_left, down_right]
 
         # number of objects/entities are the number of cells on the grid
-        self.obj_n = np.prod(env.observation_space["image"].shape[:-1]) #physical entities # TODO needs to be adjusted: we do not have obs['image'] yet
+        self.obj_n = np.prod(env.observation_space['image'].shape[:-1]) #physical entities
         self.nb_all_entities = self.obj_n
         self.obs_shape = [(len(self.nullary_predicates)), (self.obj_n, len(self.attributes)),
                        (self.obj_n, self.obj_n, len(self.rel_deter_func))] # TODO remove nullary_predicates?
@@ -109,13 +115,15 @@ class AbsoluteVKBWrapper(gym.core.ObservationWrapper):
         objs = []
         for y, row in enumerate(img):
             for x, pixel in enumerate(row):
-                obj = parse_object(x, y, pixel)
+                obj = parse_object(x, y, feature=pixel)
                 objs.append(obj)
 
         nullary_tensors = []
 
         for obj_idx, obj in enumerate(objs):
-            for p_idx, p in enumerate(self.attributes):
+            if obj.type == 1:
+                unary_tensors[0][obj_idx] = 1.0
+            for p_idx, p in enumerate(self.attributes,1): # first spot is reserved for agent information
                 if p in obj.attributes:
                     # adds feature, e.g. colour as unary tensor
                     unary_tensors[p_idx][obj_idx] = 1.0
@@ -147,8 +155,9 @@ class AbsoluteVKBWrapper(gym.core.ObservationWrapper):
 
         """
         obs = obs.copy()
-        spatial_VKB = self.img2vkb(obs["image"])
-        obs["VKB"] = spatial_VKB # additional information in form of features and no external VKB for us
+        spatial_VKB = self.img2vkb(obs['image'])
+        #obs[0]["VKB"] = spatial_VKB # additional information in form of features and no external VKB for us
+        obs['nullary'], obs['unary_tensor'], obs['binary_tensor'] = spatial_VKB
         return obs
 
 
@@ -237,20 +246,53 @@ def fan_left(obj1, obj2, direction_vec)->bool:
 
 
 if __name__ == "__main__":
-    from MABoxWorld.environments.rel_box import BoxWorldEnv
+    from r_maac.box import BoxWorldEnv
     env = BoxWorldEnv(
-        players=1,
+        players=2,
         field_size=(5,5),
         num_colours=5,
         goal_length=2,
         sight=5,
         max_episode_steps=500,
         grid_observation=True,
-        simple=True,
+        simple=False,
         relational = False,
-        deterministic= False,
+        deterministic= True,
     )
+
+    from Aurora.environment.box.box_world_env import BoxWorld
+    env2=BoxWorld(4,2,0,0)
+    #obs2 = env2.reset()
+    #print('obs2.shape ----', obs2)
     obs = env.reset()
-    print(obs[0].shape)
-    #env = AbsoluteVKBWrapper(env)
+    print('obs1.type ----', type(obs) )
+    print('obs1.type ----', obs)
+    print('observation_space ----', env.observation_space)
+    env = AbsoluteVKBWrapper(env, num_colours=env.num_colours)
+    render= True
+    done = False
+    if render:
+        env.render()
+        # pygame.display.update()  # update window
+        time.sleep(0.5)
+
+    while not done:
+        # for i in range(100):
+        actions = env.action_space.sample()
+        nobs, nreward, ndone, _ = env.step(actions)
+
+        print(nobs)
+        # print('player pos', env.players[0].position, '----', env.players[1].position )
+        # nobs, nreward, ndone, _ = env.step((1,1))
+        if sum(nreward) != 0:
+            print(nreward)
+
+        if render:
+            env.render()
+            # pygame.display.update()  # update window
+            time.sleep(0.5)
+
+        done = np.all(ndone)
+        pygame.event.pump()  # process event queue
+    # print(env.players[0].score, env.players[1].score)
 

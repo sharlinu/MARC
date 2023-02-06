@@ -106,7 +106,7 @@ class BoxWorldEnv(Env):
             self.max_objects = 2 * self.goal_length + 1  # TODO check
         self.sight = sight  # This is to set partial / full observability
         self._game_over = None
-        self.gem_colour = 100
+        self.gem_colour = 1
         self._rendering_initialized = False
         self._valid_actions = None
         self._max_episode_steps = max_episode_steps
@@ -122,8 +122,14 @@ class BoxWorldEnv(Env):
         self._grid_observation = grid_observation  # Boolean: I think the only way to introduce partial observability
 
         self.action_space = spaces.Tuple(([gym.spaces.Discrete(5)] * len(self.players)))  # TODO simplify?
-        self.observation_space = spaces.Tuple(
-            ([self._get_observation_space()] * len(self.players)))  # TODO could simplify this to one space?
+        if not self._grid_observation:
+            self.observation_space = spaces.Tuple(
+                ([self._get_observation_space()] * len(self.players)))  # TODO could simplify this to one space?
+        else:
+            self.single_observation_space = spaces.Dict()
+            self.single_observation_space['image'] = self._get_observation_space()
+            self.observation_space = spaces.Tuple(
+                ([self.single_observation_space] * len(self.players)))
         # self.observation_space = gym.spaces.Tuple(([gym.spaces.Box(low=0, high=self.num_colours, shape=self.field_size, dtype=np.int16)] * len(self.players)))  # TODO could simplify this to one space?
 
         self.viewer = None  # TODO remove?
@@ -156,25 +162,18 @@ class BoxWorldEnv(Env):
         else:
             # grid observation space
             # observation space around center
-            grid_shape = (1 + 2 * self.sight, 1 + 2 * self.sight)  # TODO shouldnt this just be self.sight, self.sight?
 
-            # foods layer: foods level
-            # max_food_level = self.max_player_level * len(self.players)
             max_colour = self.num_colours
-            obj_min = np.zeros(grid_shape, dtype=np.int64)
-            obj_max = np.ones(grid_shape, dtype=np.int64) * max_colour
+            obj_min = np.zeros(self.field_size, dtype=np.int64)
+            obj_max = np.ones(self.field_size, dtype=np.int64) * max_colour
 
             # agents layer: agent levels
-            agents_min = np.zeros(grid_shape, dtype=np.int64)
-            agents_max = np.ones(grid_shape, dtype=np.int64) * max_colour
-
-            # access layer: i the cell available
-            access_min = np.zeros(grid_shape, dtype=np.int64)  # TODO remove?
-            access_max = np.ones(grid_shape, dtype=np.int64)
+            agents_min = np.zeros(self.field_size, dtype=np.int64)
+            agents_max = np.ones(self.field_size, dtype=np.int64) * max_colour
 
             # total layer
-            min_obs = np.stack([agents_min, obj_min, access_min])
-            max_obs = np.stack([agents_max, obj_max, access_max])
+            min_obs = np.stack([agents_min, obj_min], axis=2)
+            max_obs = np.stack([agents_max, obj_max], axis=2)
 
         # return gym.spaces.Box(np.array(min_obs), np.array(max_obs), shape=(2, self.field_size[0], self.field_size[1]), dtype=np.int64)
         return gym.spaces.Box(np.array(min_obs), np.array(max_obs))
@@ -554,44 +553,18 @@ class BoxWorldEnv(Env):
             """
             Create global arrays if grid observation space
             """
-            grid_shape_x, grid_shape_y = self.field_size
-            grid_shape_x += 2 * self.sight
-            grid_shape_y += 2 * self.sight
-            grid_shape = (grid_shape_x, grid_shape_y)
-
+            grid_shape = self.field_size
             agents_layer = np.zeros(grid_shape, dtype=np.int64)
             for player in self.players:
                 player_x, player_y = player.position
-                agents_layer[player_x + self.sight, player_y + self.sight] = player.owned_key
+                agents_layer[player_x, player_y] = 1
 
-            foods_layer = np.zeros(grid_shape, dtype=np.int64)
-            foods_layer[self.sight:-self.sight, self.sight:-self.sight] = self.field.copy()
+            foods_layer = self.field.copy()
 
-            access_layer = np.ones(grid_shape, dtype=np.int64)
-            # out of bounds not accessible
-            access_layer[:self.sight, :] = 0.0
-            access_layer[-self.sight:, :] = 0.0
-            access_layer[:, :self.sight] = 0.0
-            access_layer[:, -self.sight:] = 0.0
             # agent locations are not accessible
-            for player in self.players:
-                player_x, player_y = player.position
-                access_layer[player_x + self.sight, player_y + self.sight] = 0.0
             # food locations are not accessible
-            foods_x, foods_y = self.field.nonzero()
-            for x, y in zip(foods_x, foods_y):
-                access_layer[x + self.sight, y + self.sight] = 0.0  # TODO why is this + self.sight?
+            return np.stack([agents_layer, foods_layer], axis=2)
 
-            return np.stack([agents_layer, foods_layer, access_layer])
-
-        def get_agent_grid_bounds(agent_x, agent_y):
-            """
-            Needed if grid observation space
-            :param agent_x:
-            :param agent_y:
-            :return:
-            """
-            return agent_x, agent_x + 2 * self.sight + 1, agent_y, agent_y + 2 * self.sight + 1
 
         def get_player_reward(observation):
             for p in observation.players:
@@ -601,8 +574,7 @@ class BoxWorldEnv(Env):
         observations = [self._make_obs(player) for player in self.players]  # Returns a named tuple
         if self._grid_observation:
             layers = make_global_grid_arrays()
-            agents_bounds = [get_agent_grid_bounds(*player.position) for player in self.players]
-            nobs = tuple([layers[:, start_x:end_x, start_y:end_y] for start_x, end_x, start_y, end_y in agents_bounds])
+            nobs = {'image': layers}
         else:
             nobs = tuple([make_obs_array(obs) for obs in observations])
         nreward = [get_player_reward(obs) for obs in observations]
@@ -769,7 +741,7 @@ class BoxWorldEnv(Env):
         return self._make_gym_obs()
 
     def _init_render(self):
-        from box_rendering import Viewer
+        from r_maac.box_rendering import Viewer
         self.viewer = Viewer((self.rows, self.cols))
         self._rendering_initialized = True
 
@@ -797,23 +769,14 @@ def _game_loop(env, render=False):
     while not done:
         # for i in range(100):
         actions = env.action_space.sample()
-        pressed = pygame.key.get_pressed()
-        if pressed[pygame.K_UP]:
-            actions= (1,1)
-        elif pressed[pygame.K_DOWN]:
-            actions= (2,2)
-        elif pressed[pygame.K_LEFT]:
-            actions= (3,3)
-        elif pressed[pygame.K_RIGHT]:
-            actions= (4,4)
-        else:
-            actions = (0,0)
 
         nobs, nreward, ndone, _ = env.step(actions)
         # nobs, nreward, ndone, _ = env.step((1,1))
         if sum(nreward) != 0:
             print(nreward)
 
+        print(nobs[0])
+        time.sleep(2)
 
         if render:
             env.render()
@@ -833,6 +796,7 @@ if __name__ == "__main__":
         goal_length=2,
         sight=5,
         max_episode_steps=500,
+        grid_observation= True,
         simple=False,
         relational = False,
         deterministic= True,
