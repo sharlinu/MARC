@@ -88,7 +88,7 @@ def run(config, configvar):
     avg_reward_best  = float("-inf")
     path_ckpt_best_avg = ''
     for ep_i in range(0, config.n_episodes, config.n_rollout_threads):
-        print("%s - %s - Episodes %i-%i of %i" % ('lbf', configvar['random_seed'], ep_i + 1,
+        print("%s - %s - Episodes %i-%i of %i" % (env_id, configvar['random_seed'], ep_i + 1,
                                         ep_i + 1 + config.n_rollout_threads,
                                         config.n_episodes))
         obs = env.reset()
@@ -111,7 +111,7 @@ def run(config, configvar):
             # convert actions to numpy arrays
             agent_actions = [ac.data.numpy() for ac in torch_agent_actions]
             # rearrange actions to be per environment
-            actions = [[ac[i] for ac in agent_actions] for i in range(config.n_rollout_threads)]
+            actions = [[np.argmax(ac[i]) for ac in agent_actions] for i in range(config.n_rollout_threads)]
             next_obs, rewards, dones, infos = env.step(actions)
             replay_buffer.push(obs, agent_actions, rewards, next_obs, dones)
             episode_reward_total += rewards.sum()
