@@ -54,7 +54,7 @@ class AbsoluteVKBWrapper(gym.core.ObservationWrapper):
         self.attributes = [str(i) for i in range(self.num_colours + 1 )]
         self.env_type = "boxworld"
         self.nullary_predicates = []
-        self.unary_predicates = self.attributes
+        self.unary_predicates = ['agent'] + self.attributes
         self.background_id = background_id
         if background_id in ["b0", "nolocal"]:
             self.rel_deter_func = [is_left, is_right, is_front, is_back, is_aligned, is_close]
@@ -123,10 +123,10 @@ class AbsoluteVKBWrapper(gym.core.ObservationWrapper):
         for obj_idx, obj in enumerate(objs):
             if obj.type == 1:
                 unary_tensors[0][obj_idx] = 1.0
-            for p_idx, p in enumerate(self.attributes,1): # first spot is reserved for agent information
+            for p_idx, p in enumerate(self.attributes): # first spot is reserved for agent information
                 if p in obj.attributes:
                     # adds feature, e.g. colour as unary tensor
-                    unary_tensors[p_idx][obj_idx] = 1.0
+                    unary_tensors[p_idx+1][obj_idx] = 1.0
 
         if not self.spatial_tensors:
             # create spatial tensors that gives for every rel. det rule a binary indicator between the entities

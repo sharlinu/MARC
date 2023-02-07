@@ -106,10 +106,11 @@ def run(config, configvar):
                                        critic_hidden_dim=config.critic_hidden_dim,
                                        reward_scale=config.reward_scale)
 
-    replay_buffer = ReplayBuffer(config.buffer_length, model.nagents,
-                                 [obsp.shape[0] for obsp in env.observation_space],
-                                 [acsp.shape[0] if isinstance(acsp, Box) else acsp.n
-                                  for acsp in env.action_space])
+    # replay_buffer = ReplayBuffer(config.buffer_length, model.nagents,
+    #                              [obsp.shape[0] for obsp in env.observation_space],
+    #                              [acsp.shape[0] if isinstance(acsp, Box) else acsp.n
+    #                               for acsp in env.action_space])
+    # TODO change replay buffer
     t = 0
     l_rewards = []
     reward_best      = float("-inf")
@@ -122,15 +123,16 @@ def run(config, configvar):
                                         config.n_episodes))
         obs = env.reset()
         model.prep_rollouts(device='cpu')
-        
         episode_reward_total = 0
         is_best_avg          = False
 
         for et_i in range(1, config.episode_length+1):
             # rearrange observations to be per agent, and convert to torch Variable
-            torch_obs = [Variable(torch.Tensor(np.vstack(obs[:, i])),
+            agent_obs = obs['image'].flatten()
+            agent_obs = np.expand_dims(agent_obs, axis=0)
+            torch_obs = [Variable(torch.Tensor(agent_obs),
                                   requires_grad=False)
-                         for i in range(model.nagents)]
+                         for _ in range(model.nagents)]
             # get actions as torch Variables
             try:
                 torch_agent_actions = model.step(torch_obs, explore=True)
@@ -140,9 +142,9 @@ def run(config, configvar):
             # convert actions to numpy arrays
             agent_actions = [ac.data.numpy() for ac in torch_agent_actions]
             # rearrange actions to be per environment
-            actions = [[np.argmax(ac[i]) for ac in agent_actions] for i in range(config.n_rollout_threads)]
+            actions = [np.argmax(ac) for ac in agent_actions]
             next_obs, rewards, dones, infos = env.step(actions)
-            replay_buffer.push(obs, agent_actions, rewards, next_obs, dones)
+            #replay_buffer.push(obs, agent_actions, rewards, next_obs, dones) # TODO change replay buffer
             episode_reward_total += rewards.sum()
 
             # TODO add break for dones / episodic tasks
@@ -161,8 +163,8 @@ def run(config, configvar):
                     model.update_policies(sample, logger=logger)
                     model.update_all_targets()
                 model.prep_rollouts(device='cpu')
-        ep_rews = replay_buffer.get_average_rewards(
-            config.episode_length * config.n_rollout_threads)
+#        ep_rews = replay_buffer.get_average_rewards(
+#            config.episode_length * config.n_rollout_threads) # TODO change replay buffer
         # for a_i, a_ep_rew in enumerate(ep_rews):
         #     logger.add_scalar('agent%i/mean_episode_rewards' % a_i, a_ep_rew, ep_i)
         l_rewards.append(episode_reward_total)
@@ -170,7 +172,6 @@ def run(config, configvar):
 
     # check if it in average was the best model so far
         th_l_rewards = torch.FloatTensor(np.asarray(l_rewards))
-
 
 
         if len(th_l_rewards) >= 100:

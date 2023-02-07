@@ -397,6 +397,7 @@ class BoxWorldEnv(Env):
                 (1,1),
                 self.field_size,
             )
+            return
         elif self.deterministic:
             self.players[0].setup(
                 (0, 0),
@@ -587,7 +588,7 @@ class BoxWorldEnv(Env):
         #        "observation space mismatch"
         # f"obs space error: obs: {obs}, obs_space: {self.observation_space[i]}"
 
-        return nobs, nreward, ndone, ninfo
+        return nobs, np.array(nreward), np.array(ndone), ninfo
 
     def reset(self):
         # logging.warning('environment is reset')

@@ -18,9 +18,13 @@ class ReplayBuffer(object):
         self.max_steps = max_steps
         self.num_agents = num_agents
         self.obs_buffs = []
+        self.obs_unary_buffs = []
+        self.obs_binary_buffs = []
         self.ac_buffs = []
         self.rew_buffs = []
         self.next_obs_buffs = []
+        self.next_obs_unary_buffs = []
+        self.next_obs_binary_buffs = []
         self.done_buffs = []
         for odim, adim in zip(obs_dims, ac_dims):
             self.obs_buffs.append(np.zeros((max_steps, odim), dtype=np.float32))
@@ -29,9 +33,12 @@ class ReplayBuffer(object):
             self.next_obs_buffs.append(np.zeros((max_steps, odim), dtype=np.float32))
             self.done_buffs.append(np.zeros(max_steps, dtype=np.uint8))
 
+        # TODO add unary tensor
+        # TODO add binary tensor
+        # TODO add nullary tensor
 
         self.filled_i = 0  # index of first empty location in buffer (last index when full)
-        self.curr_i = 0  # current index to write to (ovewrite oldest data)
+        self.curr_i = 0  # current index to write to (overwrite oldest data)
 
     def __len__(self):
         return self.filled_i

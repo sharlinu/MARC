@@ -362,6 +362,7 @@ class RelationalSAC(object):
         Outputs:
             actions: List of actions for each agent
         """
+        # observations = [observations['image']] * 2
         return [a.step(obs, explore=explore) for a, obs in zip(self.agents,
                                                                observations)]
 

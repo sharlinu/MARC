@@ -203,7 +203,7 @@ class RelationalCritic(nn.Module):
         super(RelationalCritic, self).__init__()
         self.sa_sizes = sa_sizes
         self.nagents = len(sa_sizes) # TODO change
-        self.num_actions = n_actions
+        self.num_actions = n_actions[0]
         self.critic_encoders = nn.ModuleList()
         self.critics = nn.ModuleList()
 

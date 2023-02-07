@@ -6,7 +6,6 @@ from r_maac.utils.agents import AttentionAgent
 from r_maac.utils.critics import AttentionCritic, RelationalCritic
 from typing import List
 # TODO import geometric package
-
 MSELoss = torch.nn.MSELoss()
 
 class AttentionSAC(object):
