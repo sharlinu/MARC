@@ -85,6 +85,9 @@ def run(config, configvar):
     )
     env = AbsoluteVKBWrapper(env, num_colours=env.num_colours)
     env.agents = [None] * len(env.action_space)
+    nullary_dim = env.obs_shape[0]
+    unary_dim = env.obs_shape[1]
+    binary_dim = env.obs_shape[2]
     env.seed(seed)
     np.random.seed(seed)
 
@@ -106,10 +109,14 @@ def run(config, configvar):
                                        critic_hidden_dim=config.critic_hidden_dim,
                                        reward_scale=config.reward_scale)
 
-    # replay_buffer = ReplayBuffer(config.buffer_length, model.nagents,
-    #                              [obsp.shape[0] for obsp in env.observation_space],
-    #                              [acsp.shape[0] if isinstance(acsp, Box) else acsp.n
-    #                               for acsp in env.action_space])
+    replay_buffer = ReplayBuffer(max_steps=config.buffer_length,
+                                 num_agents=model.nagents,
+                                 obs_dims=[np.prod(obsp['image'].shape) for obsp in env.observation_space],
+                                 nullary_dims=[nullary_dim for _ in range(model.nagents)],
+                                 unary_dims=[unary_dim for _ in range(model.nagents)],
+                                 binary_dims=[binary_dim for _ in range(model.nagents)],
+                                 ac_dims= [acsp.shape[0] if isinstance(acsp, Box) else acsp.n
+                                  for acsp in env.action_space])
     # TODO change replay buffer
     t = 0
     l_rewards = []

@@ -2,11 +2,20 @@ import numpy as np
 from torch import Tensor
 from torch.autograd import Variable
 
+
 class ReplayBuffer(object):
     """
     Replay Buffer for multi-agent RL with parallel rollouts
     """
-    def __init__(self, max_steps, num_agents, obs_dims, ac_dims):
+
+    def __init__(self,
+                 max_steps,
+                 num_agents,
+                 obs_dims,
+                 nullary_dims,
+                 unary_dims,
+                 binary_dims,
+                 ac_dims):
         """
         Inputs:
             max_steps (int): Maximum number of timepoints to store in buffer
@@ -18,24 +27,33 @@ class ReplayBuffer(object):
         self.max_steps = max_steps
         self.num_agents = num_agents
         self.obs_buffs = []
+        self.obs_nullary_buffs = []
         self.obs_unary_buffs = []
         self.obs_binary_buffs = []
         self.ac_buffs = []
         self.rew_buffs = []
         self.next_obs_buffs = []
+        self.next_obs_nullary_buffs = []
         self.next_obs_unary_buffs = []
         self.next_obs_binary_buffs = []
         self.done_buffs = []
-        for odim, adim in zip(obs_dims, ac_dims):
+        for odim, nullary_dim, unary_dim, binary_dim, adim in zip(obs_dims, nullary_dims, unary_dims, binary_dims,
+                                                                  ac_dims):
             self.obs_buffs.append(np.zeros((max_steps, odim), dtype=np.float32))
-            self.ac_buffs.append(np.zeros((max_steps, adim), dtype=np.float32))
-            self.rew_buffs.append(np.zeros(max_steps, dtype=np.float32))
-            self.next_obs_buffs.append(np.zeros((max_steps, odim), dtype=np.float32))
-            self.done_buffs.append(np.zeros(max_steps, dtype=np.uint8))
+            self.obs_nullary_buffs.append(np.zeros((max_steps, odim), dtype=np.float32))
+            self.obs_unary_buffs.append(np.zeros((max_steps,) + unary_dim, dtype=np.float32))
+            self.obs_binary_buffs.append(np.zeros((max_steps,) + binary_dim, dtype=np.float32))
 
-        # TODO add unary tensor
-        # TODO add binary tensor
-        # TODO add nullary tensor
+            self.ac_buffs.append(np.zeros((max_steps, adim), dtype=np.float32))
+
+            self.rew_buffs.append(np.zeros(max_steps, dtype=np.float32))
+
+            self.next_obs_buffs.append(np.zeros((max_steps, odim), dtype=np.float32))
+            self.next_obs_nullary_buffs.append(np.zeros((max_steps, nullary_dim), dtype=np.float32)) # this needs to change if we ever have a nullary tensor
+            self.next_obs_unary_buffs.append(np.zeros((max_steps,) + unary_dim, dtype=np.float32))
+            self.next_obs_binary_buffs.append(np.zeros((max_steps,) + binary_dim, dtype=np.float32))
+
+            self.done_buffs.append(np.zeros(max_steps, dtype=np.uint8))
 
         self.filled_i = 0  # index of first empty location in buffer (last index when full)
         self.curr_i = 0  # current index to write to (overwrite oldest data)
@@ -46,7 +64,7 @@ class ReplayBuffer(object):
     def push(self, observations, actions, rewards, next_observations, dones):
         nentries = observations.shape[0]  # handle multiple parallel environments
         if self.curr_i + nentries > self.max_steps:
-            rollover = self.max_steps - self.curr_i # num of indices to roll over
+            rollover = self.max_steps - self.curr_i  # num of indices to roll over
             for agent_i in range(self.num_agents):
                 self.obs_buffs[agent_i] = np.roll(self.obs_buffs[agent_i],
                                                   rollover, axis=0)

@@ -370,7 +370,7 @@ class RelationalSAC(object):
         """
         Update central critic for all agents
         """
-        obs, acs, rews, next_obs, dones = sample
+        obs, acs, rews, next_obs, dones = sample # TODO change because now also nullary, binary and unary tensors
         # Q loss
         next_acs = []
         next_log_pis = []
@@ -407,7 +407,7 @@ class RelationalSAC(object):
         self.niter += 1
 
     def update_policies(self, sample, soft=True, logger=None, **kwargs):
-        obs, acs, rews, next_obs, dones = sample
+        obs, acs, rews, next_obs, dones = sample # TODO add nullary, unary and binary tensors here as well
         samp_acs = []
         all_probs = []
         all_log_pis = []
