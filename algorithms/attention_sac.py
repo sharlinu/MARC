@@ -111,7 +111,7 @@ class AttentionSAC(object):
                 q_loss += reg  # regularizing attention
         q_loss.backward()
         self.critic.scale_shared_grads()
-        grad_norm = torch.nn.utils.clip_grad_norm(
+        grad_norm = torch.nn.utils.clip_grad_norm_(
             self.critic.parameters(), 10 * self.nagents)
         self.critic_optimizer.step()
         self.critic_optimizer.zero_grad()
@@ -158,7 +158,7 @@ class AttentionSAC(object):
             pol_loss.backward()
             enable_gradients(self.critic)
 
-            grad_norm = torch.nn.utils.clip_grad_norm(
+            grad_norm = torch.nn.utils.clip_grad_norm_(
                 curr_agent.policy.parameters(), 0.5)
             curr_agent.policy_optimizer.step()
             curr_agent.policy_optimizer.zero_grad()
@@ -370,7 +370,7 @@ class RelationalSAC(object):
         """
         Update central critic for all agents
         """
-        obs, acs, rews, next_obs, dones = sample # TODO change because now also nullary, binary and unary tensors
+        obs, nullary, unary, binary, acs, rews, next_obs, next_nullary, next_unary, next_binary, dones = sample # TODO change because now also nullary, binary and unary tensors
         # Q loss
         next_acs = []
         next_log_pis = []
@@ -378,13 +378,13 @@ class RelationalSAC(object):
             curr_next_ac, curr_next_log_pi = pi(ob, return_log_pi=True)
             next_acs.append(curr_next_ac)
             next_log_pis.append(curr_next_log_pi)
-        trgt_critic_in = list(zip(next_obs, next_acs))
-        critic_in = list(zip(obs, acs))
-        next_qs = self.target_critic(trgt_critic_in)
-        critic_rets = self.critic(critic_in, regularize=True,
+        #trgt_critic_in = list(zip(next_obs, next_acs))
+        #critic_in = list(zip(obs, acs))
+        next_qs = self.target_critic(unary_tensor=next_unary[0], binary_tensor=next_binary[0], actions=next_acs)
+        critic_rets = self.critic(unary_tensor=unary[0], binary_tensor=binary[0], actions=acs,
                                   logger=logger, niter=self.niter)
         q_loss = 0
-        for a_i, nq, log_pi, (pq, regs) in zip(range(self.nagents), next_qs,
+        for a_i, nq, log_pi, pq  in zip(range(self.nagents), next_qs,
                                                next_log_pis, critic_rets):
             target_q = (rews[a_i].view(-1, 1) +
                         self.gamma * nq *
@@ -392,11 +392,9 @@ class RelationalSAC(object):
             if soft:
                 target_q -= log_pi / self.reward_scale
             q_loss += MSELoss(pq, target_q.detach())
-            for reg in regs:
-                q_loss += reg  # regularizing attention
         q_loss.backward()
         self.critic.scale_shared_grads()
-        grad_norm = torch.nn.utils.clip_grad_norm(
+        grad_norm = torch.nn.utils.clip_grad_norm_(
             self.critic.parameters(), 10 * self.nagents)
         self.critic_optimizer.step()
         self.critic_optimizer.zero_grad()
@@ -407,7 +405,7 @@ class RelationalSAC(object):
         self.niter += 1
 
     def update_policies(self, sample, soft=True, logger=None, **kwargs):
-        obs, acs, rews, next_obs, dones = sample # TODO add nullary, unary and binary tensors here as well
+        obs, nullary, unary, binary, acs, rews, next_obs, next_nullary, next_unary, next_binary, dones = sample # TODO change because now also nullary, binary and unary tensors
         samp_acs = []
         all_probs = []
         all_log_pis = []
@@ -425,7 +423,8 @@ class RelationalSAC(object):
             all_pol_regs.append(pol_regs)
 
         critic_in = list(zip(obs, samp_acs)) # that probably needs to change because we are only taking in one state information not obs from all agents
-        critic_rets = self.critic(critic_in, return_all_q=True)
+        critic_rets = self.critic(unary_tensor=unary[0], binary_tensor=binary[0], actions=acs,
+                                  logger=logger, return_all_q=True)
         for a_i, probs, log_pi, pol_regs, (q, all_q) in zip(range(self.nagents), all_probs,
                                                             all_log_pis, all_pol_regs,
                                                             critic_rets):
@@ -443,7 +442,7 @@ class RelationalSAC(object):
             pol_loss.backward()
             enable_gradients(self.critic)
 
-            grad_norm = torch.nn.utils.clip_grad_norm(
+            grad_norm = torch.nn.utils.clip_grad_norm_(
                 curr_agent.policy.parameters(), 0.5)
             curr_agent.policy_optimizer.step()
             curr_agent.policy_optimizer.zero_grad()
@@ -552,7 +551,7 @@ class RelationalSAC(object):
                      'sa_size': sa_size,
                      'n_actions': a_size,
                      's_size': s_size,
-                     'input_dims': [env.obs_shape[0],env.obs_shape[1][-1],env.obs_shape[2][-1] ],
+                     'input_dims': [env.obs_shape[0] ,env.obs_shape[1][-1],env.obs_shape[2][-1] ],
                      }
         instance = cls(**init_dict)
         instance.init_dict = init_dict

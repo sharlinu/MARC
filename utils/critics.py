@@ -202,7 +202,7 @@ class RelationalCritic(nn.Module):
         """
         super(RelationalCritic, self).__init__()
         self.sa_sizes = sa_sizes
-        self.nagents = len(sa_sizes) # TODO change
+        self.nagents = 2 # TODO change
         self.num_actions = n_actions[0]
         self.critic_encoders = nn.ModuleList()
         self.critics = nn.ModuleList()
@@ -223,15 +223,20 @@ class RelationalCritic(nn.Module):
         nb_edge_types = input_dims[2]
 
         # default is nb_layers = gnn_layers = 2 and nb_dense_layers =0
-        nb_layers, nb_dense_layers, self.max_reduce = parse_code(net_code)
+        nb_layers, nb_dense_layers, _ = parse_code(net_code)
+        self.max_reduce = True # TODO hardcoded
 
-        embedder = nn.Sequential()
+        embedder = nn.Sequential() # TODO sequential unnecessary here
         embedder.add_module('embedder_fc1', nn.Linear(input_dims[1], hidden_dim))
 
-        rel_encoder = nn.Sequential()
+        # rel_encoder = nn.Sequential()
+        # for i in range(nb_layers):
+        #     rel_encoder.add_module(f's_enc_rgcn{i}', RGCNConv(hidden_dim, hidden_dim, nb_edge_types))
+        #     rel_encoder.add_module(f'relu_{i}', nn.LeakyReLU()) # TODO does this work?
+        gnn_layers = []
         for i in range(nb_layers):
-            rel_encoder.add_module(f's_enc_rgcn{i}', RGCNConv(hidden_dim, hidden_dim, nb_edge_types))
-            rel_encoder.add_module(f'relu_{i}', nn.LeakyReLU()) # TODO does this work?
+            gnn_layers.append(RGCNConv(hidden_dim, hidden_dim, nb_edge_types))
+        self.gnn_layers = nn.ModuleList(gnn_layers)
         # dense = nn.Sequential()
         # for i in range(nb_dense_layers):
         #     if i == 0:
@@ -255,11 +260,11 @@ class RelationalCritic(nn.Module):
         #state_encoder = nn.Sequential(embedder, rel_encoder)
         self.embedder = embedder # TODO shared or individual?
         # self.state_encoders.append(rel_encoder) # TODO shared or individual?
-        self.state_encoder = rel_encoder  # TODO shared or individual?
+        # self.state_encoder = rel_encoder  # TODO shared or individual?
         self.nb_dense_layers = nb_dense_layers
 
         # TODO this needs to be changed to the R-GCN components
-        self.shared_modules = [self.embedder, self.state_encoder]
+        self.shared_modules = [self.embedder, self.gnn_layers]
         #self.shared_modules = [self.key_extractors, self.selector_extractors,
         #                       self.value_extractors, self.critic_encoders]
 
@@ -279,10 +284,13 @@ class RelationalCritic(nn.Module):
             p.grad.data.mul_(1. / self.nagents)
 
     def forward(self,
-                obs,
+                unary_tensor,
+                binary_tensor,
+                actions,
                 agents=None,
                 return_q=True,
                 return_all_q=False,
+                regularize = False,
                 logger=None,
                 niter=0):
         """
@@ -302,9 +310,9 @@ class RelationalCritic(nn.Module):
         # T, B, *_ = obs["unary_tensor"].shape
         device = next(self.parameters()).device
         if agents is None:
-            agents = range(len(self.critic_encoders))
+            agents = range(2)
         state = None # TODO change
-        actions = None # TODO
+        #actions = None # TODO
         #states = [s for s, a in inps]
         #actions = [a for s, a in inps]
         #inps = [torch.cat((s, a), dim=1) for s, a in inps]
@@ -313,23 +321,30 @@ class RelationalCritic(nn.Module):
         # sa_encodings = [encoder(inp) for encoder, inp in zip(self.critic_encoders, inps)]
         # s_encodings = [self.state_encoder[a_i](states[a_i]) for a_i in agents]
         inputs = [[],
-                  torch.flatten(obs["unary_tensor"], 0, 1).float(), #flattens obs["unary_tensor"] only in 0th and 1st dim
-                  torch.flatten(obs["binary_tensor"], 0, 1).permute(0,3,1,2).float()]
+                  torch.flatten(unary_tensor, 0, 1).float(), #flattens obs["unary_tensor"] only in 0th and 1st dim
+                  #torch.flatten(binary_tensor, 0, 1).permute(0,3,1,2).float()]
+                  binary_tensor.permute(0, 3, 1, 2).float()
+                  ]
         for i in [1,2]:
             inputs[i] = inputs[i].to(device=device)
         adj_matrices = inputs[2]
         gd, slices = batch_to_gd(adj_matrices) # makes adjs geometric data usable for torch geometric
 
         # feature embedding
-        embedds = torch.flatten(inputs[1], 0, 1)
+        #embedds = torch.flatten(inputs[1], 0, 1)
+        embedds = inputs[1]
         #embedds = self.embedding_linear(embedds)
-        embedds = self.embedder(embedds) # TODO
+        embedds = self.embedder(embedds) # seems right so far
 
         # RGCN module
-        assert (embedds.dim == gd.edge_index)
-        s_encoding = self.state_encoder(embedds, gd.edge_index, gd.edge_attr)
+        #assert (embedds.dim == gd.edge_index)
+        # s_encoding = self.state_encoder.forward(embedds, gd.edge_index, gd.edge_attr) # does not work with nn.sequential
+        for layer in self.gnn_layers:
+            embedds = layer.forward(embedds, gd.edge_index, gd.edge_attr)
+            embedds = torch.relu(embedds)
 
-        chunks = torch.split(s_encoding, slices, dim=0) # splits it in slices/entities
+
+        chunks = torch.split(embedds, slices, dim=0) # splits it in slices/entities
         chunks = [p.unsqueeze(0) for p in chunks] # just adds back another dimension in the beginning
         x = torch.cat(chunks, dim=0)
         if self.max_reduce:
@@ -354,23 +369,23 @@ class RelationalCritic(nn.Module):
         for i, a_i in enumerate(agents):
         # extract state encoding for each agent that we're returning Q for
             agent_rets = []
-            all_q = self.critics[a_i](s_encoding)  # TODO critic needs to output all q_values not just one.
+            all_q = self.critics[a_i](x)  # TODO critic needs to output all q_values not just one.
             int_acs = actions[a_i].max(dim=1, keepdim=True)[1]
             q = all_q.gather(1, int_acs)
             if return_q:
                 agent_rets.append(q)
             if return_all_q:
                 agent_rets.append(all_q)
-            if logger is not None:
-                pass
+            #if logger is not None:
+            #    pass
                 #logger.add_scalars('agent%i/attention' % a_i,
                 #                   dict(('head%i_entropy' % h_i, ent) for h_i, ent
                 #                        in enumerate(head_entropies)),
                 #                   niter)
-        if len(agent_rets) == 1:
-            all_rets.append(agent_rets[0])
-        else:
-            all_rets.append(agent_rets)
+            if len(agent_rets) == 1:
+                all_rets.append(agent_rets[0])
+            else:
+                all_rets.append(agent_rets)
         if len(all_rets) == 1:
             return all_rets[0]
         else:

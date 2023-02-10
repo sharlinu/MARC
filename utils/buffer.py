@@ -40,7 +40,7 @@ class ReplayBuffer(object):
         for odim, nullary_dim, unary_dim, binary_dim, adim in zip(obs_dims, nullary_dims, unary_dims, binary_dims,
                                                                   ac_dims):
             self.obs_buffs.append(np.zeros((max_steps, odim), dtype=np.float32))
-            self.obs_nullary_buffs.append(np.zeros((max_steps, odim), dtype=np.float32))
+            self.obs_nullary_buffs.append(np.zeros((max_steps, nullary_dim), dtype=np.float32))
             self.obs_unary_buffs.append(np.zeros((max_steps,) + unary_dim, dtype=np.float32))
             self.obs_binary_buffs.append(np.zeros((max_steps,) + binary_dim, dtype=np.float32))
 
@@ -61,32 +61,71 @@ class ReplayBuffer(object):
     def __len__(self):
         return self.filled_i
 
-    def push(self, observations, actions, rewards, next_observations, dones):
-        nentries = observations.shape[0]  # handle multiple parallel environments
+    def push(self,
+             observation: dict,
+             actions: list,
+             rewards,
+             next_observation: dict,
+             dones):
+        nentries = 1    # usually for multiple parallel environments, but now just one anyways
+        # TODO split observation into different elements
+        image = observation['image'].flatten()
+        nullary_tensor = observation['nullary']
+        unary_tensor = observation['unary_tensor']
+        binary_tensor = observation['binary_tensor']
+
+        next_image = next_observation['image'].flatten()
+        next_nullary_tensor = next_observation['nullary']
+        next_unary_tensor = next_observation['unary_tensor']
+        next_binary_tensor = next_observation['binary_tensor']
+
+        # TODO these are all missing the dimension in the beginning compared to parallel env set up of maac. e.g. obs (12,) instead of (1,2,12)
         if self.curr_i + nentries > self.max_steps:
             rollover = self.max_steps - self.curr_i  # num of indices to roll over
             for agent_i in range(self.num_agents):
                 self.obs_buffs[agent_i] = np.roll(self.obs_buffs[agent_i],
                                                   rollover, axis=0)
+                self.obs_nullary_buffs[agent_i] = np.roll(self.obs_nullary_buffs[agent_i],
+                                                  rollover, axis=0)
+                self.obs_unary_buffs[agent_i] = np.roll(self.obs_unary_buffs[agent_i],
+                                                  rollover, axis=0)
+                self.obs_binary_buffs[agent_i] = np.roll(self.obs_binary_buffs[agent_i],
+                                                  rollover, axis=0)
+
                 self.ac_buffs[agent_i] = np.roll(self.ac_buffs[agent_i],
                                                  rollover, axis=0)
                 self.rew_buffs[agent_i] = np.roll(self.rew_buffs[agent_i],
                                                   rollover)
+
                 self.next_obs_buffs[agent_i] = np.roll(
                     self.next_obs_buffs[agent_i], rollover, axis=0)
+                self.next_obs_nullary_buffs[agent_i] = np.roll(
+                    self.next_obs_nullary_buffs[agent_i], rollover, axis=0)
+                self.next_obs_unary_buffs[agent_i] = np.roll(
+                    self.next_obs_unary_buffs[agent_i], rollover, axis=0)
+                self.next_obs_binary_buffs[agent_i] = np.roll(
+                    self.next_obs_binary_buffs[agent_i], rollover, axis=0)
+
                 self.done_buffs[agent_i] = np.roll(self.done_buffs[agent_i],
                                                    rollover)
             self.curr_i = 0
             self.filled_i = self.max_steps
         for agent_i in range(self.num_agents):
-            self.obs_buffs[agent_i][self.curr_i:self.curr_i + nentries] = np.vstack(
-                observations[:, agent_i])
+            self.obs_buffs[agent_i][self.curr_i:self.curr_i + nentries] = image
+            self.obs_nullary_buffs[agent_i][self.curr_i:self.curr_i + nentries] = nullary_tensor
+            self.obs_unary_buffs[agent_i][self.curr_i:self.curr_i + nentries] = unary_tensor
+            self.obs_binary_buffs[agent_i][self.curr_i:self.curr_i + nentries] = binary_tensor
+
             # actions are already batched by agent, so they are indexed differently
             self.ac_buffs[agent_i][self.curr_i:self.curr_i + nentries] = actions[agent_i]
-            self.rew_buffs[agent_i][self.curr_i:self.curr_i + nentries] = rewards[:, agent_i]
-            self.next_obs_buffs[agent_i][self.curr_i:self.curr_i + nentries] = np.vstack(
-                next_observations[:, agent_i])
-            self.done_buffs[agent_i][self.curr_i:self.curr_i + nentries] = dones[:, agent_i]
+            self.rew_buffs[agent_i][self.curr_i:self.curr_i + nentries] = rewards[agent_i]
+
+            self.next_obs_buffs[agent_i][self.curr_i:self.curr_i + nentries] = next_image
+            self.next_obs_nullary_buffs[agent_i][self.curr_i:self.curr_i + nentries] = next_nullary_tensor
+            self.next_obs_unary_buffs[agent_i][self.curr_i:self.curr_i + nentries] = next_unary_tensor
+            self.next_obs_binary_buffs[agent_i][self.curr_i:self.curr_i + nentries] = next_binary_tensor
+
+            self.done_buffs[agent_i][self.curr_i:self.curr_i + nentries] = dones[agent_i]
         self.curr_i += nentries
         if self.filled_i < self.max_steps:
             self.filled_i += nentries
@@ -108,9 +147,15 @@ class ReplayBuffer(object):
         else:
             ret_rews = [cast(self.rew_buffs[i][inds]) for i in range(self.num_agents)]
         return ([cast(self.obs_buffs[i][inds]) for i in range(self.num_agents)],
+                [cast(self.obs_nullary_buffs[i][inds]) for i in range(self.num_agents)],
+                [cast(self.obs_unary_buffs[i][inds]) for i in range(self.num_agents)],
+                [cast(self.obs_binary_buffs[i][inds]) for i in range(self.num_agents)],
                 [cast(self.ac_buffs[i][inds]) for i in range(self.num_agents)],
                 ret_rews,
                 [cast(self.next_obs_buffs[i][inds]) for i in range(self.num_agents)],
+                [cast(self.next_obs_nullary_buffs[i][inds]) for i in range(self.num_agents)],
+                [cast(self.next_obs_unary_buffs[i][inds]) for i in range(self.num_agents)],
+                [cast(self.next_obs_binary_buffs[i][inds]) for i in range(self.num_agents)],
                 [cast(self.done_buffs[i][inds]) for i in range(self.num_agents)])
 
     def get_average_rewards(self, N):

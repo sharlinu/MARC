@@ -113,9 +113,9 @@ class BoxWorldEnv(Env):
 
         # Penalties and rewards
         self.reward_gem = 10
-        self.reward_key = 10
+        self.reward_key = 0.5
         self.reward_unlock = 0
-        self.penalty = -10
+        self.penalty = -1
         self.penalty_overtime = -100
 
         self._normalize_reward = normalize_reward

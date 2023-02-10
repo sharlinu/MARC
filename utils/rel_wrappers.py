@@ -93,7 +93,7 @@ class AbsoluteVKBWrapper(gym.core.ObservationWrapper):
         # number of objects/entities are the number of cells on the grid
         self.obj_n = np.prod(env.observation_space[0]['image'].shape[:-1]) #physical entities
         self.nb_all_entities = self.obj_n
-        self.obs_shape = [(len(self.nullary_predicates)), (self.obj_n, len(self.attributes)),
+        self.obs_shape = [(len(self.nullary_predicates)), (self.obj_n, 1+ len(self.attributes)),
                        (self.obj_n, self.obj_n, len(self.rel_deter_func))] # TODO remove nullary_predicates?
         self.spatial_tensors = None
 
