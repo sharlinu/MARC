@@ -87,10 +87,12 @@ class BoxWorldEnv(Env):
             normalize_reward=True,
             grid_observation=False,
             simple = False,
+            single = False,
             relational = False,
             deterministic = False,
     ):
         self.simple = simple
+        self.single = single
         self.relational = relational
         self.deterministic = deterministic
         self.logger = logging.getLogger(__name__)
@@ -102,6 +104,8 @@ class BoxWorldEnv(Env):
         self.goal_length = goal_length
         if self.simple:
             self.max_objects = 2
+        elif self.single:
+            self.max_objects = 1
         else:
             self.max_objects = 2 * self.goal_length + 1  # TODO check
         self.sight = sight  # This is to set partial / full observability
@@ -293,9 +297,11 @@ class BoxWorldEnv(Env):
         if self.simple:
             self.field[0,0] = 2
             self.objects[(0,0)] = Object(x=0, y=0, colour=2, unlocked=True)
-
             self.field[3,3] = 2
             self.objects[(3,3)] = Object(x=3, y=3, colour=2, unlocked=True)
+        elif self.single:
+            self.field[1,1] = 2
+            self.objects[(1,1)] = Object(x=1, y=1, colour=2, unlocked=True)
         elif self.relational:
             self.key_colour = np.random.randint(2, self.num_colours)
             # TODO any need for key colour as class object?
@@ -395,6 +401,12 @@ class BoxWorldEnv(Env):
             )
             self.players[1].setup(
                 (1,1),
+                self.field_size,
+            )
+            return
+        elif self.single:
+            self.players[0].setup(
+                (1, 2),
                 self.field_size,
             )
             return
@@ -775,8 +787,8 @@ def _game_loop(env, render=False):
         # nobs, nreward, ndone, _ = env.step((1,1))
         if sum(nreward) != 0:
             print(nreward)
+            print(nobs)
 
-        print(nobs[0])
         time.sleep(2)
 
         if render:
@@ -791,14 +803,15 @@ def _game_loop(env, render=False):
 
 if __name__ == "__main__":
     env = BoxWorldEnv(
-        players=2,
-        field_size=(5,5),
+        players=1,
+        field_size=(4,4),
         num_colours=5,
-        goal_length=2,
-        sight=5,
+        goal_length=1,
+        sight=4,
         max_episode_steps=500,
         grid_observation= True,
         simple=False,
+        single = True,
         relational = False,
         deterministic= True,
     )

@@ -145,8 +145,8 @@ class AttentionSAC(object):
                                                             all_log_pis, all_pol_regs,
                                                             critic_rets):
             curr_agent = self.agents[a_i]
-            v = (all_q * probs).sum(dim=1, keepdim=True)
-            pol_target = q - v
+            v = (all_q * probs).sum(dim=1, keepdim=True) # calculate expected value as baselines
+            pol_target = q - v # TODO check if correct
             if soft:
                 pol_loss = (log_pi * (log_pi / self.reward_scale - pol_target).detach()).mean()
             else:
@@ -384,18 +384,30 @@ class RelationalSAC(object):
         critic_rets = self.critic(unary_tensor=unary[0], binary_tensor=binary[0], actions=acs,
                                   logger=logger, niter=self.niter)
         q_loss = 0
-        for a_i, nq, log_pi, pq  in zip(range(self.nagents), next_qs,
+        for a_i, nq, log_pi, pq in zip(range(self.nagents), next_qs,
                                                next_log_pis, critic_rets):
+        # TODO check hier what goes as mse inout
             target_q = (rews[a_i].view(-1, 1) +
                         self.gamma * nq *
                         (1 - dones[a_i].view(-1, 1)))
             if soft:
                 target_q -= log_pi / self.reward_scale
             q_loss += MSELoss(pq, target_q.detach())
+
         q_loss.backward()
+        for n,p in self.critic.named_parameters():
+            #if n[-6:] == 'weight':
+            #print('===========\ngradient:{}\n----------\n{}'.format(n, p.grad))
+            logger.add_scalar(f'grad/sum_{n}', p.grad.sum(), self.niter)
+            logger.add_scalar(f'grad/mean_{n}', p.grad.mean(), self.niter)
+            logger.add_scalar(f'weight/mean_{n}', p.mean(), self.niter)
+
+
         self.critic.scale_shared_grads()
         grad_norm = torch.nn.utils.clip_grad_norm_(
             self.critic.parameters(), 10 * self.nagents)
+
+
         self.critic_optimizer.step()
         self.critic_optimizer.zero_grad()
 
@@ -427,7 +439,7 @@ class RelationalSAC(object):
                                   logger=logger, return_all_q=True)
         for a_i, probs, log_pi, pol_regs, (q, all_q) in zip(range(self.nagents), all_probs,
                                                             all_log_pis, all_pol_regs,
-                                                            critic_rets):
+                                                            [critic_rets]): # TODO [critics_rets] to get one - needs to be changed for MA - hardcoded
             curr_agent = self.agents[a_i]
             v = (all_q * probs).sum(dim=1, keepdim=True)
             pol_target = q - v
@@ -517,8 +529,9 @@ class RelationalSAC(object):
     def init_from_env(cls, env, gamma=0.95, tau=0.01,
                       pi_lr=0.01, q_lr=0.01,
                       reward_scale=10.,
-                      pol_hidden_dim=128, critic_hidden_dim=128, attend_heads=4,
+                      pol_hidden_dim=64, critic_hidden_dim=64, attend_heads=4,
                       **kwargs):
+        # TODO changed the hidden dim from 128 to 64
         """
         Instantiate instance of this class from multi-agent environment
 
@@ -556,3 +569,23 @@ class RelationalSAC(object):
         instance = cls(**init_dict)
         instance.init_dict = init_dict
         return instance
+
+    @classmethod
+    def init_from_save(cls, filename, load_critic=False):
+        """
+        Instantiate instance of this class from file created by 'save' method
+        """
+        save_dict = torch.load(filename, map_location=torch.device('cpu'))
+        instance = cls(**save_dict['init_dict'])
+        instance.init_dict = save_dict['init_dict']
+        for a, params in zip(instance.agents, save_dict['agent_params']):
+            a.load_params(params)
+
+        if load_critic:
+            critic_params = save_dict['critic_params']
+            instance.critic.load_state_dict(critic_params['critic'])
+            instance.target_critic.load_state_dict(critic_params['target_critic'])
+            instance.critic_optimizer.load_state_dict(critic_params['critic_optimizer'])
+        return instance
+
+

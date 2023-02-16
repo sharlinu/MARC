@@ -15,24 +15,7 @@ import gym
 def make_parallel_env(env_id, n_rollout_threads, seed):
     def get_env_fn(rank):
         def init_env():
-            #env = gym.make("Foraging-8x8-2p-1f-v0")
-            from r_maac.box import BoxWorldEnv
-            env = BoxWorldEnv(
-                players=2,
-                field_size=(4,4),
-                num_colours=2,
-                goal_length=2,
-                sight=4,
-                max_episode_steps=500,
-                grid_observation=True,
-                simple=True,
-                relational=False,
-                #deterministic=True,
-            )
-            env = AbsoluteVKBWrapper(env,num_colours=env.num_colours)
-            env.agents = [None] * len(env.action_space)
-            env.seed(seed + rank * 1000)
-            np.random.seed(seed + rank * 1000)
+            env = gym.make("Foraging-8x8-2p-1f-v0")
             return env
         return init_env
     if n_rollout_threads == 1:
@@ -41,6 +24,7 @@ def make_parallel_env(env_id, n_rollout_threads, seed):
         return SubprocVecEnv([get_env_fn(i) for i in range(n_rollout_threads)])
 
 def run(config, configvar):
+    global episode_reward_total
     torch.set_num_threads(1)
 
     # model_dir = Path('./models') / config.env_id / config.model_name
@@ -72,14 +56,15 @@ def run(config, configvar):
     #env = make_parallel_env(config.env_id, config.n_rollout_threads, run_num)
     from r_maac.box import BoxWorldEnv
     env = BoxWorldEnv(
-        players=2,
+        players=1,
         field_size=(4, 4),
         num_colours=2,
-        goal_length=2,
+        goal_length=1,
         sight=4,
-        max_episode_steps=500,
+        max_episode_steps=25,
         grid_observation=True,
-        simple=True,
+        simple=False,
+        single= True,
         relational=False,
         # deterministic=True,
     )
@@ -125,9 +110,6 @@ def run(config, configvar):
     avg_reward_best  = float("-inf")
     path_ckpt_best_avg = ''
     for ep_i in range(0, config.n_episodes, config.n_rollout_threads):
-        print("%s - %s - Episodes %i-%i of %i" % (env_id, configvar['random_seed'], ep_i + 1,
-                                        ep_i + 1 + config.n_rollout_threads,
-                                        config.n_episodes))
         obs = env.reset()
         model.prep_rollouts(device='cpu')
         episode_reward_total = 0
@@ -151,7 +133,7 @@ def run(config, configvar):
             # rearrange actions to be per environment
             actions = [np.argmax(ac) for ac in agent_actions]
             next_obs, rewards, dones, infos = env.step(actions)
-            #replay_buffer.push(obs, agent_actions, rewards, next_obs, dones) # TODO change replay buffer
+            replay_buffer.push(obs, agent_actions, rewards, next_obs, dones) # TODO change replay buffer
             episode_reward_total += rewards.sum()
 
             # TODO add break for dones / episodic tasks
@@ -170,10 +152,19 @@ def run(config, configvar):
                     model.update_policies(sample, logger=logger)
                     model.update_all_targets()
                 model.prep_rollouts(device='cpu')
-#        ep_rews = replay_buffer.get_average_rewards(
-#            config.episode_length * config.n_rollout_threads) # TODO change replay buffer
+            if dones.all() == True:
+                print('done with time step', et_i)
+                break
+            # TODO change back
+
+        if ('box' or 'collect') in env_id:
+            ep_rews = replay_buffer.get_average_rewards(et_i) #TODO what is this reward? seems standardized
+        else:
+            ep_rews = replay_buffer.get_average_rewards(config.episode_length * config.n_rollout_threads)
         # for a_i, a_ep_rew in enumerate(ep_rews):
         #     logger.add_scalar('agent%i/mean_episode_rewards' % a_i, a_ep_rew, ep_i)
+        print("%s - %s - Episodes %i of %i - Reward %i" % (env_id, configvar['random_seed'], ep_i + 1,
+                                        config.n_episodes,  episode_reward_total))
         l_rewards.append(episode_reward_total)
 
 
@@ -262,8 +253,8 @@ if __name__ == '__main__':
         test_n_episodes = 5
         test_episode_length = 25
     else:
-        seeds = [2001,4001] #[1,2001,4001,6001,8001]
-        train_n_episodes = 4000
+        seeds = [4001] #[1,2001,4001,6001,8001]
+        train_n_episodes = 3000
         train_episode_length = 25
         test_n_episodes = 2
         test_episode_length = 25

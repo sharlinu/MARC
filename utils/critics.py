@@ -111,12 +111,16 @@ class AttentionCritic(nn.Module):
         inps = [torch.cat((s, a), dim=1) for s, a in inps]
         # extract state-action encoding for each agent
         sa_encodings = [encoder(inp) for encoder, inp in zip(self.critic_encoders, inps)]
+
         # extract state encoding for each agent that we're returning Q for
         s_encodings = [self.state_encoders[a_i](states[a_i]) for a_i in agents]
+
         # extract keys for each head for each agent
         all_head_keys = [[k_ext(enc) for enc in sa_encodings] for k_ext in self.key_extractors]
+
         # extract sa values for each head for each agent
         all_head_values = [[v_ext(enc) for enc in sa_encodings] for v_ext in self.value_extractors]
+
         # extract selectors for each head for each agent that we're returning Q for
         all_head_selectors = [[sel_ext(enc) for i, enc in enumerate(s_encodings) if i in agents]
                               for sel_ext in self.selector_extractors]
@@ -138,7 +142,7 @@ class AttentionCritic(nn.Module):
                 scaled_attend_logits = attend_logits / np.sqrt(keys[0].shape[1])
                 attend_weights = F.softmax(scaled_attend_logits, dim=2)
                 other_values = (torch.stack(values).permute(1, 2, 0) *
-                                attend_weights).sum(dim=2)
+                                attend_weights).sum(dim=2) # x_i
                 other_all_values[i].append(other_values)
                 all_attend_logits[i].append(attend_logits)
                 all_attend_probs[i].append(attend_weights)
@@ -191,7 +195,7 @@ class RelationalCritic(nn.Module):
                  input_dims: List[int],
                  hidden_dim=32,
                  norm_in=True,
-                 net_code="2g0f",
+                 net_code="1g0f",
                  mp_rounds=1):
         """
         Inputs:
@@ -202,10 +206,10 @@ class RelationalCritic(nn.Module):
         """
         super(RelationalCritic, self).__init__()
         self.sa_sizes = sa_sizes
-        self.nagents = 2 # TODO change
+        self.nagents = len(sa_sizes) # TODO hardcoded
         self.num_actions = n_actions[0]
         self.critic_encoders = nn.ModuleList()
-        self.critics = nn.ModuleList()
+        self.critics_head = nn.ModuleList()
 
         # self.state_encoder = nn.ModuleList()
         # iterate over agents
@@ -217,7 +221,7 @@ class RelationalCritic(nn.Module):
                                                       hidden_dim))
             critic.add_module('critic_nl', nn.LeakyReLU())
             critic.add_module('critic_fc2', nn.Linear(hidden_dim, self.num_actions))
-            self.critics.append(critic) # one critic for each agent
+            self.critics_head.append(critic) # one critic for each agent
 
         # This is the state encoder e(o), so only states
         nb_edge_types = input_dims[2]
@@ -226,13 +230,12 @@ class RelationalCritic(nn.Module):
         nb_layers, nb_dense_layers, _ = parse_code(net_code)
         self.max_reduce = True # TODO hardcoded
 
-        embedder = nn.Sequential() # TODO sequential unnecessary here
-        embedder.add_module('embedder_fc1', nn.Linear(input_dims[1], hidden_dim))
+        embedder = nn.Linear(input_dims[1], hidden_dim) # TODO - hardcoding needed?
 
         # rel_encoder = nn.Sequential()
         # for i in range(nb_layers):
         #     rel_encoder.add_module(f's_enc_rgcn{i}', RGCNConv(hidden_dim, hidden_dim, nb_edge_types))
-        #     rel_encoder.add_module(f'relu_{i}', nn.LeakyReLU()) # TODO does this work?
+        #     rel_encoder.add_module(f'relu_{i}', nn.LeakyReLU())
         gnn_layers = []
         for i in range(nb_layers):
             gnn_layers.append(RGCNConv(hidden_dim, hidden_dim, nb_edge_types))
@@ -261,9 +264,8 @@ class RelationalCritic(nn.Module):
         self.embedder = embedder # TODO shared or individual?
         # self.state_encoders.append(rel_encoder) # TODO shared or individual?
         # self.state_encoder = rel_encoder  # TODO shared or individual?
-        self.nb_dense_layers = nb_dense_layers
+        #self.nb_dense_layers = nb_dense_layers
 
-        # TODO this needs to be changed to the R-GCN components
         self.shared_modules = [self.embedder, self.gnn_layers]
         #self.shared_modules = [self.key_extractors, self.selector_extractors,
         #                       self.value_extractors, self.critic_encoders]
@@ -310,7 +312,7 @@ class RelationalCritic(nn.Module):
         # T, B, *_ = obs["unary_tensor"].shape
         device = next(self.parameters()).device
         if agents is None:
-            agents = range(2)
+            agents = range(self.nagents)
         state = None # TODO change
         #actions = None # TODO
         #states = [s for s, a in inps]
@@ -369,7 +371,7 @@ class RelationalCritic(nn.Module):
         for i, a_i in enumerate(agents):
         # extract state encoding for each agent that we're returning Q for
             agent_rets = []
-            all_q = self.critics[a_i](x)  # TODO critic needs to output all q_values not just one.
+            all_q = self.critics_head[a_i](x)
             int_acs = actions[a_i].max(dim=1, keepdim=True)[1]
             q = all_q.gather(1, int_acs)
             if return_q:
