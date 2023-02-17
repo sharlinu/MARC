@@ -184,19 +184,132 @@ class AttentionCritic(nn.Module):
             return all_rets
 
 
+class TestCritic(nn.Module):
+    """
+    Relational network, used as critic for all agents.
+    """
+
+    # TODO previously embedding_size = 16, now we have hidden_dim and 32
+    def __init__(self, sa_sizes: list,  # TODO at the end we should not need sa_sizes anymore?
+                 # obj_n: int,
+                 n_actions: int,
+                 input_dims: list,
+                 hidden_dim: object = 32,
+                 norm_in: object = True,
+                 net_code: object = "1g0f",
+                 mp_rounds: object = 1) -> object:
+        """
+        Inputs:
+            sa_sizes (list of (int, int)): Size of state and action spaces per
+                                          agent
+            hidden_dim (int): Number of hidden dimensions
+            norm_in (bool): Whether to apply BatchNorm to input
+        """
+        super(TestCritic, self).__init__()
+        self.sa_sizes = sa_sizes
+        self.nagents = len(sa_sizes)
+        self.num_actions = n_actions[0]
+        self.critic_encoders = nn.ModuleList()
+        self.critics_head = nn.ModuleList()
+
+        # self.state_encoder = nn.ModuleList()
+        # iterate over agents
+        for _ in range(self.nagents):
+            critic = nn.Sequential()
+            critic.add_module('critic_fc1', nn.Linear(hidden_dim,  # critic only takes in 1* hidden_dim now
+                                                      hidden_dim))
+            critic.add_module('critic_nl', nn.LeakyReLU())
+            critic.add_module('critic_fc2', nn.Linear(hidden_dim, self.num_actions))
+            self.critics_head.append(critic)  # one critic for each agent
+
+        self.embedder = nn.Linear(32, hidden_dim)  # TODO test
+
+        self.shared_modules = [self.embedder]
+        # self.shared_modules = [self.key_extractors, self.selector_extractors,
+        #                       self.value_extractors, self.critic_encoders]
+
+    def shared_parameters(self):
+        """
+        Parameters shared across agents and reward heads
+        """
+        return chain(*[m.parameters() for m in self.shared_modules])
+
+    def scale_shared_grads(self):
+        """
+        Scale gradients for parameters that are shared since they accumulate
+        gradients from the critic loss function multiple times
+        """
+        for p in self.shared_parameters():
+            p.grad.data.mul_(1. / self.nagents)
+
+    def forward(self,
+                inps,
+                agents=None,
+                return_q=True,
+                return_all_q=False,
+                regularize=False,
+                logger=None,
+                niter=0):
+        """
+        Inputs:
+            inps (list of PyTorch Matrices): Inputs to each agents' encoder
+                                             (batch of obs + ac)
+            agents (int): indices of agents to return Q for
+            return_q (bool): return Q-value
+            return_all_q (bool): return Q-value for all actions
+            regularize (bool): returns values to add to loss function for
+                               regularization
+            return_attend (bool): return attention weights per agent
+            logger (TensorboardX SummaryWriter): If passed in, important values
+                                                 are logged
+        """
+        states = [s for s, a in inps]
+        actions = [a for s, a in inps]
+        # extract state-action encoding for each agent
+        s_encodings = self.embedder(states[0]) # TODO hardcoded
+
+        agents = range(1)
+        all_rets = []
+        for i, a_i in enumerate(agents):
+            # extract state encoding for each agent that we're returning Q for
+            agent_rets = []
+            all_q = self.critics_head[a_i](s_encodings)
+            int_acs = actions[a_i].max(dim=1, keepdim=True)[1]
+            q = all_q.gather(1, int_acs)
+            if return_q:
+                agent_rets.append(q)
+            if return_all_q:
+                agent_rets.append(all_q)
+            # if logger is not None:
+            #    pass
+            # logger.add_scalars('agent%i/attention' % a_i,
+            #                   dict(('head%i_entropy' % h_i, ent) for h_i, ent
+            #                        in enumerate(head_entropies)),
+            #                   niter)
+            if len(agent_rets) == 1:
+                all_rets.append(agent_rets[0])
+            else:
+                all_rets.append(agent_rets)
+        #        if len(all_rets) == 1:
+        #            return all_rets[0]
+        #        else:
+        #            return all_rets
+        return all_rets
+
+
 class RelationalCritic(nn.Module):
     """
     Relational network, used as critic for all agents.
     """
     # TODO previously embedding_size = 16, now we have hidden_dim and 32
-    def __init__(self, sa_sizes, # TODO at the end we should not need sa_sizes anymore?
+    def __init__(self, sa_sizes: list,  # TODO at the end we should not need sa_sizes anymore?
                  #obj_n: int,
                  n_actions: int,
-                 input_dims: List[int],
-                 hidden_dim=32,
-                 norm_in=True,
-                 net_code="1g0f",
-                 mp_rounds=1):
+                 input_dims: list,
+                 hidden_dim: object = 32,
+                 norm_in: object = True,
+                 net_code: object = "1g0f",
+                 mp_rounds: object = 1) -> object:
         """
         Inputs:
             sa_sizes (list of (int, int)): Size of state and action spaces per
@@ -206,7 +319,7 @@ class RelationalCritic(nn.Module):
         """
         super(RelationalCritic, self).__init__()
         self.sa_sizes = sa_sizes
-        self.nagents = len(sa_sizes) # TODO hardcoded
+        self.nagents = len(sa_sizes)
         self.num_actions = n_actions[0]
         self.critic_encoders = nn.ModuleList()
         self.critics_head = nn.ModuleList()
@@ -214,16 +327,14 @@ class RelationalCritic(nn.Module):
         # self.state_encoder = nn.ModuleList()
         # iterate over agents
         for _ in range(self.nagents):
-
-        # This si the state/action encoder, so e(o_i,a_i)
             critic = nn.Sequential()
-            critic.add_module('critic_fc1', nn.Linear(hidden_dim, # TODO critic only takes in 1* hidden_dim now
+            critic.add_module('critic_fc1', nn.Linear(hidden_dim, # critic only takes in 1* hidden_dim now
                                                       hidden_dim))
             critic.add_module('critic_nl', nn.LeakyReLU())
             critic.add_module('critic_fc2', nn.Linear(hidden_dim, self.num_actions))
             self.critics_head.append(critic) # one critic for each agent
 
-        # This is the state encoder e(o), so only states
+
         nb_edge_types = input_dims[2]
 
         # default is nb_layers = gnn_layers = 2 and nb_dense_layers =0
@@ -388,11 +499,11 @@ class RelationalCritic(nn.Module):
                 all_rets.append(agent_rets[0])
             else:
                 all_rets.append(agent_rets)
-        if len(all_rets) == 1:
-            return all_rets[0]
-        else:
-            return all_rets
-
+#        if len(all_rets) == 1:
+#            return all_rets[0]
+#        else:
+#            return all_rets
+        return all_rets
 
 def parse_code(net_code: str):
     """

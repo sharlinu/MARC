@@ -117,10 +117,10 @@ class BoxWorldEnv(Env):
 
         # Penalties and rewards
         self.reward_gem = 10
-        self.reward_key = 0.5
+        self.reward_key = 1
         self.reward_unlock = 0
         self.penalty = -1
-        self.penalty_overtime = -100
+        self.penalty_overtime = -1
 
         self._normalize_reward = normalize_reward
         self._grid_observation = grid_observation  # Boolean: I think the only way to introduce partial observability
@@ -712,6 +712,7 @@ class BoxWorldEnv(Env):
                         # after pick up the key disappears from the grid
                         self.field[player.position] = 0
                         player.reward = self.reward_key
+                        print('player picks up key')
 
                 # check if agent moves on a lock
                 elif (player.position in self.objects.keys()
