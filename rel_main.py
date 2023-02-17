@@ -58,7 +58,7 @@ def run(config, configvar):
     env = BoxWorldEnv(
         players=1,
         field_size=(4, 4),
-        num_colours=2,
+        num_colours=1,
         goal_length=1,
         sight=4,
         max_episode_steps=25,
@@ -222,7 +222,7 @@ if __name__ == '__main__':
     parser.add_argument("--num_updates", default=4, type=int,
                         help="Number of updates per update cycle")
     parser.add_argument("--batch_size",
-                        default=1024, type=int,
+                        default=64, type=int,
                         help="Batch size for training")
     parser.add_argument("--save_interval", default=10000, type=int)
     parser.add_argument("--save_interval_log", default=100, type=int)
