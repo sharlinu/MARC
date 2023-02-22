@@ -176,11 +176,12 @@ class BoxWorldEnv(Env):
             agents_max = np.ones(self.field_size, dtype=np.int64) * max_colour
 
             # total layer
-            min_obs = np.stack([agents_min, obj_min], axis=2)
-            max_obs = np.stack([agents_max, obj_max], axis=2)
+            #min_obs = np.stack([agents_min, obj_min], axis=2)
+            #max_obs = np.stack([agents_max, obj_max], axis=2)
 
         # return gym.spaces.Box(np.array(min_obs), np.array(max_obs), shape=(2, self.field_size[0], self.field_size[1]), dtype=np.int64)
-        return gym.spaces.Box(np.array(min_obs), np.array(max_obs))
+        #return gym.spaces.Box(np.array(min_obs), np.array(max_obs))
+        return gym.spaces.Box(np.array(obj_min), np.array(obj_max))
 
     @classmethod
     def from_obs(cls, obs):
@@ -192,7 +193,7 @@ class BoxWorldEnv(Env):
         players = []
         for p in obs.players:
             player = Player()
-            player.setup(p.position, obs.field.shape)  # TODO why field.shape in setup
+            player.setup(p.position,  obs.field.shape)  # TODO why field.shape in setup
             player.score = p.score if p.score else 0
             players.append(player)
 
@@ -300,7 +301,7 @@ class BoxWorldEnv(Env):
             self.field[3,3] = 2
             self.objects[(3,3)] = Object(x=3, y=3, colour=2, unlocked=True)
         elif self.single:
-            self.field[1,1] = 2
+            self.field[1,1] = 1
             self.objects[(1,1)] = Object(x=1, y=1, colour=2, unlocked=True)
         elif self.relational:
             self.key_colour = np.random.randint(2, self.num_colours)
@@ -409,6 +410,7 @@ class BoxWorldEnv(Env):
                 (1, 2),
                 self.field_size,
             )
+            self.field[1,2] = 2
             return
         elif self.deterministic:
             self.players[0].setup(
@@ -576,7 +578,8 @@ class BoxWorldEnv(Env):
 
             # agent locations are not accessible
             # food locations are not accessible
-            return np.stack([agents_layer, foods_layer], axis=2)
+            #return np.stack([agents_layer, foods_layer], axis=2)
+            return foods_layer
 
 
         def get_player_reward(observation):
@@ -688,7 +691,10 @@ class BoxWorldEnv(Env):
                 pass
             # position needs to be on the grid
             assert 0 <= (k[0] and k[1]) < self.field_size[0]
+            prev_x, prev_y = v[0].position[0], v[0].position[1]
+            self.field[prev_x, prev_y] = 0
             v[0].position = k  # now k is the position of non-colliding player
+            self.field[k[0], k[1]] = 2
             if v[0].history:
                 # no diagonal moves allowed
                 assert abs(v[0].history[-1][0] - k[0]) + abs(v[0].history[-1][1] - k[1]) <= 1
@@ -785,12 +791,11 @@ def _game_loop(env, render=False):
         actions = env.action_space.sample()
 
         nobs, nreward, ndone, _ = env.step(actions)
+        print(nobs)
         # nobs, nreward, ndone, _ = env.step((1,1))
         if sum(nreward) != 0:
             print(nreward)
-            print(nobs)
 
-        time.sleep(2)
 
         if render:
             env.render()
@@ -798,7 +803,7 @@ def _game_loop(env, render=False):
             time.sleep(0.5)
 
         done = np.all(ndone)
-        pygame.event.pump()  # process event queue
+    pygame.display.quit()
     # print(env.players[0].score, env.players[1].score)
 
 

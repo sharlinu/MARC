@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 
 colours = {
     1: [255,255,255],  # gem colour
-    2: [128,128,117],
+    2: [128,128,117],  # agent colour
     3: [255, 250, 200],
     4: [255, 216, 177],
       5: [250, 190, 190],
@@ -102,7 +102,7 @@ class Viewer(object):
         self.screen.fill((220, 220, 220))  # fill background with colour
         #self._draw_grid()
         self.drawCells(env)
-        self.drawPlayers(env)
+        # self.drawPlayers(env)
         #self.drawFood(env)
 
         if return_rgb_array:
