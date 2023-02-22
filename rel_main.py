@@ -61,7 +61,7 @@ def run(config, configvar):
         num_colours=1,
         goal_length=1,
         sight=4,
-        max_episode_steps=25,
+        max_episode_steps=config.episode_length,
         grid_observation=True,
         simple=False,
         single= True,
@@ -254,8 +254,8 @@ if __name__ == '__main__':
         test_episode_length = 25
     else:
         seeds = [4001] #[1,2001,4001,6001,8001]
-        train_n_episodes = 3000
-        train_episode_length = 25
+        train_n_episodes = 10000
+        train_episode_length = 50
         test_n_episodes = 2
         test_episode_length = 25
     

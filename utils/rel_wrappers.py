@@ -61,7 +61,7 @@ class AbsoluteVKBWrapper(gym.core.ObservationWrapper):
     Add a vkb key-value pair, which represents the state as a vectorised knowledge base.
     Entities are objects in the gird-world, predicates represents the properties of them and relations between them.
     """
-    def __init__(self, env, num_colours, background_id="b3"):
+    def __init__(self, env, num_colours, background_id="t0"):
         super().__init__(env)
 
         self.num_colours = num_colours + 1

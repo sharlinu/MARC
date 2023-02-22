@@ -222,7 +222,7 @@ class TestCritic(nn.Module):
             critic.add_module('critic_fc2', nn.Linear(hidden_dim, self.num_actions))
             self.critics_head.append(critic)  # one critic for each agent
 
-        self.embedder = nn.Linear(32, hidden_dim)  # TODO test
+        self.embedder = nn.Linear(16, hidden_dim)  # TODO test
 
         self.shared_modules = [self.embedder]
         # self.shared_modules = [self.key_extractors, self.selector_extractors,
