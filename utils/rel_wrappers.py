@@ -5,23 +5,6 @@ from gym_minigrid.minigrid import * # imports DIR_TO_VEC as [array([1, 0]), arra
 import time
 import pygame
 #OBJECTS = ind_dict2list(OBJECT_TO_IDX)
-
-class GridObject():
-    "object is specified by its location"
-    def __init__(self, x, y, type=[], attribute=[]):
-        self.x = x
-        self.y = y
-        self.type = type
-        self.attributes = attribute
-
-    @property
-    def pos(self):
-        return np.array([self.x, self.y])
-
-    @property
-    def name(self):
-        return str(self.type)+"_"+str(self.x)+str(self.y)
-
 class GridObject():
     "object is specified by its location"
     def __init__(self, x, y, object_type=[]):
@@ -49,11 +32,27 @@ def parse_object(x:int, y:int, feature: np.array)->GridObject:
     # TODO this needs to change as we currently already have the color index
     #obj_type = [str(color2index[tuple(feature)])] # takes in RBG color from pixel and returns color index
     ##obj_type = [str(feature)] #now it should just be the index of the color that the object has
-    assert (feature[0] in [0,1])
-    type = feature[0]
-    attribute = [str(feature[1])]
-    obj = GridObject(x, y, type=type, attribute=attribute)
+    assert (feature in [0,1,2,3])
+    obj_type = [str(feature)]
+    obj = GridObject(x, y, object_type=obj_type)
     return obj
+
+
+# def parse_object2(x:int, y:int, feature, type="minigrid")->GridObject2:
+#     """
+#     :param x: column position
+#     :param y: row position
+#     :param feature: for MinAtar array of length 3. representing object,color and state, for boxworld,
+#                     it is pixel that has RGB color
+#     :return:
+#     """
+#     if type == "boxworld":
+#         # TODO this needs to change as we currently already have the color index
+#         obj_type = [str(color2index[tuple(feature)])] # takes in RBG color from pixel and returns color index
+#         obj = GridObject2(x, y, object_type=obj_type)
+#     else:
+#         raise ValueError()
+#     return obj
 
 
 from random import randint
@@ -65,12 +64,12 @@ class AbsoluteVKBWrapper(gym.core.ObservationWrapper):
     def __init__(self, env, num_colours, background_id="b3"):
         super().__init__(env)
 
-        self.num_colours = num_colours
+        self.num_colours = num_colours + 1
         background_id = background_id[:2]
-        self.attributes = [str(i) for i in range(self.num_colours + 2 )]
+        self.attributes = [str(i) for i in range(self.num_colours)]
         self.env_type = "boxworld"
         self.nullary_predicates = []
-        self.unary_predicates = ['agent'] + self.attributes
+        self.unary_predicates = self.attributes
         self.background_id = background_id
         if background_id in ["b0", "nolocal"]:
             self.rel_deter_func = [is_left, is_right, is_front, is_back, is_aligned, is_close]
@@ -109,9 +108,9 @@ class AbsoluteVKBWrapper(gym.core.ObservationWrapper):
                                    down_left, down_right]
 
         # number of objects/entities are the number of cells on the grid
-        self.obj_n = np.prod(env.observation_space[0]['image'].shape[:-1]) #physical entities
+        self.obj_n = np.prod(env.observation_space[0]['image'].shape) #physical entities
         self.nb_all_entities = self.obj_n
-        self.obs_shape = [(len(self.nullary_predicates)), (self.obj_n, 1+ len(self.attributes)),
+        self.obs_shape = [(len(self.nullary_predicates)), (self.obj_n, len(self.attributes)),
                        (self.obj_n, self.obj_n, len(self.rel_deter_func))] # TODO remove nullary_predicates?
         self.spatial_tensors = None
 
@@ -139,12 +138,10 @@ class AbsoluteVKBWrapper(gym.core.ObservationWrapper):
         nullary_tensors = []
 
         for obj_idx, obj in enumerate(objs):
-            if obj.type == 1:
-                unary_tensors[0][obj_idx] = 1.0
             for p_idx, p in enumerate(self.attributes): # first spot is reserved for agent information
                 if p in obj.attributes:
                     # adds feature, e.g. colour as unary tensor
-                    unary_tensors[p_idx+1][obj_idx] = 1.0
+                    unary_tensors[p_idx][obj_idx] = 1.0
 
         if not self.spatial_tensors:
             # create spatial tensors that gives for every rel. det rule a binary indicator between the entities
@@ -156,7 +153,7 @@ class AbsoluteVKBWrapper(gym.core.ObservationWrapper):
                         if func(obj1, obj2, direction_vec):
                             self.spatial_tensors[rel_idx][obj_idx1, obj_idx2] = 1.0
 
-        binary_tensors = self.spatial_tensors # these vectors should change every time with the environment
+        binary_tensors = self.spatial_tensors
         nullary_t, unary_t, binary_t = nullary_tensors, np.stack(unary_tensors, axis=-1), np.stack(binary_tensors, axis=-1)
         return nullary_t, unary_t, binary_t
 
@@ -179,21 +176,6 @@ class AbsoluteVKBWrapper(gym.core.ObservationWrapper):
         return obs
 
 
-def parse_object2(x:int, y:int, feature, type="minigrid")->GridObject2:
-    """
-    :param x: column position
-    :param y: row position
-    :param feature: for MinAtar array of length 3. representing object,color and state, for boxworld,
-                    it is pixel that has RGB color
-    :return:
-    """
-    if type == "boxworld":
-        # TODO this needs to change as we currently already have the color index
-        obj_type = [str(color2index[tuple(feature)])] # takes in RBG color from pixel and returns color index
-        obj = GridObject2(x, y, object_type=obj_type)
-    else:
-        raise ValueError()
-    return obj
 
 
 def offset2idx_offset(x, y, width):
@@ -276,7 +258,7 @@ class AbsoluteVKBWrapper2(gym.core.ObservationWrapper):
         portals = []
         for y, row in enumerate(img):
             for x, pixel in enumerate(row):
-                obj = parse_object2(x, y, pixel, self.env_type)
+                obj = parse_object(x, y, pixel, self.env_type)
                 objs.append(obj)
                 if self.with_portals and (x, y) in self.portal_pairs:
                     portals.append(obj)
