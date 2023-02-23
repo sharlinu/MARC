@@ -254,8 +254,8 @@ if __name__ == '__main__':
         test_episode_length = 25
     else:
         seeds = [4001] #[1,2001,4001,6001,8001]
-        train_n_episodes = 10000
-        train_episode_length = 50
+        train_n_episodes = 5000
+        train_episode_length = 25
         test_n_episodes = 2
         test_episode_length = 25
     

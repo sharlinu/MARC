@@ -3,7 +3,7 @@ import torch.nn.functional as F
 from torch.optim import Adam
 from r_maac.utils.misc import soft_update, hard_update, enable_gradients, disable_gradients
 from r_maac.utils.agents import AttentionAgent
-from r_maac.utils.critics import AttentionCritic, RelationalCritic, TestCritic
+from r_maac.utils.critics import AttentionCritic, RelationalCritic, TestCritic, TestCritic2
 import numpy as np
 
 MSELoss = torch.nn.MSELoss()
@@ -320,13 +320,13 @@ class RelationalSAC(object):
                                       num_in_pol=params['num_in_pol'],
                                       num_out_pol=params['num_out_pol'])
                          for params in agent_init_params] # are input and output dims for agent
-        self.type = 'relational'
+        self.type = 'test'
         if self.type == 'test':
-            self.critic = TestCritic(sa_sizes=sa_size,
+            self.critic = TestCritic2(sa_sizes=sa_size,
                                             n_actions=n_actions,
                                            input_dims=input_dims,
                                            hidden_dim=critic_hidden_dim)
-            self.target_critic = TestCritic(sa_sizes=sa_size,
+            self.target_critic = TestCritic2(sa_sizes=sa_size,
                                             n_actions=n_actions,
                                            input_dims=input_dims,
                                            hidden_dim=critic_hidden_dim)
