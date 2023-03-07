@@ -37,25 +37,6 @@ def parse_object(x:int, y:int, feature: np.array)->GridObject:
     obj = GridObject(x, y, object_type=obj_type)
     return obj
 
-
-# def parse_object2(x:int, y:int, feature, type="minigrid")->GridObject2:
-#     """
-#     :param x: column position
-#     :param y: row position
-#     :param feature: for MinAtar array of length 3. representing object,color and state, for boxworld,
-#                     it is pixel that has RGB color
-#     :return:
-#     """
-#     if type == "boxworld":
-#         # TODO this needs to change as we currently already have the color index
-#         obj_type = [str(color2index[tuple(feature)])] # takes in RBG color from pixel and returns color index
-#         obj = GridObject2(x, y, object_type=obj_type)
-#     else:
-#         raise ValueError()
-#     return obj
-
-
-from random import randint
 class AbsoluteVKBWrapper(gym.core.ObservationWrapper):
     """
     Add a vkb key-value pair, which represents the state as a vectorised knowledge base.
@@ -64,7 +45,7 @@ class AbsoluteVKBWrapper(gym.core.ObservationWrapper):
     def __init__(self, env, num_colours, background_id="b3"):
         super().__init__(env)
 
-        self.num_colours = num_colours + 1
+        self.num_colours = num_colours + 2
         background_id = background_id[:2]
         self.attributes = [str(i) for i in range(self.num_colours)]
         self.env_type = "boxworld"

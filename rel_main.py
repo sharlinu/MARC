@@ -56,17 +56,16 @@ def run(config, configvar):
     #env = make_parallel_env(config.env_id, config.n_rollout_threads, run_num)
     from r_maac.box import BoxWorldEnv
     env = BoxWorldEnv(
-        players=1,
+        players=2,
         field_size=(4, 4),
         num_colours=1,
         goal_length=1,
         sight=4,
         max_episode_steps=config.episode_length,
         grid_observation=True,
-        simple=False,
-        single= True,
-        relational=False,
-        # deterministic=True,
+        simple= True,
+        single= False,
+        deterministic=False,
     )
     env = AbsoluteVKBWrapper(env, num_colours=env.num_colours)
     env.agents = [None] * len(env.action_space)
@@ -76,15 +75,6 @@ def run(config, configvar):
     env.seed(seed)
     np.random.seed(seed)
 
-    # model = AttentionSAC.init_from_env(env,
-    #                                    tau=config.tau,
-    #                                    pi_lr=config.pi_lr,
-    #                                    q_lr=config.q_lr,
-    #                                    gamma=config.gamma,
-    #                                    pol_hidden_dim=config.pol_hidden_dim,
-    #                                    critic_hidden_dim=config.critic_hidden_dim,
-    #                                    attend_heads=config.attend_heads,
-    #                                    reward_scale=config.reward_scale)
     model = RelationalSAC.init_from_env(env,
                                        tau=config.tau,
                                        pi_lr=config.pi_lr,
@@ -111,6 +101,7 @@ def run(config, configvar):
     path_ckpt_best_avg = ''
     for ep_i in range(0, config.n_episodes, config.n_rollout_threads):
         obs = env.reset()
+        print('initial', obs['image'])
         model.prep_rollouts(device='cpu')
         episode_reward_total = 0
         is_best_avg          = False
@@ -166,6 +157,7 @@ def run(config, configvar):
         print("%s - %s - Episodes %i of %i - Reward %i" % (env_id, configvar['random_seed'], ep_i + 1,
                                         config.n_episodes,  episode_reward_total))
         l_rewards.append(episode_reward_total)
+        print('terminal space', obs['image'])
 
 
     # check if it in average was the best model so far
@@ -254,8 +246,8 @@ if __name__ == '__main__':
         test_episode_length = 25
     else:
         seeds = [4001] #[1,2001,4001,6001,8001]
-        train_n_episodes = 5000
-        train_episode_length = 25
+        train_n_episodes = 15000
+        train_episode_length = 50
         test_n_episodes = 2
         test_episode_length = 25
     

@@ -3,7 +3,7 @@ import torch.nn.functional as F
 from torch.optim import Adam
 from r_maac.utils.misc import soft_update, hard_update, enable_gradients, disable_gradients
 from r_maac.utils.agents import AttentionAgent
-from r_maac.utils.critics import AttentionCritic, RelationalCritic, TestCritic, TestCritic2
+from r_maac.utils.critics import AttentionCritic, RelationalCritic, TestCritic, TestCritic2, GCNCritic
 import numpy as np
 
 MSELoss = torch.nn.MSELoss()
@@ -320,13 +320,13 @@ class RelationalSAC(object):
                                       num_in_pol=params['num_in_pol'],
                                       num_out_pol=params['num_out_pol'])
                          for params in agent_init_params] # are input and output dims for agent
-        self.type = 'test'
+        self.type = 'relational'
         if self.type == 'test':
-            self.critic = TestCritic2(sa_sizes=sa_size,
+            self.critic = TestCritic(sa_sizes=sa_size,
                                             n_actions=n_actions,
                                            input_dims=input_dims,
                                            hidden_dim=critic_hidden_dim)
-            self.target_critic = TestCritic2(sa_sizes=sa_size,
+            self.target_critic = TestCritic(sa_sizes=sa_size,
                                             n_actions=n_actions,
                                            input_dims=input_dims,
                                            hidden_dim=critic_hidden_dim)
@@ -335,8 +335,16 @@ class RelationalSAC(object):
                                             n_actions=n_actions,
                                            input_dims=input_dims,
                                            hidden_dim=critic_hidden_dim)
-            self.target_critic = RelationalCritic(
-                                            sa_sizes=sa_size,
+            self.target_critic = RelationalCritic(sa_sizes=sa_size,
+                                            n_actions=n_actions,
+                                           input_dims=input_dims,
+                                           hidden_dim=critic_hidden_dim)
+        else:
+            self.critic = GCNCritic(sa_sizes=sa_size,
+                                            n_actions=n_actions,
+                                           input_dims=input_dims,
+                                           hidden_dim=critic_hidden_dim)
+            self.target_critic = GCNCritic(sa_sizes=sa_size,
                                             n_actions=n_actions,
                                            input_dims=input_dims,
                                            hidden_dim=critic_hidden_dim)
@@ -388,18 +396,17 @@ class RelationalSAC(object):
             next_acs.append(curr_next_ac)
             next_log_pis.append(curr_next_log_pi)
         if self.type == 'test':
-            trgt_critic_in = list(zip(next_obs, next_acs))
             critic_in = list(zip(obs, acs))
-            next_qs = self.target_critic(trgt_critic_in)
             critic_rets = self.critic(critic_in)
-        elif self.type == 'relational':
-            next_qs = self.target_critic(unary_tensor=next_unary[0], binary_tensor=next_binary[0], actions=next_acs)
+            trgt_critic_in = list(zip(next_obs, next_acs))
+            next_qs = self.target_critic(trgt_critic_in)
+        else:
             critic_rets = self.critic(unary_tensor=unary[0], binary_tensor=binary[0], actions=acs,
                                       logger=logger, niter=self.niter)
+            next_qs = self.target_critic(unary_tensor=next_unary[0], binary_tensor=next_binary[0], actions=next_acs)
         q_loss = 0
         for a_i, nq, log_pi, pq in zip(range(self.nagents), next_qs,
                                                next_log_pis, critic_rets):
-        # TODO check hier what goes as mse inout
             target_q = (rews[a_i].view(-1, 1) +
                         self.gamma * nq *
                         (1 - dones[a_i].view(-1, 1)))
@@ -450,13 +457,13 @@ class RelationalSAC(object):
         if self.type == 'test':
             critic_in = list(zip(obs, samp_acs)) # that probably needs to change because we are only taking in one state information not obs from all agents
             critic_rets = self.critic(critic_in, return_all_q=True)
-        elif self.type == 'relational':
-            critic_rets = self.critic(unary_tensor=unary[0], binary_tensor=binary[0], actions=acs,
+        else:
+            critic_rets = self.critic(unary_tensor=unary[0], binary_tensor=binary[0], actions=samp_acs,
                                       logger=logger, return_all_q=True)
 
         for a_i, probs, log_pi, pol_regs, (q, all_q) in zip(range(self.nagents), all_probs,
                                                             all_log_pis, all_pol_regs,
-                                                            critic_rets): # TODO [critics_rets] to get one - needs to be changed for MA - hardcoded
+                                                            critic_rets):
             curr_agent = self.agents[a_i]
             v = (all_q * probs).sum(dim=1, keepdim=True)
             pol_target = q - v

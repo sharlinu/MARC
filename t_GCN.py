@@ -116,6 +116,6 @@ plt.tick_params(left=False,
                 labelleft=False,
                 labelbottom=False)
 ax.scatter(embed[:, 0], embed[:, 1], embed[:, 2],
-           s=200, c=data.y, cmap="hsv", vmin=-2, vmax=3)
+           s=200, cmap="hsv", vmin=-2, vmax=3)
 
 plt.show()

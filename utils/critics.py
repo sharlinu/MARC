@@ -268,7 +268,7 @@ class TestCritic(nn.Module):
         # extract state-action encoding for each agent
         s_encodings = self.embedder(states[0]) # TODO hardcoded
 
-        agents = range(1)
+        agents = range(1) # TODO hardcoded
         all_rets = []
         for i, a_i in enumerate(agents):
             # extract state encoding for each agent that we're returning Q for
@@ -280,20 +280,10 @@ class TestCritic(nn.Module):
                 agent_rets.append(q)
             if return_all_q:
                 agent_rets.append(all_q)
-            # if logger is not None:
-            #    pass
-            # logger.add_scalars('agent%i/attention' % a_i,
-            #                   dict(('head%i_entropy' % h_i, ent) for h_i, ent
-            #                        in enumerate(head_entropies)),
-            #                   niter)
             if len(agent_rets) == 1:
                 all_rets.append(agent_rets[0])
             else:
                 all_rets.append(agent_rets)
-        #        if len(all_rets) == 1:
-        #            return all_rets[0]
-        #        else:
-        #            return all_rets
         return all_rets
 
 class TestCritic2(nn.Module):
@@ -323,7 +313,7 @@ class TestCritic2(nn.Module):
         self.num_actions = n_actions[0]
         self.critic_encoders = nn.ModuleList()
         self.critics_head = nn.ModuleList()
-        self.h = []
+
         # self.state_encoder = nn.ModuleList()
         # iterate over agents
         for _ in range(self.nagents):
@@ -334,11 +324,11 @@ class TestCritic2(nn.Module):
             critic.add_module('critic_fc2', nn.Linear(hidden_dim, self.num_actions))
             self.critics_head.append(critic) # one critic for each agent
 
-        #embedder = nn.Linear(input_dims[1], hidden_dim) # TODO - hardcoding needed?
+        embedder = nn.Linear(input_dims[1], hidden_dim) # TODO - hardcoding needed?
 
-        self.gcn = GCNConv(3, hidden_dim)
+        self.gcn = GCNConv(hidden_dim, hidden_dim)
 
-        #self.embedder = embedder # TODO shared or individual?
+        self.embedder = embedder
         self.shared_modules = []
 
 
@@ -358,6 +348,7 @@ class TestCritic2(nn.Module):
 
     def forward(self,
                 inps,
+                unary_tensor,
                 agents=None,
                 return_q=True,
                 return_all_q=False,
@@ -379,9 +370,6 @@ class TestCritic2(nn.Module):
         """
         states = [s for s, a in inps]
         actions = [a for s, a in inps]
-        # extract state-action encoding for each agent
-        #s_encodings = self.embedder(states[0]) # TODO hardcoded
-
 
         device = next(self.parameters()).device
         if agents is None:
@@ -397,35 +385,29 @@ class TestCritic2(nn.Module):
         edge_index = adj_t.nonzero().t().contiguous()
 
         graph_list = []
+        feat_list =[]
         for i in range(batch_size):
             simple_array = np.array(states[0][i], dtype=np.int32)
             encoded_array = np.zeros((simple_array.size,3), dtype=int)
             encoded_array[np.arange(simple_array.size), simple_array] = 1
             feat_tensor = torch.Tensor(encoded_array)
+            assert torch.equal(feat_tensor, unary_tensor[i])
+            feat_list.append(feat_tensor)
+            feat_tensor = torch.arange(nb_objects).view(-1, 1)
             single = GeometricData(x=feat_tensor, edge_index=edge_index)
             graph_list.append(single)
         gd = Batch.from_data_list(graph_list)
-
-        embedds = self.gcn(gd.x, gd.edge_index)
-        self.h.append(embedds)
+        x = np.vstack(feat_list)
+        x = torch.Tensor(x)
+        x = self.embedder(unary_tensor.flatten(0,1))
+        embedds = self.gcn(x, gd.edge_index)
         chunks = torch.split(embedds, slices, dim=0) # splits it in slices/entities
         chunks = [p.unsqueeze(0) for p in chunks] # just adds back another dimension in the beginning
         x = torch.cat(chunks, dim=0)
         if self.max_reduce:
-            x, _ = torch.max(x, dim=1) # TODO check what dimension comes out of here
+            x, _ = torch.max(x, dim=1)
         else:
-            # I think this would be for the CNN which is flattened
-            x = torch.flatten(x, start_dim=1, end_dim=2) # TODO what does that do?
-        #policy_logits = self.policy_linear(x)
-        #baseline = self.baseline_linear(x)
-        #if self.training:
-        #    action = torch.multinomial(F.softmax(policy_logits, dim=1), num_samples=1)
-        #else:
-        #    # Don't sample when testing.
-        #    action = torch.argmax(policy_logits, dim=1)
-        # policy_logits = policy_logits.view(T, B, self.num_actions)
-        # baseline = baseline.view(T, B)
-        # action = action.view(T, B)
+            x = torch.flatten(x, start_dim=1, end_dim=2)
 
         agents = range(1)
         all_rets = []
@@ -502,44 +484,10 @@ class RelationalCritic(nn.Module):
 
         embedder = nn.Linear(input_dims[1], hidden_dim) # TODO - hardcoding needed?
 
-        # rel_encoder = nn.Sequential()
-        # for i in range(nb_layers):
-        #     rel_encoder.add_module(f's_enc_rgcn{i}', RGCNConv(hidden_dim, hidden_dim, nb_edge_types))
-        #     rel_encoder.add_module(f'relu_{i}', nn.LeakyReLU())
-        # gnn_layers = []
-        # for i in range(nb_layers):
-        #     gnn_layers.append(RGCNConv(hidden_dim, hidden_dim, nb_edge_types))
-        # self.gnn_layers = nn.ModuleList(gnn_layers)
         self.gnn_layers = RGCNConv(hidden_dim, hidden_dim, nb_edge_types)
-        # dense = nn.Sequential()
-        # for i in range(nb_dense_layers):
-        #     if i == 0:
-        #         if self.max_reduce:
-        #             dense.add_module(f'rel_to_dn{i}_red', nn.Linear(hidden_dim, 128))
-        #         else:
-        #             dense.add_module(f'rel_to_dn{i}', nn.Linear(hidden_dim * obj_n, 128))
-        #     else:
-        #         dense.add_module(f'rel_to_dn{i}',nn.Linear(128, 128)) # TODO change dims here
-        #     dense.add_module('ReLU', nn.ReLU())
-        # TODO work out how critic can get hidden_dim as inputs
-        # TODO generalise the 128 to something that fits with the MAAC network
-        # self.num_actions = action_n
-        # if nb_dense_layers == 0:
-        #     # self.policy_linear = nn.Linear(hidden_dim, self.num_actions) #mapping from network to action distribution
-        #     self.baseline_linear = nn.Linear(hidden_dim, 1)
-        # else:
-        #     # self.policy_linear = nn.Linear(128, self.num_actions)
-        #     self.baseline_linear = nn.Linear(128,
-        #                                      1)  # baseline spits out scalar value (so depending on the state)
-        #state_encoder = nn.Sequential(embedder, rel_encoder)
         self.embedder = embedder # TODO shared or individual?
-        # self.state_encoders.append(rel_encoder) # TODO shared or individual?
-        # self.state_encoder = rel_encoder  # TODO shared or individual?
-        #self.nb_dense_layers = nb_dense_layers
 
         self.shared_modules = [self.embedder, self.gnn_layers]
-        #self.shared_modules = [self.key_extractors, self.selector_extractors,
-        #                       self.value_extractors, self.critic_encoders]
 
 
     def shared_parameters(self):
@@ -579,20 +527,10 @@ class RelationalCritic(nn.Module):
             logger (TensorboardX SummaryWriter): If passed in, important values
                                                  are logged
         """
-        # B = len(inps) # TODO what dim is batch_size
-        # T, B, *_ = obs["unary_tensor"].shape
         device = next(self.parameters()).device
         if agents is None:
             agents = range(self.nagents)
         state = None # TODO change
-        #actions = None # TODO
-        #states = [s for s, a in inps]
-        #actions = [a for s, a in inps]
-        #inps = [torch.cat((s, a), dim=1) for s, a in inps]
-
-        # extract state-action encoding for each agent
-        # sa_encodings = [encoder(inp) for encoder, inp in zip(self.critic_encoders, inps)]
-        # s_encodings = [self.state_encoder[a_i](states[a_i]) for a_i in agents]
         inputs = [[],
                   torch.flatten(unary_tensor, 0, 1).float(), #flattens obs["unary_tensor"] only in 0th and 1st dim
                   #torch.flatten(binary_tensor, 0, 1).permute(0,3,1,2).float()]
@@ -611,9 +549,6 @@ class RelationalCritic(nn.Module):
 
 
         # RGCN module
-        #assert (embedds.dim == gd.edge_index)
-        # s_encoding = self.state_encoder.forward(embedds, gd.edge_index, gd.edge_attr) # does not work with nn.sequential
-        # for layer in self.gnn_layers:
         embedds = self.gnn_layers(embedds, gd.edge_index, gd.edge_attr).relu()
         #embedds = torch.relu(embedds)
 
@@ -626,16 +561,6 @@ class RelationalCritic(nn.Module):
         else:
             # I think this would be for the CNN which is flattened
             x = torch.flatten(x, start_dim=1, end_dim=2) # TODO what does that do?
-        #policy_logits = self.policy_linear(x)
-        #baseline = self.baseline_linear(x)
-        #if self.training:
-        #    action = torch.multinomial(F.softmax(policy_logits, dim=1), num_samples=1)
-        #else:
-        #    # Don't sample when testing.
-        #    action = torch.argmax(policy_logits, dim=1)
-        # policy_logits = policy_logits.view(T, B, self.num_actions)
-        # baseline = baseline.view(T, B)
-        # action = action.view(T, B)
 
 
         all_rets = []
@@ -649,20 +574,10 @@ class RelationalCritic(nn.Module):
                 agent_rets.append(q)
             if return_all_q:
                 agent_rets.append(all_q)
-            #if logger is not None:
-            #    pass
-                #logger.add_scalars('agent%i/attention' % a_i,
-                #                   dict(('head%i_entropy' % h_i, ent) for h_i, ent
-                #                        in enumerate(head_entropies)),
-                #                   niter)
             if len(agent_rets) == 1:
                 all_rets.append(agent_rets[0])
             else:
                 all_rets.append(agent_rets)
-#        if len(all_rets) == 1:
-#            return all_rets[0]
-#        else:
-#            return all_rets
         return all_rets
 class GCNCritic(nn.Module):
     """
@@ -708,6 +623,20 @@ class GCNCritic(nn.Module):
         #self.embedder = embedder # TODO shared or individual?
         self.shared_modules = []
 
+    def shared_parameters(self):
+        """
+        Parameters shared across agents and reward heads
+        """
+        return chain(*[m.parameters() for m in self.shared_modules])
+
+    def scale_shared_grads(self):
+        """
+        Scale gradients for parameters that are shared since they accumulate
+        gradients from the critic loss function multiple times
+        """
+        for p in self.shared_parameters():
+            p.grad.data.mul_(1. / self.nagents)
+
     def forward(self,
                 unary_tensor,
                 binary_tensor,
@@ -734,15 +663,9 @@ class GCNCritic(nn.Module):
         device = next(self.parameters()).device
         if agents is None:
             agents = range(self.nagents)
-        #states = [s for s, a in inps]
-        #actions = [a for s, a in inps]
         self.max_reduce = True
-        # extract state-action encoding for each agent
-        # sa_encodings = [encoder(inp) for encoder, inp in zip(self.critic_encoders, inps)]
-        # s_encodings = [self.state_encoder[a_i](states[a_i]) for a_i in agents]
         inputs = [[],
                   torch.flatten(unary_tensor, 0, 1).float(), #flattens obs["unary_tensor"] only in 0th and 1st dim
-                  #torch.flatten(binary_tensor, 0, 1).permute(0,3,1,2).float()]
                   binary_tensor.permute(0, 3, 1, 2).float()
                   ]
         for i in [1,2]:
@@ -756,42 +679,27 @@ class GCNCritic(nn.Module):
         nb_relations = 1
         nb_objects = 16
         batch_size = 64
-        slices = [nb_objects for _ in range(batch_size)]
-        chunks = torch.split(embedds, slices, dim=0)  # splits it in slices/entities
 
         adj_t = torch.ones([nb_objects, nb_objects]) - torch.diag(torch.ones(nb_objects))
         edge_index = adj_t.nonzero().t().contiguous()
 
         graph_list = []
-        for i in chunks:
-            single = GeometricData(x=i, edge_index=edge_index)
+        for i in range(batch_size):
+            x = torch.arange(nb_objects).view(-1, 1)
+            single = GeometricData(x=x, edge_index=edge_index)
             graph_list.append(single)
         gd = Batch.from_data_list(graph_list)
 
-        embedds = self.gcn(gd.x, gd.edge_index)
+        embedds = self.gcn(embedds, gd.edge_index)
+        slices = [nb_objects for _ in range(batch_size)]
         chunks = torch.split(embedds, slices, dim=0) # splits it in slices/entities
         chunks = [p.unsqueeze(0) for p in chunks] # just adds back another dimension in the beginning
         x = torch.cat(chunks, dim=0)
-        if self.max_reduce:
-            x, _ = torch.max(x, dim=1) # TODO check what dimension comes out of here
-        else:
-            # I think this would be for the CNN which is flattened
-            x = torch.flatten(x, start_dim=1, end_dim=2) # TODO what does that do?
-        #policy_logits = self.policy_linear(x)
-        #baseline = self.baseline_linear(x)
-        #if self.training:
-        #    action = torch.multinomial(F.softmax(policy_logits, dim=1), num_samples=1)
-        #else:
-        #    # Don't sample when testing.
-        #    action = torch.argmax(policy_logits, dim=1)
-        # policy_logits = policy_logits.view(T, B, self.num_actions)
-        # baseline = baseline.view(T, B)
-        # action = action.view(T, B)
+        x, _ = torch.max(x, dim=1) # TODO check what dimension comes out of here
 
 
         all_rets = []
         for i, a_i in enumerate(agents):
-        # extract state encoding for each agent that we're returning Q for
             agent_rets = []
             all_q = self.critics_head[a_i](x)
             int_acs = actions[a_i].max(dim=1, keepdim=True)[1]
@@ -800,20 +708,10 @@ class GCNCritic(nn.Module):
                 agent_rets.append(q)
             if return_all_q:
                 agent_rets.append(all_q)
-            #if logger is not None:
-            #    pass
-                #logger.add_scalars('agent%i/attention' % a_i,
-                #                   dict(('head%i_entropy' % h_i, ent) for h_i, ent
-                #                        in enumerate(head_entropies)),
-                #                   niter)
             if len(agent_rets) == 1:
                 all_rets.append(agent_rets[0])
             else:
                 all_rets.append(agent_rets)
-#        if len(all_rets) == 1:
-#            return all_rets[0]
-#        else:
-#            return all_rets
         return all_rets
 
 def parse_code(net_code: str):
@@ -826,4 +724,6 @@ def parse_code(net_code: str):
     nb_dense_layers = int(net_code[-2])
     is_max = True if net_code[2] == "m" else False
     return nb_gnn_layers, nb_dense_layers, is_max
+
+
 

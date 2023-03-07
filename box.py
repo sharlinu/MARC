@@ -102,6 +102,7 @@ class BoxWorldEnv(Env):
 
         self.num_colours = num_colours
         self.goal_length = goal_length
+        self.key_colour = 1
         if self.simple:
             self.max_objects = 2
         elif self.single:
@@ -296,13 +297,20 @@ class BoxWorldEnv(Env):
 
     def spawn_boxes(self):
         if self.simple:
-            self.field[0,0] = 2
-            self.objects[(0,0)] = Object(x=0, y=0, colour=2, unlocked=True)
-            self.field[3,3] = 2
-            self.objects[(3,3)] = Object(x=3, y=3, colour=2, unlocked=True)
+            if self.deterministic:
+                self.field[0,0] = 1
+                self.objects[(0,0)] = Object(x=0, y=0, colour=2, unlocked=True)
+                self.field[3,3] = 1
+                self.objects[(3,3)] = Object(x=3, y=3, colour=2, unlocked=True)
+            else:
+                for i in range(self.n_agents):
+                    self.spawn_object(self.key_colour, box=False)
         elif self.single:
-            self.field[1,1] = 1
-            self.objects[(1,1)] = Object(x=1, y=1, colour=2, unlocked=True)
+            if self.deterministic:
+                self.field[1,1] = 1
+                self.objects[(1,1)] = Object(x=1, y=1, colour=2, unlocked=True)
+            else:
+                self.spawn_object(self.key_colour, box=False)
         elif self.relational:
             self.key_colour = np.random.randint(2, self.num_colours)
             # TODO any need for key colour as class object?
@@ -311,7 +319,7 @@ class BoxWorldEnv(Env):
                 self.spawn_object(self.key_colour, box=False)
         elif self.deterministic:
             #self.key_colour = random.randint(2, self.num_colours)
-            self.key_colour = 4
+            self.key_colour = 1
             self.spawn_det_object(self.key_colour)
         else:
             self.key_colour = np.random.randint(2, self.num_colours)
@@ -404,6 +412,8 @@ class BoxWorldEnv(Env):
                 (1,1),
                 self.field_size,
             )
+            self.field[1, 1] = 2
+            self.field[2, 2] = 2
             return
         elif self.single:
             self.players[0].setup(
@@ -663,17 +673,6 @@ class BoxWorldEnv(Env):
         for k, v in collisions.items():
             if len(v) > 1:  # value lists longer than 1 mean colliding players
                 continue
-#                if self.field[k] == 1:
-#                    if self.gem.unlocked == True:
-#                        for p in v:
-#                            logging.warning('This should currently not happen in easier setting')
-#                            p.reward = self.reward_gem
-#                        self._game_over = True  # TODO can be changed at the end as an add condition self.gem.collected=True
-#                else:
-#                    self.logger.info("colliding location is not the unlocked gem")
-#                    continue
-
-            # this goes through all new positions of non-colliding players (len(v)==1) and checks that you cannot go on
 
             # agent cannot move on lock without having the key
             elif (k in self.objects.keys()
@@ -694,7 +693,6 @@ class BoxWorldEnv(Env):
             prev_x, prev_y = v[0].position[0], v[0].position[1]
             self.field[prev_x, prev_y] = 0
             v[0].position = k  # now k is the position of non-colliding player
-            self.field[k[0], k[1]] = 2
             if v[0].history:
                 # no diagonal moves allowed
                 assert abs(v[0].history[-1][0] - k[0]) + abs(v[0].history[-1][1] - k[1]) <= 1
@@ -702,7 +700,7 @@ class BoxWorldEnv(Env):
         # pick up key if they walk on one.
         for player in self.players:
             # player wants to walk on an object
-            if self.field[player.position] != 0:
+            if self.field[player.position] not in [0, 2]: # TODO hard coded
                 self.logger.info("agent steps on an object")
                 # check if it is a key
                 if (player.position in self.objects.keys()
@@ -726,37 +724,31 @@ class BoxWorldEnv(Env):
                       and self.objects[player.position].collected == False
                       and self.objects[player.position].colour == player.owned_key):
                     cnt += 1
-        #            else:
-        #                # penalty for every step the agent does not reach the goal
-        #                p.reward = self.penalty
-        # check that all players are on locks
+
         if cnt == len(self.players):
             logging.warning('This is exactly where agents should be and finish')
             for player in self.players:
                 # both locks need to be switched to collected
                 self.objects[player.position].collected = True
                 self.objects[player.position].unlocked = True
-                # both need to be uncoloured / removed
-                self.field[player.position] = 0
-                # gem needs to be unlocked
                 self.gem.unlocked = True
-                # player.reward = self.reward_unlock
                 player.reward = self.reward_gem # TODO currently automatic collection
             self._game_over = True
 
-        if self._game_over is False:
-            self._game_over = (
-                    self.field.sum() == 0
-                    or self._max_episode_steps <= self.current_step
-            )
-
-        if self._max_episode_steps <= self.current_step:
-            for p in self.players:
-                p.reward = self.penalty_overtime
         self._gen_valid_moves()
 
         for p in self.players:
-            p.score += p.reward
+            if self._max_episode_steps <= self.current_step:
+                p.reward = self.penalty_overtime
+            else:
+                p.score += p.reward
+            self.field[p.position[0], p.position[1]] = 2
+
+        if self._game_over is False:
+            self._game_over = (
+                    self.field.sum() == 2*len(self.players)
+                    or self._max_episode_steps <= self.current_step
+            )
 
         return self._make_gym_obs()
 
@@ -791,7 +783,9 @@ def _game_loop(env, render=False):
         actions = env.action_space.sample()
 
         nobs, nreward, ndone, _ = env.step(actions)
-        print(nobs)
+        print('\n -----', actions, 'leads to \n:')
+        print(nobs['image'])
+
         # nobs, nreward, ndone, _ = env.step((1,1))
         if sum(nreward) != 0:
             print(nreward)
@@ -809,17 +803,17 @@ def _game_loop(env, render=False):
 
 if __name__ == "__main__":
     env = BoxWorldEnv(
-        players=1,
+        players=2,
         field_size=(4,4),
-        num_colours=5,
+        num_colours=1,
         goal_length=1,
         sight=4,
         max_episode_steps=500,
         grid_observation= True,
-        simple=False,
-        single = True,
+        simple = True,
+        single = False,
         relational = False,
-        deterministic= True,
+        deterministic= False,
     )
     background_colour = (50, 50, 50)
     for episode in range(1):
