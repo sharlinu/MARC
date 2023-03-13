@@ -396,7 +396,7 @@ def fan_left(obj1, obj2, direction_vec)->bool:
 
 
 if __name__ == "__main__":
-    from r_maac.box import BoxWorldEnv
+    from MABoxWorld.environments.box import BoxWorldEnv
     env = BoxWorldEnv(
         players=2,
         field_size=(5,5),

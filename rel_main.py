@@ -24,25 +24,7 @@ def make_parallel_env(env_id, n_rollout_threads, seed):
         return SubprocVecEnv([get_env_fn(i) for i in range(n_rollout_threads)])
 
 def run(config, configvar):
-    global episode_reward_total
     torch.set_num_threads(1)
-
-    # model_dir = Path('./models') / config.env_id / config.model_name
-    # if not model_dir.exists():
-    #     run_num = 1
-    # else:
-    #     exst_run_nums = [int(str(folder.name).split('run')[1]) for folder in
-    #                      model_dir.iterdir() if
-    #                      str(folder.name).startswith('run')]
-    #     if len(exst_run_nums) == 0:
-    #         run_num = 1
-    #     else:
-    #         run_num = max(exst_run_nums) + 1
-
-    # curr_run = 'run%i' % run_num
-    # run_dir = model_dir / curr_run
-    # log_dir = run_dir / 'logs'
-    # os.makedirs(str(log_dir))
 
     run_num = 1
     run_dir = configvar['dir_exp']
@@ -54,7 +36,7 @@ def run(config, configvar):
     torch.manual_seed(configvar['random_seed'])
     np.random.seed(configvar['random_seed'])
     #env = make_parallel_env(config.env_id, config.n_rollout_threads, run_num)
-    from r_maac.box import BoxWorldEnv
+    from MABoxWorld.environments.box import BoxWorldEnv
     env = BoxWorldEnv(
         players=2,
         field_size=(4, 4),
@@ -92,12 +74,11 @@ def run(config, configvar):
                                  binary_dims=[binary_dim for _ in range(model.nagents)],
                                  ac_dims= [acsp.shape[0] if isinstance(acsp, Box) else acsp.n
                                   for acsp in env.action_space])
-    # TODO change replay buffer
     t = 0
     l_rewards = []
-    reward_best      = float("-inf")
-    avg_reward       = float("-inf")
-    avg_reward_best  = float("-inf")
+    reward_best = float("-inf")
+    avg_reward = float("-inf")
+    avg_reward_best = float("-inf")
     path_ckpt_best_avg = ''
     for ep_i in range(0, config.n_episodes, config.n_rollout_threads):
         obs = env.reset()
@@ -106,7 +87,7 @@ def run(config, configvar):
         episode_reward_total = 0
         is_best_avg          = False
 
-        for et_i in range(1, config.episode_length+1):
+        for et_i in range(1, config.episode_length + 1):
             # rearrange observations to be per agent, and convert to torch Variable
             agent_obs = obs['image'].flatten()
             agent_obs = np.expand_dims(agent_obs, axis=0)
@@ -124,14 +105,14 @@ def run(config, configvar):
             # rearrange actions to be per environment
             actions = [np.argmax(ac) for ac in agent_actions]
             next_obs, rewards, dones, infos = env.step(actions)
-            replay_buffer.push(obs, agent_actions, rewards, next_obs, dones) # TODO change replay buffer
+            replay_buffer.push(obs, agent_actions, rewards, next_obs, dones)
             episode_reward_total += rewards.sum()
 
             # TODO add break for dones / episodic tasks
             obs = next_obs
             t += config.n_rollout_threads
             if (len(replay_buffer) >= config.batch_size and
-                (t % config.steps_per_update) < config.n_rollout_threads):
+                    (t % config.steps_per_update) < config.n_rollout_threads):
                 if config.use_gpu:
                     model.prep_training(device='gpu')
                 else:
@@ -160,7 +141,7 @@ def run(config, configvar):
         print('terminal space', obs['image'])
 
 
-    # check if it in average was the best model so far
+        # check if it in average was the best model so far
         th_l_rewards = torch.FloatTensor(np.asarray(l_rewards))
 
 
@@ -170,7 +151,7 @@ def run(config, configvar):
             avg_reward = avg_rewards[-1]
             if avg_reward > avg_reward_best:
                 avg_reward_best = avg_reward
-                is_best_avg = True 
+                is_best_avg = True
 
             if ep_i % config.save_interval_log == 0:
                 os.makedirs('{}/summary/'.format(run_dir), exist_ok=True)
@@ -179,15 +160,13 @@ def run(config, configvar):
                         fp.write("{}\n".format(round(el, 2)))
 
             if is_best_avg:
-                path_ckpt_best_avg_tmp = os.path.join(configvar['dir_saved_models'], 
-                                        'ckpt_best_avg_r{}.pth.tar'.format(avg_reward_best))
+                path_ckpt_best_avg_tmp = os.path.join(configvar['dir_saved_models'],
+                                                      'ckpt_best_avg_r{}.pth.tar'.format(avg_reward_best))
                 model.save(path_ckpt_best_avg_tmp)
-                # torch.save(ckpt, path_ckpt_best_avg_tmp)          
+                # torch.save(ckpt, path_ckpt_best_avg_tmp)
                 if os.path.exists(path_ckpt_best_avg):
                     os.remove(path_ckpt_best_avg)
                 path_ckpt_best_avg = path_ckpt_best_avg_tmp
-
-
 
     model.save('{}/model.pt'.format(run_dir))
     env.close()
@@ -196,7 +175,7 @@ def run(config, configvar):
 
 
 if __name__ == '__main__':
-    import shutil 
+    import shutil
     import datetime
     import json
     import glob as glob
@@ -249,9 +228,9 @@ if __name__ == '__main__':
         train_n_episodes = 15000
         train_episode_length = 50
         test_n_episodes = 2
-        test_episode_length = 25
-    
-    dir_collected_data = './experiments/MAAC_multipleseeds_data_{}_{}_{}'.format(agent_alg,env_id,exp_id)
+        test_episode_length = 50
+
+    dir_collected_data = './experiments/MAAC_multipleseeds_data_{}_{}_{}'.format(agent_alg, env_id, exp_id)
     if os.path.exists(dir_collected_data):
         toDelete= input("{} already exists, delete it if do you want to continue. Delete it? (yes/no) ".\
             format(dir_collected_data))
@@ -310,7 +289,7 @@ if __name__ == '__main__':
 
         if  os.path.exists('{}/collected_data_seed_{}.json'.format(dir_collected_data,seed)) == False:
             run(config, args)
-            
+
             # test
             # model_path = '{}/'.format(args['dir_exp'])
             #model_path = glob.glob('{}/saved_models/ckpt_best_*'.format(args['dir_exp']))[0]

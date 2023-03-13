@@ -7,7 +7,7 @@ from torch.autograd import Variable
 from algorithms.attention_sac import AttentionSAC
 import os
 import json
-from box import BoxWorldEnv
+from MABoxWorld.environments.box import BoxWorldEnv
 import numpy as np
 
 def run(config):
