@@ -10,7 +10,7 @@ from utils.make_env import make_env
 from utils.buffer import ReplayBuffer
 from utils.env_wrappers import SubprocVecEnv, DummyVecEnv
 from algorithms.attention_sac import AttentionSAC, RelationalSAC
-from utils.rel_wrappers import AbsoluteVKBWrapper
+from utils.rel_wrapper2 import AbsoluteVKBWrapper
 import gym
 def make_parallel_env(env_id, n_rollout_threads, seed):
     def get_env_fn(rank):
@@ -36,7 +36,7 @@ def run(config, configvar):
     torch.manual_seed(configvar['random_seed'])
     np.random.seed(configvar['random_seed'])
     #env = make_parallel_env(config.env_id, config.n_rollout_threads, run_num)
-    from MABoxWorld.environments.box import BoxWorldEnv
+    from MABoxWorld.environments.box2 import BoxWorldEnv
     env = BoxWorldEnv(
         players=2,
         field_size=(4, 4),
@@ -47,7 +47,7 @@ def run(config, configvar):
         grid_observation=True,
         simple= True,
         single= False,
-        deterministic=False,
+        deterministic=True,
     )
     env = AbsoluteVKBWrapper(env, num_colours=env.num_colours)
     env.agents = [None] * len(env.action_space)
@@ -82,18 +82,19 @@ def run(config, configvar):
     path_ckpt_best_avg = ''
     for ep_i in range(0, config.n_episodes, config.n_rollout_threads):
         obs = env.reset()
-        print('initial', obs['image'])
+        #print('initial', obs['image'][0],obs['image'][1])
         model.prep_rollouts(device='cpu')
         episode_reward_total = 0
         is_best_avg          = False
 
         for et_i in range(1, config.episode_length + 1):
             # rearrange observations to be per agent, and convert to torch Variable
-            agent_obs = obs['image'].flatten()
-            agent_obs = np.expand_dims(agent_obs, axis=0)
-            torch_obs = [Variable(torch.Tensor(agent_obs),
+            agent_obs = [np.expand_dims(ob['image'].flatten(), axis=0) for ob in obs]
+            #agent_obs = obs['image'].flatten()
+            #agent_obs = np.expand_dims(agent_obs, axis=0)
+            torch_obs = [Variable(torch.Tensor(agent_obs[i]),
                                   requires_grad=False)
-                         for _ in range(model.nagents)]
+                         for i in range(model.nagents)]
             # get actions as torch Variables
             try:
                 torch_agent_actions = model.step(torch_obs, explore=True)
@@ -138,7 +139,7 @@ def run(config, configvar):
         print("%s - %s - Episodes %i of %i - Reward %i" % (env_id, configvar['random_seed'], ep_i + 1,
                                         config.n_episodes,  episode_reward_total))
         l_rewards.append(episode_reward_total)
-        print('terminal space', obs['image'])
+        #print('terminal space', obs['image'])
 
 
         # check if it in average was the best model so far

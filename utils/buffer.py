@@ -62,22 +62,12 @@ class ReplayBuffer(object):
         return self.filled_i
 
     def push(self,
-             observation: dict,
+             observation: tuple,
              actions: list,
              rewards,
-             next_observation: dict,
+             next_observation: tuple,
              dones):
         nentries = 1    # usually for multiple parallel environments, but now just one anyways
-        # TODO split observation into different elements
-        image = observation['image'].flatten()
-        nullary_tensor = observation['nullary']
-        unary_tensor = observation['unary_tensor']
-        binary_tensor = observation['binary_tensor']
-
-        next_image = next_observation['image'].flatten()
-        next_nullary_tensor = next_observation['nullary']
-        next_unary_tensor = next_observation['unary_tensor']
-        next_binary_tensor = next_observation['binary_tensor']
 
         # TODO these are all missing the dimension in the beginning compared to parallel env set up of maac. e.g. obs (12,) instead of (1,2,12)
         if self.curr_i + nentries > self.max_steps:
@@ -91,7 +81,6 @@ class ReplayBuffer(object):
                                                   rollover, axis=0)
                 self.obs_binary_buffs[agent_i] = np.roll(self.obs_binary_buffs[agent_i],
                                                   rollover, axis=0)
-
                 self.ac_buffs[agent_i] = np.roll(self.ac_buffs[agent_i],
                                                  rollover, axis=0)
                 self.rew_buffs[agent_i] = np.roll(self.rew_buffs[agent_i],
@@ -111,19 +100,18 @@ class ReplayBuffer(object):
             self.curr_i = 0
             self.filled_i = self.max_steps
         for agent_i in range(self.num_agents):
-            self.obs_buffs[agent_i][self.curr_i:self.curr_i + nentries] = image
-            self.obs_nullary_buffs[agent_i][self.curr_i:self.curr_i + nentries] = nullary_tensor
-            self.obs_unary_buffs[agent_i][self.curr_i:self.curr_i + nentries] = unary_tensor
-            self.obs_binary_buffs[agent_i][self.curr_i:self.curr_i + nentries] = binary_tensor
+            self.obs_buffs[agent_i][self.curr_i:self.curr_i + nentries] = observation[agent_i]['image'].flatten()
+            self.obs_nullary_buffs[agent_i][self.curr_i:self.curr_i + nentries] = observation[agent_i]['nullary']
+            self.obs_unary_buffs[agent_i][self.curr_i:self.curr_i + nentries] = observation[agent_i]['unary_tensor']
+            self.obs_binary_buffs[agent_i][self.curr_i:self.curr_i + nentries] = observation[agent_i]['binary_tensor']
 
-            # actions are already batched by agent, so they are indexed differently
             self.ac_buffs[agent_i][self.curr_i:self.curr_i + nentries] = actions[agent_i]
             self.rew_buffs[agent_i][self.curr_i:self.curr_i + nentries] = rewards[agent_i]
 
-            self.next_obs_buffs[agent_i][self.curr_i:self.curr_i + nentries] = next_image
-            self.next_obs_nullary_buffs[agent_i][self.curr_i:self.curr_i + nentries] = next_nullary_tensor
-            self.next_obs_unary_buffs[agent_i][self.curr_i:self.curr_i + nentries] = next_unary_tensor
-            self.next_obs_binary_buffs[agent_i][self.curr_i:self.curr_i + nentries] = next_binary_tensor
+            self.next_obs_buffs[agent_i][self.curr_i:self.curr_i + nentries] = next_observation[agent_i]['image'].flatten()
+            self.next_obs_nullary_buffs[agent_i][self.curr_i:self.curr_i + nentries] = next_observation[agent_i]['nullary']
+            self.next_obs_unary_buffs[agent_i][self.curr_i:self.curr_i + nentries] = next_observation[agent_i]['unary_tensor']
+            self.next_obs_binary_buffs[agent_i][self.curr_i:self.curr_i + nentries] = next_observation[agent_i]['binary_tensor']
 
             self.done_buffs[agent_i][self.curr_i:self.curr_i + nentries] = dones[agent_i]
         self.curr_i += nentries
