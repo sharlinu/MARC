@@ -4,10 +4,14 @@ import time
 import imageio
 from pathlib import Path
 from torch.autograd import Variable
-from algorithms.attention_sac import AttentionSAC
+from algorithms.attention_sac import AttentionSAC, RelationalSAC
 import os
 import json
-from MABoxWorld.environments.box import BoxWorldEnv
+import sys
+sys.path.insert(0, '/Users/sharlinu/Desktop/github/MABoxWorld/environments')
+sys.path.insert(0, '/Users/sharlinu/Desktop/github/MABoxWorld/Images')
+sys.path.insert(0, '/Users/sharlinu/Desktop/github/MABoxWorld/')
+from environments.box2 import BoxWorldEnv
 import numpy as np
 
 def run(config):
@@ -27,21 +31,22 @@ def run(config):
     gif_path = '{}/{}'.format(eval_path, 'gifs')
     os.makedirs(gif_path, exist_ok=True)
 
-    maddpg = AttentionSAC.init_from_save(model_path)
+    model = RelationalSAC.init_from_save(model_path)
     print(config.benchmark)
     env = BoxWorldEnv(
         players=2,
-        field_size=(5,5),
+        field_size=(4,4),
         num_colours=2,
         goal_length=2,
-        sight=5,
-        max_episode_steps=200,
-        simple=False,
+        sight=4,
+        max_episode_steps=50,
+        grid_observation = True,
+        simple=True,
         relational=False,
         deterministic=True,
     )
 
-    maddpg.prep_rollouts(device='cpu')
+    model.prep_rollouts(device='cpu')
     ifi = 1 / config.fps  # inter-frame interval
     collect_data = {}
     l_ep_rew = []
@@ -67,15 +72,16 @@ def run(config):
         for t_i in range(config.episode_length):
             calc_start = time.time()
 
-            if config.no_render != False:
-                frames.append(env.render(mode='rgb_array', close=False)[0])  
+            #if config.no_render != False:
+            #    frames.append(env.render(mode='rgb_array', close=False)[0])
 
             # rearrange observations to be per agent, and convert to torch Variable
-            torch_obs = [Variable(torch.Tensor(obs[i]).view(1, -1),
+            agent_obs = [np.expand_dims(ob['image'].flatten(), axis=0) for ob in obs]
+            torch_obs = [Variable(torch.Tensor(agent_obs[i]),
                                   requires_grad=False)
-                         for i in range(maddpg.nagents)]
+                         for i in range(model.nagents)]
             # get actions as torch Variables
-            torch_actions = maddpg.step(torch_obs, explore=False)
+            torch_actions = model.step(torch_obs, explore=False)
             # convert actions to numpy arrays
             actions = [np.argmax(ac.data.numpy().flatten()) for ac in torch_actions]
             obs, rewards, dones, infos = env.step(actions)
@@ -139,7 +145,7 @@ if __name__ == '__main__':
     parser.add_argument("--n_episodes", default=10, type=int)
     parser.add_argument("--episode_length", default=25, type=int)
     parser.add_argument("--fps", default=30, type=int)
-    parser.add_argument("--no_render", action="store_false",
+    parser.add_argument("--no_render", default=True, action="store_false",
                         help="render")
     parser.add_argument("--benchmark", action="store_false",
                         help="benchmark mode")

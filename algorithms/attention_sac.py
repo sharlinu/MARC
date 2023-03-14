@@ -1,9 +1,9 @@
 import torch
 import torch.nn.functional as F
 from torch.optim import Adam
-from r_maac.utils.misc import soft_update, hard_update, enable_gradients, disable_gradients
-from r_maac.utils.agents import AttentionAgent
-from r_maac.utils.critics import AttentionCritic, RelationalCritic, TestCritic, TestCritic2, GCNCritic
+from utils.misc import soft_update, hard_update, enable_gradients, disable_gradients
+from utils.agents import AttentionAgent
+from utils.critics import AttentionCritic, RelationalCritic, TestCritic, TestCritic2, GCNCritic
 import numpy as np
 
 MSELoss = torch.nn.MSELoss()

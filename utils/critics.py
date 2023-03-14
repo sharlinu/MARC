@@ -1,4 +1,4 @@
-from Aurora.agent.geometric.util import batch_to_gd
+#from Aurora.agent.geometric.util import batch_to_gd
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -727,3 +727,45 @@ def parse_code(net_code: str):
 
 
 
+def batch_to_gd(batch: torch.Tensor):
+    # [B x R x E x E]
+    batch_size = batch.shape[0]
+    nb_relations = batch.shape[1] #gets 14 out when full relations
+    nb_objects = batch.shape[2] # gets 81 out for 7x7 grid + walls
+
+    assert batch.shape[2] == batch.shape[3]
+
+    # index array for all entities
+    x = torch.arange(nb_objects).view(-1, 1)
+
+    # I guess this should split the batch into single chunks along the batch size
+    i_lst = [x.view(nb_relations, nb_objects, nb_objects) for x in torch.split(batch, 1, dim=0)]
+
+    def to_gd(tensor: Tensor) -> GeometricData:
+        """
+        takes batch of adjacency geometric data and transforms it to a GeometricData object for torchgeometric
+        """
+        # tensor is one batch of multi-dimensional adjacency matrix
+        nz = torch.nonzero(tensor)
+        edge_attr = nz[:, 0]
+        # edge_lst = nz[:, 1:].cpu().numpy().tolist()
+        # edge_index = torch.LongTensor(list(zip(*edge_lst)))
+        edge_index = nz[:, 1:].T
+        return GeometricData(x=x, edge_index=edge_index, edge_attr=edge_attr)
+
+    batch_data = [to_gd(instance) for instance in i_lst]
+
+    # import torch_geometric
+    # import networkx as nx
+    # g = torch_geometric.utils.to_networkx(batch_data[0], to_undirected=True)
+    # import matplotlib
+    # matplotlib.use("Agg")
+    # import matplotlib.pyplot as plt
+    # f = plt.figure()
+    # nx.draw(g, ax=f.add_subplot(111))
+    # f.savefig("graph.png")
+
+    geometric_batch = Batch.from_data_list(batch_data)
+    max_node = max(i + 1 for b in batch_data for i in b.x[:, 0].cpu().numpy())
+    slices = [max_node for _ in batch_data]
+    return geometric_batch, slices

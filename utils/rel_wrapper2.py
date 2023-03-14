@@ -4,15 +4,15 @@ from Aurora.agent.util import rotate_vec2d
 from gym_minigrid.minigrid import * # imports DIR_TO_VEC as [array([1, 0]), array([0, 1]), array([-1,  0]), array([ 0, -1])]
 import time
 import pygame
+from collections import namedtuple
 #OBJECTS = ind_dict2list(OBJECT_TO_IDX)
 
 class GridObject():
     "object is specified by its location"
-    def __init__(self, x, y, type=[], attribute=[]):
+    def __init__(self, x, y, attributes):
         self.x = x
         self.y = y
-        self.type = type
-        self.attributes = attribute
+        self.attributes = attributes # should be a namedtuple
 
     @property
     def pos(self):
@@ -21,23 +21,6 @@ class GridObject():
     @property
     def name(self):
         return str(self.type)+"_"+str(self.x)+str(self.y)
-
-def parse_object(x:int, y:int, feature: np.array)->GridObject:
-    """
-    :param x: column position
-    :param y: row position
-    :param feature: feature should just be a single digit here, i.e. the color of the box
-    :return:
-    """
-    # TODO this needs to change as we currently already have the color index
-    #obj_type = [str(color2index[tuple(feature)])] # takes in RBG color from pixel and returns color index
-    ##obj_type = [str(feature)] #now it should just be the index of the color that the object has
-    assert (feature[0] in [0,1])
-    type = feature[0]
-    attribute = [str(feature[1])]
-    obj = GridObject(x, y, type=type, attribute=attribute)
-    return obj
-
 
 from random import randint
 class AbsoluteVKBWrapper(gym.core.ObservationWrapper):
@@ -50,10 +33,14 @@ class AbsoluteVKBWrapper(gym.core.ObservationWrapper):
 
         self.num_colours = num_colours
         background_id = background_id[:2]
-        self.attributes = [str(i) for i in range(self.num_colours + 2 )]
+        #self.attributes = [str(i) for i in range(self.num_colours + 2 )]
+        self.attribute_labels = ['agents', 'id', 'colour']
+        self.n_attr = len(self.attribute_labels)
+        self.attributes = namedtuple('attr', ' '.join(self.attribute_labels))
+
         self.env_type = "boxworld"
         self.nullary_predicates = []
-        self.unary_predicates = ['agent'] + self.attributes
+        #self.unary_predicates = ['agent'] + self.attributes
         self.background_id = background_id
         if background_id in ["b0", "nolocal"]:
             self.rel_deter_func = [is_left, is_right, is_front, is_back, is_aligned, is_close]
@@ -94,7 +81,7 @@ class AbsoluteVKBWrapper(gym.core.ObservationWrapper):
         # number of objects/entities are the number of cells on the grid
         self.obj_n = np.prod(env.observation_space[0]['image'].shape[:-1]) #physical entities
         self.nb_all_entities = self.obj_n
-        self.obs_shape = [(len(self.nullary_predicates)), (self.obj_n, 1+ len(self.attributes)),
+        self.obs_shape = [(len(self.nullary_predicates)), (self.obj_n, self.n_attr),
                        (self.obj_n, self.obj_n, len(self.rel_deter_func))] # TODO remove nullary_predicates?
         self.spatial_tensors = None
 
@@ -112,22 +99,20 @@ class AbsoluteVKBWrapper(gym.core.ObservationWrapper):
 
         """
         img = img.astype(np.int32)
-        unary_tensors = [np.zeros(self.obj_n) for _ in range(len(self.unary_predicates))] # so this is a list of binary vectors for each color, indicating what entities have the colour
+        unary_tensors = [np.zeros(self.obj_n) for _ in range(self.n_attr)] # so this is a list of binary vectors for each color, indicating what entities have the colour
         objs = []
         for y, row in enumerate(img):
             for x, pixel in enumerate(row):
-                obj = parse_object(x, y, feature=pixel)
+                #obj = parse_object(x, y, feature=pixel)
+                attributes = self.attributes(*pixel)
+                obj = GridObject(x,y, attributes=attributes)
                 objs.append(obj)
 
         nullary_tensors = []
 
         for obj_idx, obj in enumerate(objs):
-            if obj.type == 1:
-                unary_tensors[0][obj_idx] = 1.0
-            for p_idx, p in enumerate(self.attributes): # first spot is reserved for agent information
-                if p in obj.attributes:
-                    # adds feature, e.g. colour as unary tensor
-                    unary_tensors[p_idx+1][obj_idx] = 1.0
+            for p_idx, p in enumerate(self.attribute_labels):
+                unary_tensors[p_idx][obj_idx] = obj.attributes[p_idx]
 
         if not self.spatial_tensors:
             # create spatial tensors that gives for every rel. det rule a binary indicator between the entities
@@ -174,6 +159,7 @@ def is_self(obj1, obj2, _ )->bool:
         return True
     else:
         return False
+
 def is_any(obj1, obj2, _ )->bool:
     if obj1 != obj2:
         return True

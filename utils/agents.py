@@ -1,8 +1,8 @@
 from torch import Tensor
 from torch.autograd import Variable
 from torch.optim import Adam
-from r_maac.utils.misc import hard_update, gumbel_softmax, onehot_from_logits
-from r_maac.utils.policies import DiscretePolicy
+from utils.misc import hard_update, gumbel_softmax, onehot_from_logits
+from utils.policies import DiscretePolicy
 
 class AttentionAgent(object):
     """

@@ -47,7 +47,7 @@ def run(config, configvar):
         grid_observation=True,
         simple= True,
         single= False,
-        deterministic=True,
+        deterministic=False,
     )
     env = AbsoluteVKBWrapper(env, num_colours=env.num_colours)
     env.agents = [None] * len(env.action_space)
@@ -292,11 +292,11 @@ if __name__ == '__main__':
             run(config, args)
 
             # test
-            # model_path = '{}/'.format(args['dir_exp'])
-            #model_path = glob.glob('{}/saved_models/ckpt_best_*'.format(args['dir_exp']))[0]
-            #cmd_test = 'python evaluate.py {} {} --n_episodes {} --episode_length {} --no_render'.format(env_id, model_path, test_n_episodes, test_episode_length)
-            #print(cmd_test)
-            #os.system(cmd_test)
+            model_path = '{}/'.format(args['dir_exp'])
+            model_path = glob.glob('{}/saved_models/ckpt_best_*'.format(args['dir_exp']))[0]
+            cmd_test = 'python evaluate_discrete.py {} {} --n_episodes {} --episode_length {} --no_render'.format(env_id, model_path, test_n_episodes, test_episode_length)
+            print(cmd_test)
+            os.system(cmd_test)
 
             # save files to dir collected data
             shutil.copyfile('{}/evaluate/collected_data.json'.format(list_exp_dir[-1]),
