@@ -42,8 +42,7 @@ def run(config):
         max_episode_steps=50,
         grid_observation = True,
         simple=True,
-        relational=False,
-        deterministic=True,
+        #deterministic=True,
     )
 
     model.prep_rollouts(device='cpu')
@@ -63,13 +62,18 @@ def run(config):
         l_rewards = []
         ep_rew = 0
 
+
+        from utils.rel_wrapper2 import AbsoluteVKBWrapper
+        env = AbsoluteVKBWrapper(env, num_colours=env.num_colours)
         obs = env.reset()
+        env.render()
 
         if config.save_gifs:
             frames = []
             frames.append(env.render('rgb_array')[0])
 
         for t_i in range(config.episode_length):
+            #print('unary', obs[0]['unary_tensor'][:,0])
             calc_start = time.time()
 
             #if config.no_render != False:
@@ -87,8 +91,8 @@ def run(config):
             obs, rewards, dones, infos = env.step(actions)
             env.render()
             time.sleep(0.5)
-            collect_item['final_reward'] = sum(rewards)
-            collect_item['l_rewards'].append(sum(rewards))
+            #collect_item['final_reward'] = sum(rewards)
+            #collect_item['l_rewards'].append(sum(rewards))
             collect_item['l_infos'].append(infos)
 
             calc_end = time.time()
@@ -113,19 +117,7 @@ def run(config):
 
         with open('{}/collected_data.json'.format(eval_path), 'w') as outfile:
             json.dump(collect_data, outfile,indent=4)
-        #     if config.save_gifs:
-        #         frames.append(env.render('rgb_array')[0])
-        #     calc_end = time.time()
-        #     elapsed = calc_end - calc_start
-        #     if elapsed < ifi:
-        #         time.sleep(ifi - elapsed)
-        #     env.render('human')
-        # if config.save_gifs:
-        #     gif_num = 0
-        #     while (gif_path / ('%i_%i.gif' % (gif_num, ep_i))).exists():
-        #         gif_num += 1
-        #     imageio.mimsave(str(gif_path / ('%i_%i.gif' % (gif_num, ep_i))),
-        #                     frames, duration=ifi)
+
     print("Average reward: {}".format(sum(l_ep_rew)/config.n_episodes))
     env.close()
 

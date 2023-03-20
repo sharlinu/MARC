@@ -6,22 +6,9 @@ from gym.spaces import Box
 from pathlib import Path
 from torch.autograd import Variable
 from tensorboardX import SummaryWriter
-from utils.make_env import make_env
 from utils.buffer import ReplayBuffer
-from utils.env_wrappers import SubprocVecEnv, DummyVecEnv
 from algorithms.attention_sac import AttentionSAC, RelationalSAC
 from utils.rel_wrapper2 import AbsoluteVKBWrapper
-import gym
-def make_parallel_env(env_id, n_rollout_threads, seed):
-    def get_env_fn(rank):
-        def init_env():
-            env = gym.make("Foraging-8x8-2p-1f-v0")
-            return env
-        return init_env
-    if n_rollout_threads == 1:
-        return DummyVecEnv([get_env_fn(0)])
-    else:
-        return SubprocVecEnv([get_env_fn(i) for i in range(n_rollout_threads)])
 
 def run(config, configvar):
     torch.set_num_threads(1)
@@ -35,25 +22,25 @@ def run(config, configvar):
 
     torch.manual_seed(configvar['random_seed'])
     np.random.seed(configvar['random_seed'])
-    #env = make_parallel_env(config.env_id, config.n_rollout_threads, run_num)
     from MABoxWorld.environments.box2 import BoxWorldEnv
     env = BoxWorldEnv(
         players=2,
         field_size=(4, 4),
-        num_colours=1,
-        goal_length=1,
+        num_colours=2,
+        goal_length=2,
         sight=4,
         max_episode_steps=config.episode_length,
         grid_observation=True,
         simple= True,
         single= False,
-        deterministic=False,
+        #deterministic=True,
     )
     env = AbsoluteVKBWrapper(env, num_colours=env.num_colours)
     env.agents = [None] * len(env.action_space)
     nullary_dim = env.obs_shape[0]
     unary_dim = env.obs_shape[1]
     binary_dim = env.obs_shape[2]
+    print('nullary_dim', nullary_dim, 'unary_dim:', unary_dim, 'binary_dim', binary_dim)
     env.seed(seed)
     np.random.seed(seed)
 
@@ -109,7 +96,6 @@ def run(config, configvar):
             replay_buffer.push(obs, agent_actions, rewards, next_obs, dones)
             episode_reward_total += rewards.sum()
 
-            # TODO add break for dones / episodic tasks
             obs = next_obs
             t += config.n_rollout_threads
             if (len(replay_buffer) >= config.batch_size and
@@ -134,8 +120,8 @@ def run(config, configvar):
             ep_rews = replay_buffer.get_average_rewards(et_i) #TODO what is this reward? seems standardized
         else:
             ep_rews = replay_buffer.get_average_rewards(config.episode_length * config.n_rollout_threads)
-        # for a_i, a_ep_rew in enumerate(ep_rews):
-        #     logger.add_scalar('agent%i/mean_episode_rewards' % a_i, a_ep_rew, ep_i)
+        for a_i, a_ep_rew in enumerate(ep_rews):
+             logger.add_scalar('agent%i/mean_episode_rewards' % a_i, a_ep_rew, ep_i)
         print("%s - %s - Episodes %i of %i - Reward %i" % (env_id, configvar['random_seed'], ep_i + 1,
                                         config.n_episodes,  episode_reward_total))
         l_rewards.append(episode_reward_total)
@@ -194,7 +180,7 @@ if __name__ == '__main__':
     parser.add_argument("--num_updates", default=4, type=int,
                         help="Number of updates per update cycle")
     parser.add_argument("--batch_size",
-                        default=64, type=int,
+                        default=128, type=int,
                         help="Batch size for training")
     parser.add_argument("--save_interval", default=10000, type=int)
     parser.add_argument("--save_interval_log", default=100, type=int)
@@ -213,8 +199,8 @@ if __name__ == '__main__':
     config = parser.parse_args()
     args   = vars(config)
 
-    env_id = 'Boxworld'
-    agent_alg = 'MAAC'
+    env_id = 'Boxworld_random_key'
+    agent_alg = 'rgcn'
 
     exp_id = 'std'
     # exp_id = 'try'
@@ -226,10 +212,10 @@ if __name__ == '__main__':
         test_episode_length = 25
     else:
         seeds = [4001] #[1,2001,4001,6001,8001]
-        train_n_episodes = 15000
+        train_n_episodes = 6000
         train_episode_length = 50
-        test_n_episodes = 2
-        test_episode_length = 50
+        test_n_episodes = 10
+        test_episode_length = 10
 
     dir_collected_data = './experiments/MAAC_multipleseeds_data_{}_{}_{}'.format(agent_alg, env_id, exp_id)
     if os.path.exists(dir_collected_data):
@@ -249,14 +235,11 @@ if __name__ == '__main__':
         args['n_episodes']     = train_n_episodes
         args['episode_length'] = train_episode_length
         args['exp_id']         = exp_id
-        args['modelname']      = 'MAAC'
-        args['modelname']      = 'MAAC'
+        args['modelname']      = agent_alg
 
-        dir_exp_name = '{}_{}_{}_{}_{}_seed{}'.format(str([datetime.date.today()][0]),
+        dir_exp_name = '{}_{}_{}_{}'.format(str([datetime.date.today()][0]),
                                     args['env_id'],
                                     args['modelname'],
-                                    agent_alg,
-                                    args['exp_id'],
                                     args['random_seed'])
         args['dir_exp'] = '{}/{}'.format(args['dir_base'],dir_exp_name)
         args['dir_summary'] = '{}/summary'.format(args['dir_exp'])

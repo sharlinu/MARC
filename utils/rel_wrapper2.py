@@ -1,6 +1,4 @@
 import numpy as np
-from Aurora.environment.box.boxworld_gen import color2index, all_colors
-from Aurora.agent.util import rotate_vec2d
 from gym_minigrid.minigrid import * # imports DIR_TO_VEC as [array([1, 0]), array([0, 1]), array([-1,  0]), array([ 0, -1])]
 import time
 import pygame
@@ -144,15 +142,10 @@ class AbsoluteVKBWrapper(gym.core.ObservationWrapper):
         for ob in obs:
             spatial_VKB = self.img2vkb(ob['image'])
             ob['nullary'], ob['unary_tensor'], ob['binary_tensor'] = spatial_VKB
-
         return obs
-
-
-
 
 def offset2idx_offset(x, y, width):
     return y*width+x
-
 
 def is_self(obj1, obj2, _ )->bool:
     if obj1 == obj2:
@@ -247,7 +240,7 @@ def fan_left(obj1, obj2, direction_vec)->bool:
 
 
 if __name__ == "__main__":
-    from r_maac.box import BoxWorldEnv
+    from MABoxWorld.environments.box2 import BoxWorldEnv
     env = BoxWorldEnv(
         players=2,
         field_size=(5,5),
@@ -297,3 +290,14 @@ if __name__ == "__main__":
         pygame.event.pump()  # process event queue
     # print(env.players[0].score, env.players[1].score)
 
+def rotate_vec2d(vec, degrees):
+    """
+    rotate a vector anti-clockwise
+    :param vec:
+    :param degrees:
+    :return:
+    """
+    theta = np.radians(degrees)
+    c, s = np.cos(theta), np.sin(theta)
+    R = np.array(((c, -s), (s, c)))
+    return R@vec

@@ -616,9 +616,10 @@ class GCNCritic(nn.Module):
             critic.add_module('critic_fc2', nn.Linear(hidden_dim, self.num_actions))
             self.critics_head.append(critic) # one critic for each agent
 
-        #embedder = nn.Linear(input_dims[1], hidden_dim) # TODO - hardcoding needed?
+        self.embedder = nn.Linear(input_dims[1], hidden_dim) # TODO - hardcoding needed?
 
-        self.gcn = GCNConv(input_dims[1], hidden_dim)
+        #self.gcn = GCNConv(input_dims[1], hidden_dim)
+        self.gcn = GCNConv(hidden_dim, hidden_dim)
 
         #self.embedder = embedder # TODO shared or individual?
         self.shared_modules = []
@@ -674,6 +675,7 @@ class GCNCritic(nn.Module):
         # feature embedding
         #embedds = self.embedder(inputs[1]) # seems right so far
         embedds = inputs[1]
+        embedds = self.embedder(embedds)
 
 
         nb_relations = 1
@@ -741,7 +743,7 @@ def batch_to_gd(batch: torch.Tensor):
     # I guess this should split the batch into single chunks along the batch size
     i_lst = [x.view(nb_relations, nb_objects, nb_objects) for x in torch.split(batch, 1, dim=0)]
 
-    def to_gd(tensor: Tensor) -> GeometricData:
+    def to_gd(tensor: torch.Tensor) -> GeometricData:
         """
         takes batch of adjacency geometric data and transforms it to a GeometricData object for torchgeometric
         """
@@ -754,16 +756,6 @@ def batch_to_gd(batch: torch.Tensor):
         return GeometricData(x=x, edge_index=edge_index, edge_attr=edge_attr)
 
     batch_data = [to_gd(instance) for instance in i_lst]
-
-    # import torch_geometric
-    # import networkx as nx
-    # g = torch_geometric.utils.to_networkx(batch_data[0], to_undirected=True)
-    # import matplotlib
-    # matplotlib.use("Agg")
-    # import matplotlib.pyplot as plt
-    # f = plt.figure()
-    # nx.draw(g, ax=f.add_subplot(111))
-    # f.savefig("graph.png")
 
     geometric_batch = Batch.from_data_list(batch_data)
     max_node = max(i + 1 for b in batch_data for i in b.x[:, 0].cpu().numpy())

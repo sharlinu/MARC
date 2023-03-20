@@ -611,5 +611,3 @@ class RelationalSAC(object):
             instance.target_critic.load_state_dict(critic_params['target_critic'])
             instance.critic_optimizer.load_state_dict(critic_params['critic_optimizer'])
         return instance
-
-
