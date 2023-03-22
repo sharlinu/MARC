@@ -21,16 +21,15 @@ class GridObject():
         return str(self.type)+"_"+str(self.x)+str(self.y)
 
 from random import randint
-class AbsoluteVKBWrapper(gym.core.ObservationWrapper):
+class AbsoluteVKBWrapper(gym.ObservationWrapper):
     """
     Add a vkb key-value pair, which represents the state as a vectorised knowledge base.
     Entities are objects in the gird-world, predicates represents the properties of them and relations between them.
     """
     def __init__(self, env, num_colours, background_id="b3"):
-        super().__init__(env)
+        super().__init__(env, new_step_api=True)
 
         self.num_colours = num_colours
-        background_id = background_id[:2]
         #self.attributes = [str(i) for i in range(self.num_colours + 2 )]
         self.attribute_labels = ['agents', 'id', 'colour']
         self.n_attr = len(self.attribute_labels)
@@ -144,6 +143,18 @@ class AbsoluteVKBWrapper(gym.core.ObservationWrapper):
             ob['nullary'], ob['unary_tensor'], ob['binary_tensor'] = spatial_VKB
         return obs
 
+def rotate_vec2d(vec, degrees):
+    """
+    rotate a vector anti-clockwise
+    :param vec:
+    :param degrees:
+    :return:
+    """
+    theta = np.radians(degrees)
+    c, s = np.cos(theta), np.sin(theta)
+    R = np.array(((c, -s), (s, c)))
+    return R@vec
+
 def offset2idx_offset(x, y, width):
     return y*width+x
 
@@ -253,16 +264,8 @@ if __name__ == "__main__":
         relational = False,
         deterministic= True,
     )
-
-    from Aurora.environment.box.box_world_env import BoxWorld
-    env2=BoxWorld(4,2,0,0)
-    #obs2 = env2.reset()
-    #print('obs2.shape ----', obs2)
-    obs = env.reset()
-    print('obs1.type ----', type(obs) )
-    print('obs1.type ----', obs)
-    print('observation_space ----', env.observation_space)
     env = AbsoluteVKBWrapper(env, num_colours=env.num_colours)
+    obs = env.reset()
     render= True
     done = False
     if render:
@@ -290,14 +293,4 @@ if __name__ == "__main__":
         pygame.event.pump()  # process event queue
     # print(env.players[0].score, env.players[1].score)
 
-def rotate_vec2d(vec, degrees):
-    """
-    rotate a vector anti-clockwise
-    :param vec:
-    :param degrees:
-    :return:
-    """
-    theta = np.radians(degrees)
-    c, s = np.cos(theta), np.sin(theta)
-    R = np.array(((c, -s), (s, c)))
-    return R@vec
+

@@ -462,30 +462,21 @@ class RelationalCritic(nn.Module):
         self.sa_sizes = sa_sizes
         self.nagents = len(sa_sizes)
         self.num_actions = n_actions[0]
-        self.critic_encoders = nn.ModuleList()
         self.critics_head = nn.ModuleList()
+        self.nb_edge_types = input_dims[2]
+        self.max_reduce = True # TODO hardcoded
 
-        # self.state_encoder = nn.ModuleList()
+        self.embedder = nn.Linear(input_dims[1], hidden_dim) # TODO - hardcoding needed?
+        self.gnn_layers = RGCNConv(hidden_dim, hidden_dim, self.nb_edge_types)
+
         # iterate over agents
         for _ in range(self.nagents):
             critic = nn.Sequential()
-            critic.add_module('critic_fc1', nn.Linear(hidden_dim, # critic only takes in 1* hidden_dim now
+            critic.add_module('critic_fc1', nn.Linear(hidden_dim + self.num_actions * (self.nagents-1),
                                                       hidden_dim))
             critic.add_module('critic_nl', nn.LeakyReLU())
             critic.add_module('critic_fc2', nn.Linear(hidden_dim, self.num_actions))
             self.critics_head.append(critic) # one critic for each agent
-
-
-        nb_edge_types = input_dims[2]
-
-        # default is nb_layers = gnn_layers = 2 and nb_dense_layers =0
-        nb_layers, nb_dense_layers, _ = parse_code(net_code)
-        self.max_reduce = True # TODO hardcoded
-
-        embedder = nn.Linear(input_dims[1], hidden_dim) # TODO - hardcoding needed?
-
-        self.gnn_layers = RGCNConv(hidden_dim, hidden_dim, nb_edge_types)
-        self.embedder = embedder # TODO shared or individual?
 
         self.shared_modules = [self.embedder, self.gnn_layers]
 
@@ -566,8 +557,10 @@ class RelationalCritic(nn.Module):
         all_rets = []
         for i, a_i in enumerate(agents):
         # extract state encoding for each agent that we're returning Q for
+            other_actions = actions[-a_i]
+            critic_in = torch.cat((x, other_actions), dim=1)
             agent_rets = []
-            all_q = self.critics_head[a_i](x)
+            all_q = self.critics_head[a_i](critic_in)
             int_acs = actions[a_i].max(dim=1, keepdim=True)[1]
             q = all_q.gather(1, int_acs)
             if return_q:

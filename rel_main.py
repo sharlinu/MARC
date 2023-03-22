@@ -5,44 +5,50 @@ import numpy as np
 from gym.spaces import Box
 from pathlib import Path
 from torch.autograd import Variable
+from warnings import filterwarnings  # noqa
+filterwarnings(action='ignore',
+                        category=DeprecationWarning,
+                        module='tensorboardX')
 from tensorboardX import SummaryWriter
 from utils.buffer import ReplayBuffer
 from algorithms.attention_sac import AttentionSAC, RelationalSAC
 from utils.rel_wrapper2 import AbsoluteVKBWrapper
+import yaml
+from utils.plotting import plot_fig
 
-def run(config, configvar):
+
+def run(config):
     torch.set_num_threads(1)
 
     run_num = 1
-    run_dir = configvar['dir_exp']
-    log_dir = configvar['dir_summary']
-    config.env_id = configvar['env_id']
+    run_dir = config.dir_exp
+    log_dir = config.dir_summary
 
     logger = SummaryWriter(str(log_dir))
 
-    torch.manual_seed(configvar['random_seed'])
-    np.random.seed(configvar['random_seed'])
+    torch.manual_seed(config.random_seed)
+    np.random.seed(config.random_seed)
     from MABoxWorld.environments.box2 import BoxWorldEnv
     env = BoxWorldEnv(
-        players=2,
-        field_size=(4, 4),
-        num_colours=2,
-        goal_length=2,
-        sight=4,
+        players=config.player,
+        field_size=(config.field, config.field),
+        num_colours=config.num_colours,
+        goal_length=config.goal_length,
+        sight=config.field,
         max_episode_steps=config.episode_length,
-        grid_observation=True,
-        simple= True,
-        single= False,
-        #deterministic=True,
+        grid_observation=config.grid_observation,
+        single=config.single,
+        simple=config.simple,
+        deterministic=config.deterministic,
     )
+    env.seed(config.random_seed)
+    np.random.seed(config.random_seed)
     env = AbsoluteVKBWrapper(env, num_colours=env.num_colours)
     env.agents = [None] * len(env.action_space)
     nullary_dim = env.obs_shape[0]
     unary_dim = env.obs_shape[1]
     binary_dim = env.obs_shape[2]
     print('nullary_dim', nullary_dim, 'unary_dim:', unary_dim, 'binary_dim', binary_dim)
-    env.seed(seed)
-    np.random.seed(seed)
 
     model = RelationalSAC.init_from_env(env,
                                        tau=config.tau,
@@ -116,13 +122,13 @@ def run(config, configvar):
                 break
             # TODO change back
 
-        if ('box' or 'collect') in env_id:
+        if ('box' or 'collect') in config.env_id:
             ep_rews = replay_buffer.get_average_rewards(et_i) #TODO what is this reward? seems standardized
         else:
             ep_rews = replay_buffer.get_average_rewards(config.episode_length * config.n_rollout_threads)
         for a_i, a_ep_rew in enumerate(ep_rews):
              logger.add_scalar('agent%i/mean_episode_rewards' % a_i, a_ep_rew, ep_i)
-        print("%s - %s - Episodes %i of %i - Reward %i" % (env_id, configvar['random_seed'], ep_i + 1,
+        print("%s - %s - Episodes %i of %i - Reward %i" % (config.env_id, config.random_seed, ep_i + 1,
                                         config.n_episodes,  episode_reward_total))
         l_rewards.append(episode_reward_total)
         #print('terminal space', obs['image'])
@@ -147,7 +153,7 @@ def run(config, configvar):
                         fp.write("{}\n".format(round(el, 2)))
 
             if is_best_avg:
-                path_ckpt_best_avg_tmp = os.path.join(configvar['dir_saved_models'],
+                path_ckpt_best_avg_tmp = os.path.join(config.dir_saved_models,
                                                       'ckpt_best_avg_r{}.pth.tar'.format(avg_reward_best))
                 model.save(path_ckpt_best_avg_tmp)
                 # torch.save(ckpt, path_ckpt_best_avg_tmp)
@@ -155,6 +161,7 @@ def run(config, configvar):
                     os.remove(path_ckpt_best_avg)
                 path_ckpt_best_avg = path_ckpt_best_avg_tmp
 
+    plot_fig(l_rewards, 'rewards_total', config.dir_summary)
     model.save('{}/model.pt'.format(run_dir))
     env.close()
     logger.export_scalars_to_json('{}/summary.json'.format(run_dir))
@@ -197,30 +204,21 @@ if __name__ == '__main__':
                         help='path of the experiment directory')
     parser.set_defaults(use_gpu=False)
     config = parser.parse_args()
-    args   = vars(config)
+    args = vars(config)
 
-    env_id = 'Boxworld_random_key'
-    agent_alg = 'rgcn'
+    with open("config.yaml", "r") as file:
+        params = yaml.load(file, Loader=yaml.FullLoader)
 
-    exp_id = 'std'
-    # exp_id = 'try'
-    if exp_id == 'try':
-        seeds = [1,2001]
-        train_n_episodes = 101
-        train_episode_length = 25
-        test_n_episodes = 5
-        test_episode_length = 25
-    else:
-        seeds = [4001] #[1,2001,4001,6001,8001]
-        train_n_episodes = 6000
-        train_episode_length = 50
-        test_n_episodes = 10
-        test_episode_length = 10
+    for k, v in params.items():
+        args[k] = v
 
-    dir_collected_data = './experiments/MAAC_multipleseeds_data_{}_{}_{}'.format(agent_alg, env_id, exp_id)
+    dir_collected_data = './experiments/MAAC_multipleseeds_data_{}_{}_{}'.format(config.agent_alg, config.env_id,
+                                                                                 config.exp_id)
+
     if os.path.exists(dir_collected_data):
-        toDelete= input("{} already exists, delete it if do you want to continue. Delete it? (yes/no) ".\
-            format(dir_collected_data))
+        #toDelete = input("{} already exists, delete it if do you want to continue. Delete it? (yes/no) ". \
+        #                 format(dir_collected_data))
+        toDelete = 'yes'
         if toDelete.lower() == 'yes':
             shutil.rmtree(dir_collected_data)
             print("Directory removed")
@@ -229,19 +227,14 @@ if __name__ == '__main__':
         os.makedirs(dir_collected_data)
 
     list_exp_dir = []
-    for seed in seeds:
-        args['env_id']         = env_id
-        args['random_seed']    = seed
-        args['n_episodes']     = train_n_episodes
-        args['episode_length'] = train_episode_length
-        args['exp_id']         = exp_id
-        args['modelname']      = agent_alg
+    for seed in args['seeds']:
+        args['random_seed'] = seed
 
-        dir_exp_name = '{}_{}_{}_{}'.format(str([datetime.date.today()][0]),
-                                    args['env_id'],
-                                    args['modelname'],
-                                    args['random_seed'])
-        args['dir_exp'] = '{}/{}'.format(args['dir_base'],dir_exp_name)
+        dir_exp_name = '{}_{}_{}_seed{}'.format(str([datetime.date.today()][0]),
+                                                args['env_id'],
+                                                args['exp_id'],
+                                                args['random_seed'])
+        args['dir_exp'] = '{}/{}'.format(args['dir_base'], dir_exp_name)
         args['dir_summary'] = '{}/summary'.format(args['dir_exp'])
         args['dir_saved_models'] = '{}/saved_models'.format(args['dir_exp'])
         args['dir_monitor'] = '{}/monitor'.format(args['dir_exp'])
@@ -251,14 +244,15 @@ if __name__ == '__main__':
         if os.path.exists(directory):
             # toDelete= input("{} already exists, delete it if do you want to continue. Delete it? (yes/no) ".\
             #     format(directory))
-            toDelete = 'no'
+            toDelete = 'yes'
             if toDelete.lower() == 'yes':
                 shutil.rmtree(directory)
                 print("Directory removed")
-            if toDelete == 'No':
+            if toDelete.lower() == 'no':
                 print("It was not possible to continue, an experiment \
-                    folder is required.Terminiting here.")
+                        folder is required.Terminiting here.")
                 import sys
+
                 sys.exit()
         if os.path.exists(directory) == False:
             os.makedirs(directory)
@@ -271,22 +265,22 @@ if __name__ == '__main__':
         # train
         list_exp_dir.append(args['dir_exp'])
 
-        if  os.path.exists('{}/collected_data_seed_{}.json'.format(dir_collected_data,seed)) == False:
-            run(config, args)
+        if os.path.exists('{}/collected_data_seed_{}.json'.format(dir_collected_data, seed)) == False:
+            run(config)
 
             # test
-            model_path = '{}/'.format(args['dir_exp'])
+            # model_path = '{}/'.format(args['dir_exp'])
             model_path = glob.glob('{}/saved_models/ckpt_best_*'.format(args['dir_exp']))[0]
-            cmd_test = 'python evaluate_discrete.py {} {} --n_episodes {} --episode_length {} --no_render'.format(env_id, model_path, test_n_episodes, test_episode_length)
+            cmd_test = 'python evaluate_discrete.py {} --no_render'.format(model_path)
             print(cmd_test)
             os.system(cmd_test)
 
             # save files to dir collected data
-            shutil.copyfile('{}/evaluate/collected_data.json'.format(list_exp_dir[-1]),
-                    '{}/collected_data_seed_{}.json'.format(dir_collected_data,seed)
-                    )
+            #            shutil.copyfile('{}/evaluate/collected_data.json'.format(list_exp_dir[-1]),
+            #                    '{}/collected_data_seed_{}.json'.format(dir_collected_data,seed)
+            #                    )
 
             # save files to dir collected data
             shutil.copyfile('{}/summary/reward_total.txt'.format(list_exp_dir[-1]),
-                    '{}/reward_training_seed{}.txt'.format(dir_collected_data,seed)
-                    )
+                            '{}/reward_training_seed{}.txt'.format(dir_collected_data, seed)
+                            )

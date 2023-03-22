@@ -1,0 +1,22 @@
+env_id: 'Boxworld_box'
+simple: False
+deterministic: True
+single: False
+
+player: 2
+field: 4
+num_colours: 2
+goal_length: 2
+grid_observation: True
+
+n_episodes: 20000
+episode_length: 100
+test_n_episodes: 5
+test_episode_length: 15
+seeds: [4001]
+agent_alg: 'RMAC'
+exp_id : 'std'
+
+#save_interval: 500
+
+
