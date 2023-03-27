@@ -16,7 +16,7 @@ def plot_fig(record, name, path_summary):
     plt.axvline(0, color='black')
     # plt.yticks(np.arange(-200, 10, 10.0))
 
-    ax.plot(durations_t.numpy())
+    #ax.plot(durations_t.numpy())
     if len(durations_t) >= 100:
         means = durations_t.unfold(0, 100, 1).mean(1).view(-1)
         means = torch.cat((torch.zeros(99), means))
@@ -28,3 +28,10 @@ def plot_fig(record, name, path_summary):
     plt.show()
     fig.savefig('{}/{}.png'.format(path_summary, name))
     plt.close(fig)
+
+if __name__ == '__main__':
+    with open('../experiments/2023-03-22_Boxworld_box_std_seed4001/summary/reward_total.txt', 'r') as fp:
+        lines = [float(line) for line in fp]
+
+        plot_fig(lines, 'reward_total', '../experiments/2023-03-22_Boxworld_box_std_seed4001/summary')
+        print('worked')
