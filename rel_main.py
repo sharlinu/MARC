@@ -261,6 +261,9 @@ if __name__ == '__main__':
             os.makedirs(args['dir_monitor'])
             with open(os.path.expanduser('{}/arguments.txt'.format(args['dir_exp'])), 'w+') as file:
                 file.write(json.dumps(args, indent=4, sort_keys=True))
+            with open(os.path.expanduser('{}/config.yaml'.format(args['dir_exp'])), 'w+') as file:
+                documents = yaml.dump(args, file)
+
 
         # train
         list_exp_dir.append(args['dir_exp'])

@@ -24,11 +24,6 @@ class Action(Enum):
     EAST = 4
 def run(config):
     model_path = config.model_path
-    # if config.incremental is not None:
-    #     model_path = model_path / 'incremental' / ('model_ep%i.pt' %
-    #                                                config.incremental)
-    # else:
-    #     model_path = model_path / 'model.pt'
 
     # create folder for evaluating
     eval_path = Path(config.model_path)
@@ -154,7 +149,7 @@ if __name__ == '__main__':
 
     args = vars(config)
 
-    with open("config.yaml", "r") as file:
+    with open(f"{config.dir_exp}/config.yaml", "r") as file:
         params = yaml.load(file, Loader=yaml.FullLoader)
 
     for k,v in params.items():
