@@ -70,7 +70,8 @@ def run(config):
         from utils.rel_wrapper2 import AbsoluteVKBWrapper
         env = AbsoluteVKBWrapper(env, num_colours=env.num_colours)
         obs = env.reset()
-        env.render()
+        if render:
+            env.render()
 
         if config.save_gifs:
             frames = []
@@ -93,15 +94,16 @@ def run(config):
             # convert actions to numpy arrays
             actions = [np.argmax(ac.data.numpy().flatten()) for ac in torch_actions]
             obs, rewards, dones, infos = env.step(actions)
-            env.render()
-            time.sleep(0.5)
+            if render:
+                env.render()
+                time.sleep(0.5)
             #collect_item['final_reward'] = sum(rewards)
             #collect_item['l_rewards'].append(sum(rewards))
             collect_item['l_infos'].append(infos)
 
             calc_end = time.time()
             elapsed = calc_end - calc_start
-            if elapsed < ifi:
+            if render and (elapsed < ifi):
                 time.sleep(ifi - elapsed)
             ep_rew += sum(rewards)
 
@@ -146,10 +148,11 @@ if __name__ == '__main__':
     parser.add_argument("--benchmark", action="store_false",
                         help="benchmark mode")
     config = parser.parse_args()
-
+    render = False
     args = vars(config)
-
-    with open(f"{config.dir_exp}/config.yaml", "r") as file:
+    eval_path = Path(config.model_path)
+    dir_exp = Path(*eval_path.parts[:-2])
+    with open(f"{dir_exp}/config.yaml", "r") as file:
         params = yaml.load(file, Loader=yaml.FullLoader)
 
     for k,v in params.items():
