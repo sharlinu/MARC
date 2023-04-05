@@ -43,12 +43,12 @@ def run(config):
     )
     env.seed(config.random_seed)
     np.random.seed(config.random_seed)
-    env = AbsoluteVKBWrapper(env, num_colours=env.num_colours)
+    env = AbsoluteVKBWrapper(env, num_colours=env.num_colours, background_id=config.background_id)
+    print(f'Background id used {env.background_id}')
     env.agents = [None] * len(env.action_space)
-    nullary_dim = env.obs_shape[0]
-    unary_dim = env.obs_shape[1]
-    binary_dim = env.obs_shape[2]
-    print('nullary_dim', nullary_dim, 'unary_dim:', unary_dim, 'binary_dim', binary_dim)
+    unary_dim = env.obs_shape[0]
+    binary_dim = env.obs_shape[1]
+    print('unary_dim:', unary_dim, 'binary_dim', binary_dim)
 
     model = RelationalSAC.init_from_env(env,
                                        tau=config.tau,
@@ -62,7 +62,6 @@ def run(config):
     replay_buffer = ReplayBuffer(max_steps=config.buffer_length,
                                  num_agents=model.nagents,
                                  obs_dims=[np.prod(obsp['image'].shape) for obsp in env.observation_space],
-                                 nullary_dims=[nullary_dim for _ in range(model.nagents)],
                                  unary_dims=[unary_dim for _ in range(model.nagents)],
                                  binary_dims=[binary_dim for _ in range(model.nagents)],
                                  ac_dims= [acsp.shape[0] if isinstance(acsp, Box) else acsp.n
