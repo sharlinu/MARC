@@ -12,6 +12,7 @@ class ReplayBuffer(object):
                  max_steps,
                  num_agents,
                  obs_dims,
+                 nullary_dims,
                  unary_dims,
                  binary_dims,
                  ac_dims):
@@ -26,17 +27,20 @@ class ReplayBuffer(object):
         self.max_steps = max_steps
         self.num_agents = num_agents
         self.obs_buffs = []
+        self.obs_nullary_buffs = []
         self.obs_unary_buffs = []
         self.obs_binary_buffs = []
         self.ac_buffs = []
         self.rew_buffs = []
         self.next_obs_buffs = []
+        self.next_obs_nullary_buffs = []
         self.next_obs_unary_buffs = []
         self.next_obs_binary_buffs = []
         self.done_buffs = []
-        for odim, unary_dim, binary_dim, adim in zip(obs_dims, unary_dims, binary_dims,
+        for odim, nullary_dim, unary_dim, binary_dim, adim in zip(obs_dims, nullary_dims, unary_dims, binary_dims,
                                                                   ac_dims):
             self.obs_buffs.append(np.zeros((max_steps, odim), dtype=np.float32))
+            self.obs_nullary_buffs.append(np.zeros((max_steps, nullary_dim), dtype=np.float32))
             self.obs_unary_buffs.append(np.zeros((max_steps,) + unary_dim, dtype=np.float32))
             self.obs_binary_buffs.append(np.zeros((max_steps,) + binary_dim, dtype=np.float32))
 
@@ -45,6 +49,7 @@ class ReplayBuffer(object):
             self.rew_buffs.append(np.zeros(max_steps, dtype=np.float32))
 
             self.next_obs_buffs.append(np.zeros((max_steps, odim), dtype=np.float32))
+            self.next_obs_nullary_buffs.append(np.zeros((max_steps, nullary_dim), dtype=np.float32)) # this needs to change if we ever have a nullary tensor
             self.next_obs_unary_buffs.append(np.zeros((max_steps,) + unary_dim, dtype=np.float32))
             self.next_obs_binary_buffs.append(np.zeros((max_steps,) + binary_dim, dtype=np.float32))
 
@@ -70,6 +75,8 @@ class ReplayBuffer(object):
             for agent_i in range(self.num_agents):
                 self.obs_buffs[agent_i] = np.roll(self.obs_buffs[agent_i],
                                                   rollover, axis=0)
+                self.obs_nullary_buffs[agent_i] = np.roll(self.obs_nullary_buffs[agent_i],
+                                                  rollover, axis=0)
                 self.obs_unary_buffs[agent_i] = np.roll(self.obs_unary_buffs[agent_i],
                                                   rollover, axis=0)
                 self.obs_binary_buffs[agent_i] = np.roll(self.obs_binary_buffs[agent_i],
@@ -81,6 +88,8 @@ class ReplayBuffer(object):
 
                 self.next_obs_buffs[agent_i] = np.roll(
                     self.next_obs_buffs[agent_i], rollover, axis=0)
+                self.next_obs_nullary_buffs[agent_i] = np.roll(
+                    self.next_obs_nullary_buffs[agent_i], rollover, axis=0)
                 self.next_obs_unary_buffs[agent_i] = np.roll(
                     self.next_obs_unary_buffs[agent_i], rollover, axis=0)
                 self.next_obs_binary_buffs[agent_i] = np.roll(
@@ -92,6 +101,7 @@ class ReplayBuffer(object):
             self.filled_i = self.max_steps
         for agent_i in range(self.num_agents):
             self.obs_buffs[agent_i][self.curr_i:self.curr_i + nentries] = observation[agent_i]['image'].flatten()
+            self.obs_nullary_buffs[agent_i][self.curr_i:self.curr_i + nentries] = observation[agent_i]['nullary']
             self.obs_unary_buffs[agent_i][self.curr_i:self.curr_i + nentries] = observation[agent_i]['unary_tensor']
             self.obs_binary_buffs[agent_i][self.curr_i:self.curr_i + nentries] = observation[agent_i]['binary_tensor']
 
@@ -99,6 +109,7 @@ class ReplayBuffer(object):
             self.rew_buffs[agent_i][self.curr_i:self.curr_i + nentries] = rewards[agent_i]
 
             self.next_obs_buffs[agent_i][self.curr_i:self.curr_i + nentries] = next_observation[agent_i]['image'].flatten()
+            self.next_obs_nullary_buffs[agent_i][self.curr_i:self.curr_i + nentries] = next_observation[agent_i]['nullary']
             self.next_obs_unary_buffs[agent_i][self.curr_i:self.curr_i + nentries] = next_observation[agent_i]['unary_tensor']
             self.next_obs_binary_buffs[agent_i][self.curr_i:self.curr_i + nentries] = next_observation[agent_i]['binary_tensor']
 
@@ -117,7 +128,6 @@ class ReplayBuffer(object):
         else:
             cast = lambda x: Variable(Tensor(x), requires_grad=False)
         if norm_rews:
-            # issue with normalised rewards comes if batch_size < max_episode_steps
             ret_rews = [cast((self.rew_buffs[i][inds] -
                               self.rew_buffs[i][:self.filled_i].mean()) /
                              self.rew_buffs[i][:self.filled_i].std())
@@ -125,11 +135,13 @@ class ReplayBuffer(object):
         else:
             ret_rews = [cast(self.rew_buffs[i][inds]) for i in range(self.num_agents)]
         return ([cast(self.obs_buffs[i][inds]) for i in range(self.num_agents)],
+                [cast(self.obs_nullary_buffs[i][inds]) for i in range(self.num_agents)],
                 [cast(self.obs_unary_buffs[i][inds]) for i in range(self.num_agents)],
                 [cast(self.obs_binary_buffs[i][inds]) for i in range(self.num_agents)],
                 [cast(self.ac_buffs[i][inds]) for i in range(self.num_agents)],
                 ret_rews,
                 [cast(self.next_obs_buffs[i][inds]) for i in range(self.num_agents)],
+                [cast(self.next_obs_nullary_buffs[i][inds]) for i in range(self.num_agents)],
                 [cast(self.next_obs_unary_buffs[i][inds]) for i in range(self.num_agents)],
                 [cast(self.next_obs_binary_buffs[i][inds]) for i in range(self.num_agents)],
                 [cast(self.done_buffs[i][inds]) for i in range(self.num_agents)])

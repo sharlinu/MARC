@@ -36,6 +36,7 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
         self.attributes = namedtuple('attr', ' '.join(self.attribute_labels))
 
         self.env_type = "boxworld"
+        self.nullary_predicates = []
         #self.unary_predicates = ['agent'] + self.attributes
         self.background_id = background_id
         if background_id in ["b0", "nolocal"]:
@@ -77,8 +78,8 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
         # number of objects/entities are the number of cells on the grid
         self.obj_n = np.prod(env.observation_space[0]['image'].shape[:-1]) #physical entities
         self.nb_all_entities = self.obj_n
-        self.obs_shape = [(self.obj_n, self.n_attr),
-                       (self.obj_n, self.obj_n, len(self.rel_deter_func))]
+        self.obs_shape = [(len(self.nullary_predicates)), (self.obj_n, self.n_attr),
+                       (self.obj_n, self.obj_n, len(self.rel_deter_func))] # TODO remove nullary_predicates?
         self.spatial_tensors = None
 
     def img2vkb(self, img, direction=None):
@@ -90,7 +91,7 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
         direction :
 
         Returns
-            unary_t (attribute per entity), binary_t (relation between entities)
+        nullary_t (direction) , unary_t (attribute per entity), binary_t (relation between entities)
         -------
 
         """
@@ -104,6 +105,7 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
                 obj = GridObject(x,y, attributes=attributes)
                 objs.append(obj)
 
+        nullary_tensors = []
 
         for obj_idx, obj in enumerate(objs):
             for p_idx, p in enumerate(self.attribute_labels):
@@ -120,8 +122,8 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
                             self.spatial_tensors[rel_idx][obj_idx1, obj_idx2] = 1.0
 
         binary_tensors = self.spatial_tensors # these vectors should change every time with the environment
-        unary_t, binary_t = np.stack(unary_tensors, axis=-1), np.stack(binary_tensors, axis=-1)
-        return unary_t, binary_t
+        nullary_t, unary_t, binary_t = nullary_tensors, np.stack(unary_tensors, axis=-1), np.stack(binary_tensors, axis=-1)
+        return nullary_t, unary_t, binary_t
 
     def observation(self, obs):
         """
@@ -138,7 +140,7 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
         #obs = obs.copy()
         for ob in obs:
             spatial_VKB = self.img2vkb(ob['image'])
-            ob['unary_tensor'], ob['binary_tensor'] = spatial_VKB
+            ob['nullary'], ob['unary_tensor'], ob['binary_tensor'] = spatial_VKB
         return obs
 
 def rotate_vec2d(vec, degrees):
