@@ -49,8 +49,11 @@ def run(config):
     unary_dim = env.obs_shape[1]
     binary_dim = env.obs_shape[2]
     print('nullary_dim', nullary_dim, 'unary_dim:', unary_dim, 'binary_dim', binary_dim)
-
+    env.reset()
+    spatial_tensors = env.spatial_tensors
     model = RelationalSAC.init_from_env(env,
+                                        spatial_tensors=spatial_tensors,
+                                        batch_size = config.batch_size,
                                        tau=config.tau,
                                        pi_lr=config.pi_lr,
                                        q_lr=config.q_lr,

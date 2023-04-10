@@ -445,6 +445,8 @@ class RelationalCritic(nn.Module):
     # TODO previously embedding_size = 16, now we have hidden_dim and 32
     def __init__(self, sa_sizes: list,  # TODO at the end we should not need sa_sizes anymore?
                  #obj_n: int,
+                 spatial_tensors,
+                 batch_size: int,
                  n_actions: int,
                  input_dims: list,
                  hidden_dim: int = 32,
@@ -464,7 +466,11 @@ class RelationalCritic(nn.Module):
         self.num_actions = n_actions[0]
         self.critics_head = nn.ModuleList()
         self.nb_edge_types = input_dims[2]
+        self.batch_size = batch_size
         self.max_reduce = True # TODO hardcoded
+        self.spatial_tensors = np.array(spatial_tensors)
+        self.binary_batch = torch.tensor([self.spatial_tensors for _ in range(self.batch_size)])
+
 
         self.embedder = nn.Linear(input_dims[1], hidden_dim) # TODO - hardcoding needed?
         self.gnn_layers = RGCNConv(hidden_dim, hidden_dim, self.nb_edge_types)
@@ -530,7 +536,7 @@ class RelationalCritic(nn.Module):
         for i in [1,2]:
             inputs[i] = inputs[i].to(device=device)
         adj_matrices = inputs[2]
-        gd, slices = batch_to_gd(adj_matrices) # makes adjs geometric data usable for torch geometric
+        gd, slices = batch_to_gd(self.binary_batch) # makes adjs geometric data usable for torch geometric
 
         # feature embedding
         #embedds = torch.flatten(inputs[1], 0, 1)
@@ -726,7 +732,7 @@ def batch_to_gd(batch: torch.Tensor):
     # [B x R x E x E]
     batch_size = batch.shape[0]
     nb_relations = batch.shape[1] #gets 14 out when full relations
-    nb_objects = batch.shape[2] # gets 81 out for 7x7 grid + walls
+    nb_objects = batch.shape[2] # gets n x n out
 
     assert batch.shape[2] == batch.shape[3]
 

@@ -288,6 +288,8 @@ class RelationalSAC(object):
     def __init__(self,
                  agent_init_params,
                  sa_size,
+                 spatial_tensors,
+                 batch_size,
                  n_actions,
                  input_dims,
                  gamma=0.95,
@@ -321,21 +323,25 @@ class RelationalSAC(object):
                                       num_out_pol=params['num_out_pol'])
                          for params in agent_init_params] # are input and output dims for agent
         self.type = 'relational'
-        if self.type == 'test':
-            self.critic = TestCritic(sa_sizes=sa_size,
-                                            n_actions=n_actions,
-                                           input_dims=input_dims,
-                                           hidden_dim=critic_hidden_dim)
-            self.target_critic = TestCritic(sa_sizes=sa_size,
-                                            n_actions=n_actions,
-                                           input_dims=input_dims,
-                                           hidden_dim=critic_hidden_dim)
-        elif self.type=='relational':
+        # if self.type == 'test':
+        #     self.critic = TestCritic(sa_sizes=sa_size,
+        #                                     n_actions=n_actions,
+        #                                    input_dims=input_dims,
+        #                                    hidden_dim=critic_hidden_dim)
+        #     self.target_critic = TestCritic(sa_sizes=sa_size,
+        #                                     n_actions=n_actions,
+        #                                    input_dims=input_dims,
+        #                                    hidden_dim=critic_hidden_dim)
+        if self.type=='relational':
             self.critic = RelationalCritic(sa_sizes=sa_size,
+                                           spatial_tensors=spatial_tensors,
+                                           batch_size = batch_size,
                                             n_actions=n_actions,
                                            input_dims=input_dims,
                                            hidden_dim=critic_hidden_dim)
             self.target_critic = RelationalCritic(sa_sizes=sa_size,
+                                            spatial_tensors=spatial_tensors,
+                                                  batch_size = batch_size,
                                             n_actions=n_actions,
                                            input_dims=input_dims,
                                            hidden_dim=critic_hidden_dim)
@@ -388,6 +394,7 @@ class RelationalSAC(object):
         Update central critic for all agents
         """
         obs, nullary, unary, binary, acs, rews, next_obs, next_nullary, next_unary, next_binary, dones = sample # TODO change because now also nullary, binary and unary tensors
+
         # Q loss
         next_acs = []
         next_log_pis = []
@@ -550,7 +557,10 @@ class RelationalSAC(object):
         torch.save(save_dict, filename)
 
     @classmethod
-    def init_from_env(cls, env, gamma=0.95, tau=0.01,
+    def init_from_env(cls, env,
+                      spatial_tensors,
+                      batch_size,
+                      gamma=0.95, tau=0.01,
                       pi_lr=0.01, q_lr=0.01,
                       reward_scale=10.,
                       pol_hidden_dim=64, critic_hidden_dim=64, attend_heads=4,
@@ -586,9 +596,12 @@ class RelationalSAC(object):
                      'critic_hidden_dim': critic_hidden_dim,
                      'agent_init_params': agent_init_params,
                      'sa_size': sa_size,
+                     'spatial_tensors':spatial_tensors,
+                     'batch_size': batch_size,
                      'n_actions': a_size,
                      's_size': s_size,
                      'input_dims': [env.obs_shape[0] ,env.obs_shape[1][-1], env.obs_shape[2][-1] ],
+
                      }
         instance = cls(**init_dict)
         instance.init_dict = init_dict
