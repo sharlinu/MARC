@@ -1,17 +1,16 @@
 import numpy as np
-from Aurora.environment.box.boxworld_gen import color2index, all_colors
-from Aurora.agent.util import rotate_vec2d
 from gym_minigrid.minigrid import * # imports DIR_TO_VEC as [array([1, 0]), array([0, 1]), array([-1,  0]), array([ 0, -1])]
 import time
 import pygame
+from collections import namedtuple
 #OBJECTS = ind_dict2list(OBJECT_TO_IDX)
+
 class GridObject():
     "object is specified by its location"
-    def __init__(self, x, y, object_type=[]):
+    def __init__(self, x, y, attributes):
         self.x = x
         self.y = y
-        self.type = object_type
-        self.attributes = object_type
+        self.attributes = attributes # should be a namedtuple
 
     @property
     def pos(self):
@@ -21,36 +20,24 @@ class GridObject():
     def name(self):
         return str(self.type)+"_"+str(self.x)+str(self.y)
 
-
-def parse_object(x:int, y:int, feature: np.array)->GridObject:
-    """
-    :param x: column position
-    :param y: row position
-    :param feature: feature should just be a single digit here, i.e. the color of the box
-    :return:
-    """
-    # TODO this needs to change as we currently already have the color index
-    #obj_type = [str(color2index[tuple(feature)])] # takes in RBG color from pixel and returns color index
-    ##obj_type = [str(feature)] #now it should just be the index of the color that the object has
-    assert (feature in [0,1,2,3])
-    obj_type = [str(feature)]
-    obj = GridObject(x, y, object_type=obj_type)
-    return obj
-
-class AbsoluteVKBWrapper(gym.core.ObservationWrapper):
+from random import randint
+class AbsoluteVKBWrapper(gym.ObservationWrapper):
     """
     Add a vkb key-value pair, which represents the state as a vectorised knowledge base.
     Entities are objects in the gird-world, predicates represents the properties of them and relations between them.
     """
     def __init__(self, env, num_colours, background_id="b3"):
-        super().__init__(env)
+        super().__init__(env, new_step_api=True)
 
-        self.num_colours = num_colours + 2
-        background_id = background_id[:2]
-        self.attributes = [str(i) for i in range(self.num_colours)]
+        self.num_colours = num_colours
+        #self.attributes = [str(i) for i in range(self.num_colours + 2 )]
+        self.attribute_labels = ['agents', 'id', 'colour']
+        self.n_attr = len(self.attribute_labels)
+        self.attributes = namedtuple('attr', ' '.join(self.attribute_labels))
+
         self.env_type = "boxworld"
         self.nullary_predicates = []
-        self.unary_predicates = self.attributes
+        #self.unary_predicates = ['agent'] + self.attributes
         self.background_id = background_id
         if background_id in ["b0", "nolocal"]:
             self.rel_deter_func = [is_left, is_right, is_front, is_back, is_aligned, is_close]
@@ -89,10 +76,10 @@ class AbsoluteVKBWrapper(gym.core.ObservationWrapper):
                                    down_left, down_right]
 
         # number of objects/entities are the number of cells on the grid
-        self.obj_n = np.prod(env.observation_space[0]['image'].shape) #physical entities
+        self.obj_n = np.prod(env.observation_space[0]['image'].shape[:-1]) #physical entities
         self.nb_all_entities = self.obj_n
-        self.obs_shape = [(len(self.nullary_predicates)), (self.obj_n, len(self.attributes)),
-                       (self.obj_n, self.obj_n, len(self.rel_deter_func))] # TODO remove nullary_predicates?
+        self.obs_shape = {'unary':(self.obj_n, self.n_attr),
+                          'binary':(self.obj_n, self.obj_n, len(self.rel_deter_func))}
         self.spatial_tensors = None
 
     def img2vkb(self, img, direction=None):
@@ -109,32 +96,32 @@ class AbsoluteVKBWrapper(gym.core.ObservationWrapper):
 
         """
         img = img.astype(np.int32)
-        unary_tensors = [np.zeros(self.obj_n) for _ in range(len(self.unary_predicates))] # so this is a list of binary vectors for each color, indicating what entities have the colour
+        unary_tensors = [np.zeros(self.obj_n) for _ in range(self.n_attr)] # so this is a list of binary vectors for each color, indicating what entities have the colour
         objs = []
         for y, row in enumerate(img):
             for x, pixel in enumerate(row):
-                obj = parse_object(x, y, feature=pixel)
+                #obj = parse_object(x, y, feature=pixel)
+                attributes = self.attributes(*pixel)
+                obj = GridObject(x,y, attributes=attributes)
                 objs.append(obj)
 
         nullary_tensors = []
 
         for obj_idx, obj in enumerate(objs):
-            for p_idx, p in enumerate(self.attributes): # first spot is reserved for agent information
-                if p in obj.attributes:
-                    # adds feature, e.g. colour as unary tensor
-                    unary_tensors[p_idx][obj_idx] = 1.0
+            for p_idx, p in enumerate(self.attribute_labels):
+                unary_tensors[p_idx][obj_idx] = obj.attributes[p_idx]
 
         if not self.spatial_tensors:
             # create spatial tensors that gives for every rel. det rule a binary indicator between the entities
             self.spatial_tensors = [np.zeros([len(objs), len(objs)]) for _ in range(len(self.rel_deter_func))] # 14  81x2 vectors for each relation
             for obj_idx1, obj1 in enumerate(objs):
                 for obj_idx2, obj2 in enumerate(objs):
-                    direction_vec = DIR_TO_VEC[1] # TODO I'd say it's down - CHANGED IT TO 1 INSTEAD OF 3
+                    direction_vec = DIR_TO_VEC[1]
                     for rel_idx, func in enumerate(self.rel_deter_func):
                         if func(obj1, obj2, direction_vec):
                             self.spatial_tensors[rel_idx][obj_idx1, obj_idx2] = 1.0
 
-        binary_tensors = self.spatial_tensors
+        binary_tensors = self.spatial_tensors # these vectors should change every time with the environment
         nullary_t, unary_t, binary_t = nullary_tensors, np.stack(unary_tensors, axis=-1), np.stack(binary_tensors, axis=-1)
         return nullary_t, unary_t, binary_t
 
@@ -150,165 +137,33 @@ class AbsoluteVKBWrapper(gym.core.ObservationWrapper):
         -------
 
         """
-        obs = obs.copy()
-        spatial_VKB = self.img2vkb(obs['image'])
-        #obs[0]["VKB"] = spatial_VKB # additional information in form of features and no external VKB for us
-        obs['nullary'], obs['unary_tensor'], obs['binary_tensor'] = spatial_VKB
+        #obs = obs.copy()
+        for ob in obs:
+            spatial_VKB = self.img2vkb(ob['image'])
+            ob['nullary'], ob['unary_tensor'], ob['binary_tensor'] = spatial_VKB
         return obs
 
-
-
+def rotate_vec2d(vec, degrees):
+    """
+    rotate a vector anti-clockwise
+    :param vec:
+    :param degrees:
+    :return:
+    """
+    theta = np.radians(degrees)
+    c, s = np.cos(theta), np.sin(theta)
+    R = np.array(((c, -s), (s, c)))
+    return R@vec
 
 def offset2idx_offset(x, y, width):
     return y*width+x
-
-
-from random import randint
-class AbsoluteVKBWrapper2(gym.core.ObservationWrapper):
-    """
-    Add a vkb key-value pair, which represents the state as a vectorised knowledge base.
-    Entities are objects in the gird-world, predicates represents the properties of them and relations between them.
-    """
-    def __init__(self, env, background_id="b3", with_portals=False):
-        super().__init__(env)
-
-        background_id = background_id[:2]
-        self.attributes = [str(i) for i in range(len(all_colors))]
-        self.env_type = "boxworld"
-        self.nullary_predicates = []
-        self.unary_predicates = self.attributes
-        self.background_id = background_id
-        if background_id in ["b0", "nolocal"]:
-            self.rel_deter_func = [is_left, is_right, is_front, is_back, is_aligned, is_close]
-        elif background_id == "b1":
-            self.rel_deter_func = [is_top_adj, is_left_adj, is_top_right_adj, is_top_left_adj]
-        elif background_id in ["b2", "local"]:
-            self.rel_deter_func = [is_top_adj, is_left_adj, is_top_right_adj, is_top_left_adj,
-                                   is_down_adj, is_right_adj, is_down_left_adj, is_down_right_adj]
-        elif background_id in ["b3", "all"]:
-            self.rel_deter_func = [is_top_adj, is_left_adj, is_top_right_adj, is_top_left_adj,
-                                   is_down_adj, is_right_adj, is_down_left_adj, is_down_right_adj,
-                                   is_left, is_right, is_front, is_back, is_aligned, is_close]
-        elif background_id == "b4":
-            self.rel_deter_func = [is_left, is_right, is_front, is_back]
-        elif background_id == "b5":
-            self.rel_deter_func = [is_top_adj, is_left_adj, is_down_adj, is_right_adj]
-        elif background_id in ["b6", "noremote"]:
-            self.rel_deter_func = [is_top_adj, is_left_adj, is_top_right_adj, is_top_left_adj,
-                                   is_down_adj, is_right_adj, is_down_left_adj, is_down_right_adj,
-                                   is_aligned, is_close]
-        elif background_id in ["b7", "noauxi"]:
-            self.rel_deter_func = [is_top_adj, is_left_adj, is_top_right_adj, is_top_left_adj,
-                                   is_down_adj, is_right_adj, is_down_left_adj, is_down_right_adj,
-                                   is_left, is_right, is_front, is_back]
-        elif background_id in ["b8"]:
-            self.rel_deter_func = [is_top_adj, is_left_adj, is_top_right_adj, is_top_left_adj,
-                                   is_down_adj, is_right_adj, is_down_left_adj, is_down_right_adj,
-                                   is_left, is_right, is_front, is_back, fan_top, fan_down,
-                                   fan_left, fan_right]
-        elif background_id in ["b9"]:
-            self.rel_deter_func = [is_top_adj, is_left_adj, is_top_right_adj, is_top_left_adj,
-                                   is_down_adj, is_right_adj, is_down_left_adj, is_down_right_adj,
-                                   is_left, is_right, is_front, is_back, top_right, top_left,
-                                   down_left, down_right]
-
-        # number of objects/entities are the number of cells on the grid
-        self.obj_n = np.prod(env.observation_space["image"].shape[:-1]) #physical entities
-        self.nb_all_entities = self.obj_n
-        self.obs_shape = [(len(self.nullary_predicates)), (self.obj_n, len(self.attributes)),
-                       (self.obj_n, self.obj_n, len(self.rel_deter_func))]
-        self.spatial_tensors = None
-        self.with_portals = with_portals # TODO delete
-
-    def img2vkb(self, img, direction=None):
-        """
-        Takes in an RGB img (n+2, n+2, 3) and returns vectorized attributes
-        Parameters
-        ----------
-        img : image of the environment
-        direction :
-
-        Returns
-        nullary_t (direction) , unary_t (attribute per entity), binary_t (relation between entities)
-        -------
-
-        """
-        img = img.astype(np.int32)
-        unary_tensors = [np.zeros(self.obj_n) for _ in range(len(self.unary_predicates))]
-        objs = []
-        portals = []
-        for y, row in enumerate(img):
-            for x, pixel in enumerate(row):
-                obj = parse_object(x, y, pixel, self.env_type)
-                objs.append(obj)
-                if self.with_portals and (x, y) in self.portal_pairs:
-                    portals.append(obj)
-
-        if self.env_type == "minigrid":
-            # nullary tensor only given for minigrid and direction
-            nullary_tensors = np.zeros(4, dtype=np.float32)
-            nullary_tensors[direction] = 1
-        else:
-            nullary_tensors = []
-
-        for obj_idx, obj in enumerate(objs):
-            for p_idx, p in enumerate(self.attributes):
-                if p in obj.attributes:
-                    # adds feature, e.g. colour as unary tensor
-                    unary_tensors[p_idx][obj_idx] = 1.0
-
-        if not self.spatial_tensors:
-            # create spatial tensors that gives for every rel. det rule a binary indicator between the entities
-            self.spatial_tensors = [np.zeros([len(objs), len(objs)]) for _ in range(len(self.rel_deter_func))]
-            for obj_idx1, obj1 in enumerate(objs):
-                for obj_idx2, obj2 in enumerate(objs):
-                    direction_vec = DIR_TO_VEC[1] # TODO I'd say it's down - CANGED IT TO 1 INSTEAD OF 3
-                    if portals:
-                        if obj2.name == portals[0].name:
-                            obj2 = portals[1]
-                        elif obj2.name == portals[1].name:
-                            obj2 = portals[0]
-                    for rel_idx, func in enumerate(self.rel_deter_func):
-                        if func(obj1, obj2, direction_vec):
-                            self.spatial_tensors[rel_idx][obj_idx1, obj_idx2] = 1.0
-        binary_tensors = self.spatial_tensors
-        nullary_t, unary_t, binary_t = nullary_tensors, np.stack(unary_tensors, axis=-1), np.stack(binary_tensors, axis=-1)
-        if self.env_type == "rtfm" and self.env.with_vkb: # fill in the larger tensor
-            nb_unaries = unary_t.shape[-1]
-            nb_binaries = binary_t.shape[-1]
-            unary = np.zeros([ self.nb_entities, nb_unaries], dtype=np.float32)
-            unary[:self.nb_physical,:] = unary_t
-            binary = np.zeros([self.nb_entities, self.nb_entities, nb_binaries], dtype=np.float32)
-            binary[:self.nb_physical,:self.nb_physical,:] = binary_t
-            unary_t = unary
-            binary_t = binary
-        return nullary_t, unary_t, binary_t
-
-    def observation(self, obs):
-        """
-        Wrapper that customizes the default observation space.
-        Is called also when environment is reset!
-        Parameters
-        ----------
-        obs : Observation from the default environment
-
-        Returns
-        -------
-
-        """
-        obs = obs.copy()
-        spatial_VKB = self.img2vkb(obs["image"])
-        obs["VKB"] = spatial_VKB # additional information in form of features and no external VKB for us
-        return obs
-
-
-
 
 def is_self(obj1, obj2, _ )->bool:
     if obj1 == obj2:
         return True
     else:
         return False
+
 def is_any(obj1, obj2, _ )->bool:
     if obj1 != obj2:
         return True
@@ -396,7 +251,7 @@ def fan_left(obj1, obj2, direction_vec)->bool:
 
 
 if __name__ == "__main__":
-    from MABoxWorld.environments.box import BoxWorldEnv
+    from MABoxWorld.environments.box2 import BoxWorldEnv
     env = BoxWorldEnv(
         players=2,
         field_size=(5,5),
@@ -409,16 +264,8 @@ if __name__ == "__main__":
         relational = False,
         deterministic= True,
     )
-
-    from Aurora.environment.box.box_world_env import BoxWorld
-    env2=BoxWorld(4,2,0,0)
-    #obs2 = env2.reset()
-    #print('obs2.shape ----', obs2)
-    obs = env.reset()
-    print('obs1.type ----', type(obs) )
-    print('obs1.type ----', obs)
-    print('observation_space ----', env.observation_space)
     env = AbsoluteVKBWrapper(env, num_colours=env.num_colours)
+    obs = env.reset()
     render= True
     done = False
     if render:
@@ -445,4 +292,5 @@ if __name__ == "__main__":
         done = np.all(ndone)
         pygame.event.pump()  # process event queue
     # print(env.players[0].score, env.players[1].score)
+
 

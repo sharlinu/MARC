@@ -11,7 +11,7 @@ filterwarnings(action='ignore',
                         module='tensorboardX')
 from tensorboardX import SummaryWriter
 from utils.buffer import ReplayBuffer
-from algorithms.attention_sac import AttentionSAC, RelationalSAC
+from algorithms.attention_sac import RelationalSAC
 from utils.rel_wrapper2 import AbsoluteVKBWrapper
 import yaml
 from utils.plotting import plot_fig
@@ -45,10 +45,9 @@ def run(config):
     np.random.seed(config.random_seed)
     env = AbsoluteVKBWrapper(env, num_colours=env.num_colours)
     env.agents = [None] * len(env.action_space)
-    nullary_dim = env.obs_shape[0]
-    unary_dim = env.obs_shape[1]
-    binary_dim = env.obs_shape[2]
-    print('nullary_dim', nullary_dim, 'unary_dim:', unary_dim, 'binary_dim', binary_dim)
+    # nullary_dim = env.obs_shape[0]
+    unary_dim = env.obs_shape['unary']
+    # binary_dim = env.obs_shape[2]
     env.reset()
     spatial_tensors = env.spatial_tensors
     model = RelationalSAC.init_from_env(env,
@@ -65,9 +64,9 @@ def run(config):
     replay_buffer = ReplayBuffer(max_steps=config.buffer_length,
                                  num_agents=model.nagents,
                                  obs_dims=[np.prod(obsp['image'].shape) for obsp in env.observation_space],
-                                 nullary_dims=[nullary_dim for _ in range(model.nagents)],
+                                 # nullary_dims=[nullary_dim for _ in range(model.nagents)],
                                  unary_dims=[unary_dim for _ in range(model.nagents)],
-                                 binary_dims=[binary_dim for _ in range(model.nagents)],
+                                 # binary_dims=[binary_dim for _ in range(model.nagents)],
                                  ac_dims= [acsp.shape[0] if isinstance(acsp, Box) else acsp.n
                                   for acsp in env.action_space])
     t = 0

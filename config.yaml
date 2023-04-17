@@ -1,23 +1,26 @@
-env_id: 'Boxworld_box'
+env_id: 'Boxworld_box_b3'
 simple: False
 deterministic: False
 single: False
+background_id: 'b3'
 
 player: 2
 field: 5
 num_colours: 2
 goal_length: 2
 grid_observation: True
+fixed: False # only applies to non-det boxes, if true it fixes the locks left and right of the box
 
-n_episodes: 20000
+n_episodes: 25000
 episode_length: 100
 test_n_episodes: 5
 test_episode_length: 20
 seeds: [4001]
 
+
 agent_alg: 'RMAC'
 exp_id : 'std'
-batch_size : 64
+batch_size : 1024
 #save_interval: 500
 
 

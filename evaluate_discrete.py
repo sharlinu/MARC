@@ -4,7 +4,7 @@ import time
 import imageio
 from pathlib import Path
 from torch.autograd import Variable
-from algorithms.attention_sac import AttentionSAC, RelationalSAC
+from algorithms.attention_sac import RelationalSAC
 import os
 import json
 import sys
@@ -148,7 +148,7 @@ if __name__ == '__main__':
     parser.add_argument("--benchmark", action="store_false",
                         help="benchmark mode")
     config = parser.parse_args()
-    render = False
+    render = True
     args = vars(config)
     eval_path = Path(config.model_path)
     dir_exp = Path(*eval_path.parts[:-2])
