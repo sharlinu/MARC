@@ -15,7 +15,7 @@ from algorithms.attention_sac import RelationalSAC
 from utils.rel_wrapper2 import AbsoluteVKBWrapper
 import yaml
 from utils.plotting import plot_fig
-
+from lbforaging.foraging import ForagingEnv
 
 def run(config):
     torch.set_num_threads(1)
@@ -28,18 +28,17 @@ def run(config):
 
     torch.manual_seed(config.random_seed)
     np.random.seed(config.random_seed)
-    from MABoxWorld.environments.box2 import BoxWorldEnv
-    env = BoxWorldEnv(
+    env = ForagingEnv(
         players=config.player,
+        # max_player_level=args.max_player_level,
+        max_player_level=3,
         field_size=(config.field, config.field),
-        num_colours=config.num_colours,
-        goal_length=config.goal_length,
+        max_food=config.max_food,
+        # max_food = 3,
+        grid_observation=True,
         sight=config.field,
-        max_episode_steps=config.episode_length,
-        grid_observation=config.grid_observation,
-        single=config.single,
-        simple=config.simple,
-        deterministic=config.deterministic,
+        max_episode_steps=25,
+        force_coop=config.force_coop
     )
     env.seed(config.random_seed)
     np.random.seed(config.random_seed)

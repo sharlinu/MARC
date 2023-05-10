@@ -1,26 +1,29 @@
-env_id: 'Boxworld_box_b3'
-simple: False
-deterministic: False
-single: False
-background_id: 'b3'
+env_id: 'lbf_8x8_2p_2f_coop'
+exp_id : 'std'
 
 player: 2
-field: 5
-num_colours: 2
-goal_length: 2
+field: 8
+
+max_food: 2
+force_coop: True
+
+#num_colours: 2
+#fixed: False
+#goal_length: 2
+#simple: False
+#deterministic: False
+#single: False
+
 grid_observation: True
-fixed: False # only applies to non-det boxes, if true it fixes the locks left and right of the box
-
-n_episodes: 25000
-episode_length: 100
-test_n_episodes: 5
-test_episode_length: 20
+#batch_size : 128
+n_episodes: 5600000
+episode_length: 25
+test_n_episodes: 10
+test_episode_length: 25
 seeds: [4001]
+agent_alg: 'rmac'
+buffer_length: 10000
 
-
-agent_alg: 'RMAC'
-exp_id : 'std'
-batch_size : 1024
 #save_interval: 500
 
 
