@@ -51,15 +51,6 @@ class RelationalSAC(object):
                                       num_out_pol=params['num_out_pol'])
                          for params in agent_init_params] # are input and output dims for agent
         self.type = 'relational'
-        # if self.type == 'test':
-        #     self.critic = TestCritic(sa_sizes=sa_size,
-        #                                     n_actions=n_actions,
-        #                                    input_dims=input_dims,
-        #                                    hidden_dim=critic_hidden_dim)
-        #     self.target_critic = TestCritic(sa_sizes=sa_size,
-        #                                     n_actions=n_actions,
-        #                                    input_dims=input_dims,
-        #                                    hidden_dim=critic_hidden_dim)
         if self.type=='relational':
             self.critic = RelationalCritic(sa_sizes=sa_size,
                                            spatial_tensors=spatial_tensors,
@@ -73,15 +64,6 @@ class RelationalSAC(object):
                                             n_actions=n_actions,
                                             input_dims=input_dims,
                                             hidden_dim=critic_hidden_dim)
-        # else:
-        #     self.critic = GCNCritic(sa_sizes=sa_size,
-        #                                     n_actions=n_actions,
-        #                                    input_dims=input_dims,
-        #                                    hidden_dim=critic_hidden_dim)
-        #     self.target_critic = GCNCritic(sa_sizes=sa_size,
-        #                                     n_actions=n_actions,
-        #                                    input_dims=input_dims,
-        #                                    hidden_dim=critic_hidden_dim)
         hard_update(self.target_critic, self.critic) # hard update only at the beginning to initialise
         self.critic_optimizer = Adam(self.critic.parameters(), lr=q_lr,
                                      weight_decay=1e-3)

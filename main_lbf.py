@@ -203,10 +203,14 @@ if __name__ == '__main__':
     parser.add_argument("--use_gpu", action='store_true')
     parser.add_argument('--dir_base', default='./experiments',
                         help='path of the experiment directory')
-    parser.set_defaults(use_gpu=False)
     config = parser.parse_args()
     args = vars(config)
+    if torch.cuda.is_available():
+        config.use_gpu = True
+    else:
+        config.use_gpu = False
 
+    print('use gpu', config.use_gpu)
     with open("config.yaml", "r") as file:
         params = yaml.load(file, Loader=yaml.FullLoader)
 
