@@ -15,7 +15,8 @@ from environments.box2 import BoxWorldEnv
 import numpy as np
 from enum import Enum
 import yaml
-
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 class Action(Enum):
     NONE = 0
     NORTH = 1

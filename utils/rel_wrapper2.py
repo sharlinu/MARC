@@ -7,10 +7,10 @@ from collections import namedtuple
 
 class GridObject():
     "object is specified by its location"
-    def __init__(self, x, y, attributes):
+    def __init__(self, x, y):
         self.x = x
         self.y = y
-        self.attributes = attributes # should be a namedtuple
+        # self.attributes = attributes
 
     @property
     def pos(self):
@@ -26,58 +26,20 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
     Add a vkb key-value pair, which represents the state as a vectorised knowledge base.
     Entities are objects in the gird-world, predicates represents the properties of them and relations between them.
     """
-    def __init__(self, env, num_colours, background_id="b3"):
+    def __init__(self, env, background_id="b3"):
         super().__init__(env, new_step_api=True)
 
-        self.num_colours = num_colours
-        #self.attributes = [str(i) for i in range(self.num_colours + 2 )]
-        self.attribute_labels = ['agents', 'id', 'colour']
+        self.attribute_labels = ['agents', 'id', 'colour'] # TODO generalise where colour is general attribute
         self.n_attr = len(self.attribute_labels)
         self.attributes = namedtuple('attr', ' '.join(self.attribute_labels))
 
-        self.env_type = "boxworld"
-        self.nullary_predicates = []
-        #self.unary_predicates = ['agent'] + self.attributes
+        self.env_type = "boxworld" # TODO generalise
         self.background_id = background_id
-        if background_id in ["b0", "nolocal"]:
-            self.rel_deter_func = [is_left, is_right, is_front, is_back, is_aligned, is_close]
-        elif background_id in ["t0", "any"]:
-            self.rel_deter_func = [is_any]
-        elif background_id == "b1":
-            self.rel_deter_func = [is_top_adj, is_left_adj, is_top_right_adj, is_top_left_adj]
-        elif background_id in ["b2", "local"]:
-            self.rel_deter_func = [is_top_adj, is_left_adj, is_top_right_adj, is_top_left_adj,
-                                   is_down_adj, is_right_adj, is_down_left_adj, is_down_right_adj]
-        elif background_id in ["b3", "all"]:
-            self.rel_deter_func = [is_top_adj, is_left_adj, is_top_right_adj, is_top_left_adj,
-                                   is_down_adj, is_right_adj, is_down_left_adj, is_down_right_adj,
-                                   is_left, is_right, is_front, is_back, is_aligned, is_close]
-        elif background_id == "b4":
-            self.rel_deter_func = [is_left, is_right, is_front, is_back]
-        elif background_id == "b5":
-            self.rel_deter_func = [is_top_adj, is_left_adj, is_down_adj, is_right_adj]
-        elif background_id in ["b6", "noremote"]:
-            self.rel_deter_func = [is_top_adj, is_left_adj, is_top_right_adj, is_top_left_adj,
-                                   is_down_adj, is_right_adj, is_down_left_adj, is_down_right_adj,
-                                   is_aligned, is_close]
-        elif background_id in ["b7", "noauxi"]:
-            self.rel_deter_func = [is_top_adj, is_left_adj, is_top_right_adj, is_top_left_adj,
-                                   is_down_adj, is_right_adj, is_down_left_adj, is_down_right_adj,
-                                   is_left, is_right, is_front, is_back]
-        elif background_id in ["b8"]:
-            self.rel_deter_func = [is_top_adj, is_left_adj, is_top_right_adj, is_top_left_adj,
-                                   is_down_adj, is_right_adj, is_down_left_adj, is_down_right_adj,
-                                   is_left, is_right, is_front, is_back, fan_top, fan_down,
-                                   fan_left, fan_right]
-        elif background_id in ["b9"]:
-            self.rel_deter_func = [is_top_adj, is_left_adj, is_top_right_adj, is_top_left_adj,
-                                   is_down_adj, is_right_adj, is_down_left_adj, is_down_right_adj,
-                                   is_left, is_right, is_front, is_back, top_right, top_left,
-                                   down_left, down_right]
+
+        self.rel_deter_func = self.id_to_rule_list(self.background_id)
 
         # number of objects/entities are the number of cells on the grid
         self.obj_n = np.prod(env.observation_space[0]['image'].shape[:-1]) #physical entities
-        self.nb_all_entities = self.obj_n
         self.obs_shape = {'unary':(self.obj_n, self.n_attr),
                           'binary':(self.obj_n, self.obj_n, len(self.rel_deter_func))}
         self.spatial_tensors = None
@@ -96,24 +58,28 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
 
         """
         img = img.astype(np.int32)
-        unary_tensors = [np.zeros(self.obj_n) for _ in range(self.n_attr)] # so this is a list of binary vectors for each color, indicating what entities have the colour
+
+        def extract_attributes(data):
+            # Get the size of the grid and number of attributes
+            n_rows, n_cols, n_attr = data.shape
+
+            # Initialize a list of attribute vectors, each with length n_rows * n_cols
+            attribute_vectors = []
+            for i in range(n_attr):
+                attribute_vectors.append(np.reshape(data[:, :, i], (n_rows * n_cols)))
+
+            return attribute_vectors
+        unary_tensors = extract_attributes(img)
+        # unary_tensors = [np.zeros(self.obj_n) for _ in range(self.n_attr)] # so this is a list of binary vectors for each color, indicating what entities have the colour
         objs = []
         for y, row in enumerate(img):
             for x, pixel in enumerate(row):
-                #obj = parse_object(x, y, feature=pixel)
-                attributes = self.attributes(*pixel)
-                obj = GridObject(x,y, attributes=attributes)
+                obj = GridObject(x,y)
                 objs.append(obj)
-
-        # nullary_tensors = []
-
-        for obj_idx, obj in enumerate(objs):
-            for p_idx, p in enumerate(self.attribute_labels):
-                unary_tensors[p_idx][obj_idx] = obj.attributes[p_idx]
 
         if not self.spatial_tensors:
             # create spatial tensors that gives for every rel. det rule a binary indicator between the entities
-            self.spatial_tensors = [np.zeros([len(objs), len(objs)]) for _ in range(len(self.rel_deter_func))] # 14  81x2 vectors for each relation
+            self.spatial_tensors = [np.zeros([len(objs), len(objs)]) for _ in range(len(self.rel_deter_func))] # 14  81x81 vectors for each relation
             for obj_idx1, obj1 in enumerate(objs):
                 for obj_idx2, obj2 in enumerate(objs):
                     direction_vec = DIR_TO_VEC[1]
@@ -121,7 +87,7 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
                         if func(obj1, obj2, direction_vec):
                             self.spatial_tensors[rel_idx][obj_idx1, obj_idx2] = 1.0
 
-        binary_tensors = self.spatial_tensors # these vectors should change every time with the environment
+        binary_tensors = self.spatial_tensors
         unary_t, binary_t = np.stack(unary_tensors, axis=-1), np.stack(binary_tensors, axis=-1)
         return unary_t, binary_t
 
@@ -142,6 +108,44 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
             spatial_VKB = self.img2vkb(ob['image'])
             ob['unary_tensor'], ob['binary_tensor'] = spatial_VKB
         return obs
+
+    def id_to_rule_list(self,background_id):
+        if background_id in ["b0", "nolocal"]:
+            rel_deter_func = [is_left, is_right, is_front, is_back, is_aligned, is_close]
+        elif background_id in ["t0", "any"]:
+            rel_deter_func = [is_any]
+        elif background_id == "b1":
+            rel_deter_func = [is_top_adj, is_left_adj, is_top_right_adj, is_top_left_adj]
+        elif background_id in ["b2", "local"]:
+            rel_deter_func = [is_top_adj, is_left_adj, is_top_right_adj, is_top_left_adj,
+                                   is_down_adj, is_right_adj, is_down_left_adj, is_down_right_adj]
+        elif background_id in ["b3", "all"]:
+            rel_deter_func = [is_top_adj, is_left_adj, is_top_right_adj, is_top_left_adj,
+                                   is_down_adj, is_right_adj, is_down_left_adj, is_down_right_adj,
+                                   is_left, is_right, is_front, is_back, is_aligned, is_close]
+        elif background_id == "b4":
+            rel_deter_func = [is_left, is_right, is_front, is_back]
+        elif background_id == "b5":
+            rel_deter_func = [is_top_adj, is_left_adj, is_down_adj, is_right_adj]
+        elif background_id in ["b6", "noremote"]:
+            rel_deter_func = [is_top_adj, is_left_adj, is_top_right_adj, is_top_left_adj,
+                                   is_down_adj, is_right_adj, is_down_left_adj, is_down_right_adj,
+                                   is_aligned, is_close]
+        elif background_id in ["b7", "noauxi"]:
+            rel_deter_func = [is_top_adj, is_left_adj, is_top_right_adj, is_top_left_adj,
+                                   is_down_adj, is_right_adj, is_down_left_adj, is_down_right_adj,
+                                   is_left, is_right, is_front, is_back]
+        elif background_id in ["b8"]:
+            rel_deter_func = [is_top_adj, is_left_adj, is_top_right_adj, is_top_left_adj,
+                                   is_down_adj, is_right_adj, is_down_left_adj, is_down_right_adj,
+                                   is_left, is_right, is_front, is_back, fan_top, fan_down,
+                                   fan_left, fan_right]
+        elif background_id in ["b9"]:
+            rel_deter_func = [is_top_adj, is_left_adj, is_top_right_adj, is_top_left_adj,
+                                   is_down_adj, is_right_adj, is_down_left_adj, is_down_right_adj,
+                                   is_left, is_right, is_front, is_back, top_right, top_left,
+                                   down_left, down_right]
+        return rel_deter_func
 
 def rotate_vec2d(vec, degrees):
     """
