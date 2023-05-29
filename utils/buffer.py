@@ -119,14 +119,14 @@ class ReplayBuffer(object):
         if self.curr_i == self.max_steps:
             self.curr_i = 0
 
-    def sample(self, N, to_gpu=False, norm_rews=True):
+    def sample(self, N, to_gpu=False, norm_rews=False):
         inds = np.random.choice(np.arange(self.filled_i), size=N,
                                 replace=True)
         if to_gpu:
             cast = lambda x: Variable(Tensor(x), requires_grad=False).cuda()
         else:
             cast = lambda x: Variable(Tensor(x), requires_grad=False)
-        if norm_rews and sum([self.rew_buffs[i][:self.filled_i].mean() for i in range(self.num_agents)]) !=0 :
+        if norm_rews and sum([self.rew_buffs[i][:self.filled_i].mean() for i in range(self.num_agents)]) !=0:
             ret_rews = [cast((self.rew_buffs[i][inds] -
                               self.rew_buffs[i][:self.filled_i].mean()) /
                              self.rew_buffs[i][:self.filled_i].std())

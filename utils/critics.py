@@ -101,15 +101,6 @@ class RelationalCritic(nn.Module):
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
         if agents is None:
             agents = range(self.nagents)
-        # state = None
-        # inputs = [[],
-        #           torch.flatten(unary_tensor, 0, 1).float(), #flattens obs["unary_tensor"] only in 0th and 1st dim
-        #           #torch.flatten(binary_tensor, 0, 1).permute(0,3,1,2).float()]
-        #           binary_tensor.permute(0, 3, 1, 2).float()
-        #           ]
-        # for i in [1,2]:
-        #     inputs[i] = inputs[i].to(device=device)
-        # adj_matrices = inputs[2]
         all_rets = []
 
         for a_i in agents:
@@ -135,8 +126,9 @@ class RelationalCritic(nn.Module):
                 x = torch.flatten(x, start_dim=1, end_dim=2) # TODO what does that do?
 
             # extract state encoding for each agent that we're returning Q for
-            other_actions = actions[-a_i]
-            critic_in = torch.cat((x, other_actions), dim=1)
+            other_actions = actions.copy()
+            other_actions.pop(a_i)
+            critic_in = torch.cat((x, *other_actions), dim=1)
             agent_rets = []
             all_q = self.critics_head[a_i](critic_in)
             int_acs = actions[a_i].max(dim=1, keepdim=True)[1]

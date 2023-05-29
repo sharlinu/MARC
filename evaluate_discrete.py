@@ -8,10 +8,13 @@ from algorithms.attention_sac import RelationalSAC
 import os
 import json
 import sys
-sys.path.insert(0, '/Users/sharlinu/Desktop/github/MABoxWorld/environments')
-sys.path.insert(0, '/Users/sharlinu/Desktop/github/MABoxWorld/Images')
-sys.path.insert(0, '/Users/sharlinu/Desktop/github/MABoxWorld/')
-from environments.box2 import BoxWorldEnv
+# sys.path.insert(0, '/Users/sharlinu/Desktop/github/MABoxWorld/environments')
+# sys.path.insert(0, '/Users/sharlinu/Desktop/github/MABoxWorld/Images')
+sys.path.insert(0, '/home/utke_s@WMGDS.WMG.WARWICK.AC.UK/github/MABoxWorld')
+sys.path.insert(0, '/home/utke_s@WMGDS.WMG.WARWICK.AC.UK/github/MABoxWorld/environments')
+
+from environments.box import BoxWorldEnv
+from lbforaging.foraging import ForagingEnv
 import numpy as np
 from enum import Enum
 import yaml
@@ -37,18 +40,34 @@ def run(config):
 
     model = RelationalSAC.init_from_save(model_path)
     print(config.benchmark)
-    env = BoxWorldEnv(
-        players=config.player,
-        field_size=(config.field, config.field),
-        num_colours=config.num_colours,
-        goal_length=config.goal_length,
-        sight=config.field,
-        grid_observation=config.grid_observation,
-        max_episode_steps=config.test_episode_length,
-        simple=config.simple,
-        single=config.single,
-        deterministic=config.deterministic,
-    )
+    if 'boxworld' in config.env_id:
+        from environments.box import BoxWorldEnv
+        env = BoxWorldEnv(
+            players=config.player,
+            field_size=(config.field,config.field),
+            num_colours=config.num_colours,
+            goal_length=config.goal_length,
+            sight=config.field,
+            max_episode_steps=config.test_episode_length,
+            grid_observation=config.grid_observation,
+            simple=config.simple,
+            single=config.single,
+            deterministic=config.deterministic,
+        )
+    elif 'lbf' in  config.env_id:
+        env = ForagingEnv(
+            players=config.player,
+            # max_player_level=config.max_player_level,
+            max_player_level=3,
+            field_size=(config.field, config.field),
+            max_food=config.max_food,
+            grid_observation=config.grid_observation,
+            sight=config.field,
+            max_episode_steps=25,
+            force_coop=config.force_coop,
+        )
+    else:
+        raise ValueError(f'Cannot cater for the environment {config.env_id}')
 
     model.prep_rollouts(device='cpu')
     ifi = 1 / config.fps  # inter-frame interval
@@ -69,7 +88,7 @@ def run(config):
 
 
         from utils.rel_wrapper2 import AbsoluteVKBWrapper
-        env = AbsoluteVKBWrapper(env, num_colours=env.num_colours)
+        env = AbsoluteVKBWrapper(env)
         obs = env.reset()
         if render:
             env.render()
@@ -86,8 +105,9 @@ def run(config):
             #    frames.append(env.render(mode='rgb_array', close=False)[0])
 
             # rearrange observations to be per agent, and convert to torch Variable
-            agent_obs = [np.expand_dims(ob['image'].flatten(), axis=0) for ob in obs]
-            torch_obs = [Variable(torch.Tensor(agent_obs[i]),
+            if config.grid_observation:
+                obs = [np.expand_dims(ob['image'].flatten(), axis=0) for ob in obs]
+            torch_obs = [Variable(torch.Tensor(obs[i]).view(1,-1),
                                   requires_grad=False)
                          for i in range(model.nagents)]
             # get actions as torch Variables
@@ -149,7 +169,7 @@ if __name__ == '__main__':
     parser.add_argument("--benchmark", action="store_false",
                         help="benchmark mode")
     config = parser.parse_args()
-    render = True
+    render = False
     args = vars(config)
     eval_path = Path(config.model_path)
     dir_exp = Path(*eval_path.parts[:-2])

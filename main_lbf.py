@@ -30,11 +30,9 @@ def run(config):
     np.random.seed(config.random_seed)
     env = ForagingEnv(
         players=config.player,
-        # max_player_level=args.max_player_level,
-        max_player_level=3,
+        max_player_level=config.max_player_level,
         field_size=(config.field, config.field),
         max_food=config.max_food,
-        # max_food = 3,
         grid_observation=True,
         sight=config.field,
         max_episode_steps=25,
@@ -129,7 +127,7 @@ def run(config):
             ep_rews = replay_buffer.get_average_rewards(config.episode_length * config.n_rollout_threads)
         for a_i, a_ep_rew in enumerate(ep_rews):
              logger.add_scalar('agent%i/mean_episode_rewards' % a_i, a_ep_rew, ep_i)
-        print("%s - %s - Episodes %i of %i - Reward %i" % (config.env_id, config.random_seed, ep_i + 1,
+        print("%s - %s - Episodes %i of %i - Reward %.1f" % (config.env_id, config.random_seed, ep_i + 1,
                                         config.n_episodes,  episode_reward_total))
         l_rewards.append(episode_reward_total)
         #print('terminal space', obs['image'])
@@ -163,8 +161,11 @@ def run(config):
                     os.remove(path_ckpt_best_avg)
                 path_ckpt_best_avg = path_ckpt_best_avg_tmp
 
-    plot_fig(l_rewards, 'reward_total', config.dir_summary)
-    model.save('{}/model.pt'.format(run_dir))
+    plot_fig(l_rewards, 'reward_total', config.dir_summary, show=True)
+    path_ckpt_final = os.path.join(config.dir_saved_models,
+                                          'ckpt_final.pth.tar')
+    model.save(path_ckpt_final)
+    # model.save('{}/model.pt'.format(config.dir_saved_models))
     env.close()
     logger.export_scalars_to_json('{}/summary.json'.format(run_dir))
     logger.close()
