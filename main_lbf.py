@@ -129,7 +129,7 @@ def run(config):
             ep_rews = replay_buffer.get_average_rewards(config.episode_length * config.n_rollout_threads)
         for a_i, a_ep_rew in enumerate(ep_rews):
              logger.add_scalar('agent%i/mean_episode_rewards' % a_i, a_ep_rew, ep_i)
-        print("%s - %s - Episodes %i of %i - Reward %i" % (config.env_id, config.random_seed, ep_i + 1,
+        print("%s - %s - Episodes %i of %i - Reward %.1f" % (config.env_id, config.random_seed, ep_i + 1,
                                         config.n_episodes,  episode_reward_total))
         l_rewards.append(episode_reward_total)
         #print('terminal space', obs['image'])

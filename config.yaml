@@ -1,22 +1,22 @@
-env_id: 'lbf_8x8_2p_2f_coop'
+env_id: 'lbf_7x7_3p_1f_coop'
 exp_id : 'std'
 
-player: 2
-field: 8
+player: 3
+field: 7
 
-max_food: 2
+max_food: 1
 force_coop: True
 
-#num_colours: 2
-#fixed: False
-#goal_length: 2
-#simple: False
-#deterministic: False
-#single: False
+num_colours: 2
+fixed: False
+goal_length: 2
+simple: False
+deterministic: False
+single: False
 
 grid_observation: True
 #batch_size : 128
-n_episodes: 5600000
+n_episodes: 100
 episode_length: 25
 test_n_episodes: 10
 test_episode_length: 25

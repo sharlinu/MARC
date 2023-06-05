@@ -28,7 +28,7 @@ def run(config):
 
     torch.manual_seed(config.random_seed)
     np.random.seed(config.random_seed)
-    from MABoxWorld.environments.box2 import BoxWorldEnv
+    from MABoxWorld.environments.box import BoxWorldEnv
     env = BoxWorldEnv(
         players=config.player,
         field_size=(config.field, config.field),

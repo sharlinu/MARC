@@ -119,7 +119,7 @@ class ReplayBuffer(object):
         if self.curr_i == self.max_steps:
             self.curr_i = 0
 
-    def sample(self, N, to_gpu=False, norm_rews=True):
+    def sample(self, N, to_gpu=False, norm_rews=False):
         inds = np.random.choice(np.arange(self.filled_i), size=N,
                                 replace=True)
         if to_gpu:
