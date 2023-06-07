@@ -109,7 +109,10 @@ class ReplayBuffer(object):
 
             self.next_obs_buffs[agent_i][self.curr_i:self.curr_i + nentries] = next_observation[agent_i]['image'].flatten()
             # self.next_obs_nullary_buffs[agent_i][self.curr_i:self.curr_i + nentries] = next_observation[agent_i]['nullary']
-            self.next_obs_unary_buffs[agent_i][self.curr_i:self.curr_i + nentries] = next_observation[agent_i]['unary_tensor']
+            try:
+                self.next_obs_unary_buffs[agent_i][self.curr_i:self.curr_i + nentries] = next_observation[agent_i]['unary_tensor']
+            except:
+                print('debug')
             # self.next_obs_binary_buffs[agent_i][self.curr_i:self.curr_i + nentries] = next_observation[agent_i]['binary_tensor']
 
             self.done_buffs[agent_i][self.curr_i:self.curr_i + nentries] = dones[agent_i]

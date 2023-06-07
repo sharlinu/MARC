@@ -82,8 +82,8 @@ def run(config):
         ep_rew = 0
 
 
-        from utils.rel_wrapper2 import AbsoluteVKBWrapper
-        env = AbsoluteVKBWrapper(env)
+        from utils.rel_wrapper_active import AbsoluteVKBWrapper
+        env = AbsoluteVKBWrapper(env, config.dense)
         obs = env.reset()
         if render:
             env.render()
@@ -96,7 +96,7 @@ def run(config):
                 obs = [np.expand_dims(ob['image'].flatten(), axis=0) for ob in obs]
             torch_obs = [Variable(torch.Tensor(obs[i]).view(1, -1),
                                   requires_grad=False)
-                         for i in range(model.nagents)]
+                         for i in range(model.n_agents)]
             # get actions as torch Variables
             torch_actions = model.step(torch_obs, explore=False)
             # convert actions to numpy arrays

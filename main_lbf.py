@@ -12,7 +12,7 @@ filterwarnings(action='ignore',
 from tensorboardX import SummaryWriter
 from utils.buffer import ReplayBuffer
 from algorithms.attention_sac import RelationalSAC
-from utils.rel_wrapper2 import AbsoluteVKBWrapper
+from utils.rel_wrapper_active import AbsoluteVKBWrapper
 import yaml
 from utils.plotting import plot_fig
 from lbforaging.foraging import ForagingEnv
@@ -42,7 +42,7 @@ def run(config):
     )
     env.seed(config.random_seed)
     np.random.seed(config.random_seed)
-    env = AbsoluteVKBWrapper(env)
+    env = AbsoluteVKBWrapper(env, config.dense)
     env.agents = [None] * len(env.action_space)
     # nullary_dim = env.obs_shape[0]
     unary_dim = env.obs_shape['unary']
@@ -61,10 +61,10 @@ def run(config):
                                        reward_scale=config.reward_scale)
 
     replay_buffer = ReplayBuffer(max_steps=config.buffer_length,
-                                 num_agents=model.nagents,
+                                 num_agents=model.n_agents,
                                  obs_dims=[np.prod(obsp['image'].shape) for obsp in env.observation_space],
                                  # nullary_dims=[nullary_dim for _ in range(model.nagents)],
-                                 unary_dims=[unary_dim for _ in range(model.nagents)],
+                                 unary_dims=[unary_dim for _ in range(model.n_agents)],
                                  # binary_dims=[binary_dim for _ in range(model.nagents)],
                                  ac_dims= [acsp.shape[0] if isinstance(acsp, Box) else acsp.n
                                   for acsp in env.action_space])
@@ -88,7 +88,7 @@ def run(config):
             #agent_obs = np.expand_dims(agent_obs, axis=0)
             torch_obs = [Variable(torch.Tensor(agent_obs[i]),
                                   requires_grad=False)
-                         for i in range(model.nagents)]
+                         for i in range(model.n_agents)]
             # get actions as torch Variables
             try:
                 torch_agent_actions = model.step(torch_obs, explore=True)
