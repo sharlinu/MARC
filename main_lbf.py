@@ -12,7 +12,7 @@ filterwarnings(action='ignore',
 from tensorboardX import SummaryWriter
 from utils.buffer import ReplayBuffer
 from algorithms.attention_sac import RelationalSAC
-from utils.rel_wrapper_active import AbsoluteVKBWrapper
+from utils.rel_wrapper2 import AbsoluteVKBWrapper
 import yaml
 from utils.plotting import plot_fig
 from lbforaging.foraging import ForagingEnv

@@ -82,7 +82,7 @@ def run(config):
         ep_rew = 0
 
 
-        from utils.rel_wrapper_active import AbsoluteVKBWrapper
+        from utils.rel_wrapper2 import AbsoluteVKBWrapper
         env = AbsoluteVKBWrapper(env, config.dense)
         obs = env.reset()
         if render:
