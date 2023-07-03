@@ -113,6 +113,7 @@ class RelationalCritic(nn.Module):
         # for i in [1,2]:
         #     inputs[i] = inputs[i].to(device=device)
         # adj_matrices = inputs[2]
+
         all_rets = []
 
         for a_i in agents:

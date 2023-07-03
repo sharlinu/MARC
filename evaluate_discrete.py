@@ -8,10 +8,15 @@ from algorithms.attention_sac import RelationalSAC
 import os
 import json
 import sys
-sys.path.insert(0, '/Users/sharlinu/Desktop/github/MABoxWorld/environments')
-sys.path.insert(0, '/Users/sharlinu/Desktop/github/MABoxWorld/Images')
-sys.path.insert(0, '/Users/sharlinu/Desktop/github/MABoxWorld/')
+# sys.path.insert(0, '/Users/sharlinu/Desktop/github/MABoxWorld/environments')
+# sys.path.insert(0, '/Users/sharlinu/Desktop/github/MABoxWorld/Images')
+# sys.path.insert(0, '/Users/sharlinu/Desktop/github/MABoxWorld/')
 # from environments.box import BoxWorldEnv
+sys.path.insert(0, '/home/utke_s@WMGDS.WMG.WARWICK.AC.UK/github/MABoxWorld')
+sys.path.insert(0, '/home/utke_s@WMGDS.WMG.WARWICK.AC.UK/github/MABoxWorld/environments')
+
+from environments.box import BoxWorldEnv
+from lbforaging.foraging import ForagingEnv
 import numpy as np
 from enum import Enum
 import yaml
@@ -53,14 +58,14 @@ def run(config):
     elif 'lbf' in  config.env_id:
         env = ForagingEnv(
             players=config.player,
-            # max_player_level=args.max_player_level,
+            # max_player_level=config.max_player_level,
             max_player_level=3,
             field_size=(config.field, config.field),
             max_food=config.max_food,
-            grid_observation=True,
+            grid_observation=config.grid_observation,
             sight=config.field,
             max_episode_steps=25,
-            force_coop=True,
+            force_coop=config.force_coop,
         )
     else:
         raise ValueError(f'Cannot cater for the environment {config.env_id}')
@@ -81,9 +86,9 @@ def run(config):
         l_rewards = []
         ep_rew = 0
 
-
         from utils.rel_wrapper_active import AbsoluteVKBWrapper
         env = AbsoluteVKBWrapper(env, config.dense)
+
         obs = env.reset()
         if render:
             env.render()

@@ -5,7 +5,8 @@ import matplotlib.pyplot as plt
 import torch
 import numpy as np
 
-def plot_fig(record, name, path_summary, show = False ):
+
+def plot_fig(record, name, path_summary, show = False):
     durations_t = torch.FloatTensor(np.asarray(record))
 
     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(20, 15))
@@ -30,8 +31,8 @@ def plot_fig(record, name, path_summary, show = False ):
     plt.close(fig)
 
 if __name__ == '__main__':
-    with open('../experiments/2023-03-22_Boxworld_box_std_seed4001/summary/reward_total.txt', 'r') as fp:
+    with open('../experiments/2023-05-10_lbf_8x8_2p_2f_coop_std_seed4001/summary/reward_total.txt', 'r') as fp:
         lines = [float(line) for line in fp]
 
-        plot_fig(lines, 'reward_total', '../experiments/2023-03-22_Boxworld_box_std_seed4001/summary')
+        plot_fig(lines, 'reward_total', '../experiments/2023-05-10_lbf_8x8_2p_2f_coop_std_seed4001/summary')
         print('worked')

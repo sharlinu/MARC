@@ -16,6 +16,7 @@ dist/
 # Log files
 *.log
 experiments/
+config.yaml
 # Package files
 *.jar
 
