@@ -107,7 +107,7 @@ class RelationalSAC(object):
         """
         Update central critic for all agents
         """
-        obs, unary, acs, rews, next_obs, next_unary, dones = sample
+        obs, unary,binary, acs, rews, next_obs, next_unary, next_binary, dones = sample
 
         # Q loss
         next_acs = []
@@ -117,9 +117,9 @@ class RelationalSAC(object):
             next_acs.append(curr_next_ac)
             next_log_pis.append(curr_next_log_pi)
 
-        critic_rets = self.critic(obs=obs, unary_tensors=unary, actions=acs,
+        critic_rets = self.critic(obs=obs, unary_tensors=unary, binary_tensors=binary, actions=acs,
                                   logger=logger, niter=self.niter)
-        next_qs = self.target_critic(obs=next_obs, unary_tensors=next_unary, actions=next_acs)
+        next_qs = self.target_critic(obs=next_obs, unary_tensors=next_unary, binary_tensors=binary, actions=next_acs)
         q_loss = 0
         for a_i, nq, log_pi, pq in zip(range(self.n_agents), next_qs,
                                                next_log_pis, critic_rets):
@@ -153,7 +153,7 @@ class RelationalSAC(object):
         self.niter += 1
 
     def update_policies(self, sample, soft=True, logger=None, **kwargs):
-        obs, unary, acs, rews, next_obs, next_unary, dones = sample
+        obs, unary, binary, acs, rews, next_obs, next_unary, next_binary,  dones = sample
         samp_acs = []
         all_probs = []
         all_log_pis = []
@@ -170,7 +170,7 @@ class RelationalSAC(object):
             all_log_pis.append(log_pi)
             all_pol_regs.append(pol_regs)
 
-        critic_rets = self.critic(obs=obs, unary_tensors=unary,  actions=samp_acs,
+        critic_rets = self.critic(obs=obs, unary_tensors=unary, binary_tensors=binary, actions=samp_acs,
                                   logger=logger, return_all_q=True)
 
         for a_i, probs, log_pi, pol_regs, (q, all_q) in zip(range(self.n_agents), all_probs,

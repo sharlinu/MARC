@@ -3,7 +3,8 @@ import numpy as np
 import gym
 import time
 import pygame
-
+import torch
+from torch_geometric.data import Data as GeometricData, Batch
 class GridObject:
     "object is specified by its location"
     def __init__(self, x, y):
@@ -115,16 +116,11 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
                         if func(obj1, obj2, direction_vec):
                             self.spatial_tensors[rel_idx][obj_idx1, obj_idx2] = 1.0
 
-        binary_tensors = self.spatial_tensors
+        binary_tensors = torch.tensor(self.spatial_tensors)
 
-        # if not np.array_equal(np.array(self.prev), np.array(self.spatial_tensors)):
-        #     print(f'self.prev {self.prev}')
-        #     print(f'self.spatial {self.spatial_tensors}')
-        self.prev = self.spatial_tensors
-
-
-        unary_t, binary_t = np.stack(unary_tensors, axis=-1), np.stack(binary_tensors, axis=-1)
-        return unary_t, binary_t
+        unary_t = np.stack(unary_tensors, axis=-1)
+        gd = to_gd(binary_tensors, nb_objects=self.obj_n)
+        return unary_t, gd
 
     def observation(self, obs):
         """
@@ -183,6 +179,28 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
         else:
             rel_deter_func = None
         return rel_deter_func
+
+def to_gd(data: torch.Tensor, nb_objects) -> GeometricData:
+    """
+    takes batch of adjacency geometric data and transforms it to a GeometricData object for torch.geometric
+
+    Parameters
+    --------
+    data : heterogeneous adjacency matrix (nb_relations, nb_objects, nb_objects)
+    """
+    nb_objects = nb_objects
+    x = torch.arange(nb_objects).view(-1, 1) # TODO change to actual node features i.e. the unary tensors
+    nz = torch.nonzero(data)
+
+    # list of all edges and what relationtype they have
+    edge_attr = nz[:, 0]
+
+    # list of node to node indicating an edge
+    edge_index = nz[:, 1:].T
+    return GeometricData(x=x, edge_index=edge_index, edge_attr=edge_attr)
+
+
+
 
 def rotate_vec2d(vec, degrees):
     """

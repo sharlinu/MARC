@@ -10,7 +10,7 @@ filterwarnings(action='ignore',
                         category=DeprecationWarning,
                         module='tensorboardX')
 from tensorboardX import SummaryWriter
-from utils.buffer import ReplayBuffer
+from utils.buffer import ReplayBuffer, ReplayBuffer2
 from algorithms.attention_sac import RelationalSAC
 from utils.rel_wrapper2 import AbsoluteVKBWrapper
 import yaml
@@ -60,14 +60,15 @@ def run(config):
                                        critic_hidden_dim=config.critic_hidden_dim,
                                        reward_scale=config.reward_scale)
 
-    replay_buffer = ReplayBuffer(max_steps=config.buffer_length,
+    replay_buffer = ReplayBuffer2(max_steps=config.buffer_length,
                                  num_agents=model.n_agents,
                                  obs_dims=[np.prod(obsp['image'].shape) for obsp in env.observation_space],
                                  # nullary_dims=[nullary_dim for _ in range(model.nagents)],
                                  unary_dims=[unary_dim for _ in range(model.n_agents)],
                                  # binary_dims=[binary_dim for _ in range(model.nagents)],
                                  ac_dims= [acsp.shape[0] if isinstance(acsp, Box) else acsp.n
-                                  for acsp in env.action_space])
+                                  for acsp in env.action_space],
+                                  dense = config.dense)
     t = 0
     l_rewards = []
     reward_best = float("-inf")

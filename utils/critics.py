@@ -43,7 +43,7 @@ class RelationalCritic(nn.Module):
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         self.batch_size = batch_size
         self.max_reduce = True # TODO hardcoded
-        self.dense = True
+        # self.dense = True
         self.rel_deter_func = rel_deter_func
 
         self.spatial_tensors = np.array(spatial_tensors)
@@ -85,8 +85,8 @@ class RelationalCritic(nn.Module):
     def forward(self,
                 obs,
                 unary_tensors,
-                # binary_tensor,
                 actions,
+                binary_tensors = None,
                 agents=None,
                 return_q=True,
                 return_all_q=False,
@@ -128,10 +128,15 @@ class RelationalCritic(nn.Module):
 
 
             # RGCN module
-            if self.dense:
-                binary_batch = self.preprocess(obs[a_i].numpy())
-                # binary_batch = torch.tensor([spatial_tensors for _ in range(self.batch_size)])
-                gd, self.slices = batch_to_gd(binary_batch, self.device)  # makes adjs geometric data usable for torch geometric
+            if binary_tensors:
+
+                # single_gd, self.slices = to_gd(binary_t)  # makes adjs geometric data usable for torch geometric
+                # batch_data = [to_gd(instance) for instance in binary_tensors]
+
+                gd = Batch.from_data_list(binary_tensors[a_i]).to(device = self.device)
+                # max_node = max(i + 1 for b in batch_data for i in b.x[:, 0].cpu().numpy())
+                # slices = [max_node for _ in batch_data]
+
                 embedds = self.gnn_layers(embedds, gd.edge_index, gd.edge_attr)
             else:
                 embedds = self.gnn_layers(embedds, self.gd.edge_index, self.gd.edge_attr)
