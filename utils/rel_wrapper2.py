@@ -35,7 +35,7 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
         self.background_id = background_id
 
         self.rel_deter_func = self.id_to_rule_list(self.background_id)
-
+        self.n_rel_rules = len(self.rel_deter_func)
         # number of objects/entities are the number of cells on the grid
         if not self.dense:
             self.obj_n = np.prod(env.observation_space[0]['image'].shape[:-1]) #physical entities
@@ -44,12 +44,14 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
         self.obs_shape = {'unary': (self.obj_n, self.n_attr),
                           'binary': (self.obj_n, self.obj_n, len(self.rel_deter_func))}
         self.spatial_tensors = None
+        self.prev = None
 
     def extract_dense_attributes(self, data):
         # Compute the sum of attributes along the last dimension
         attribute_sum = np.sum(data, axis=2)
 
         non_zero_count = np.count_nonzero(attribute_sum)
+        assert non_zero_count == self.obj_n, 'object mismatch'
         # Find the indices of non-zero attribute sums
         non_zero_indices = np.nonzero(attribute_sum)
 
@@ -59,7 +61,8 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
         attribute_vectors = []
 
         for i in range(self.n_attr):
-            attribute_vectors.append(np.reshape(filtered_data[:, i], non_zero_count))
+            attribute_vectors.append(np.reshape(filtered_data[:,i], non_zero_count))
+        assert len(attribute_vectors) == self.obj_n, 'object mismatch'
         return attribute_vectors
 
     def extract_attributes(self, data):
@@ -113,6 +116,13 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
                             self.spatial_tensors[rel_idx][obj_idx1, obj_idx2] = 1.0
 
         binary_tensors = self.spatial_tensors
+
+        # if not np.array_equal(np.array(self.prev), np.array(self.spatial_tensors)):
+        #     print(f'self.prev {self.prev}')
+        #     print(f'self.spatial {self.spatial_tensors}')
+        self.prev = self.spatial_tensors
+
+
         unary_t, binary_t = np.stack(unary_tensors, axis=-1), np.stack(binary_tensors, axis=-1)
         return unary_t, binary_t
 
@@ -170,6 +180,8 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
                                    is_down_adj, is_right_adj, is_down_left_adj, is_down_right_adj,
                                    is_left, is_right, is_front, is_back, top_right, top_left,
                                    down_left, down_right]
+        else:
+            rel_deter_func = None
         return rel_deter_func
 
 def rotate_vec2d(vec, degrees):

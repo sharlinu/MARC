@@ -17,6 +17,7 @@ class RelationalSAC(object):
                  agent_init_params,
                  spatial_tensors,
                  batch_size,
+                 rel_deter_func,
                  n_actions,
                  input_dims,
                  n_agents=2,
@@ -50,18 +51,19 @@ class RelationalSAC(object):
                                       num_in_pol=params['num_in_pol'],
                                       num_out_pol=params['num_out_pol'])
                          for params in agent_init_params] # are input and output dims for agent
-        self.critic = RelationalCritic(
-                                        # sa_sizes=sa_size,
-                                        n_agents=self.n_agents,
+        self.critic = RelationalCritic(n_agents=self.n_agents,
+                                       # obs = obs,
                                        spatial_tensors=spatial_tensors,
+                                       rel_deter_func=rel_deter_func,
                                        batch_size = batch_size,
                                        n_actions=n_actions,
                                        input_dims=input_dims,
                                        hidden_dim=critic_hidden_dim)
         self.target_critic = RelationalCritic(
-            # sa_sizes=sa_size,
                                         n_agents = self.n_agents,
+                                        # obs = obs,
                                         spatial_tensors=spatial_tensors,
+                                        rel_deter_func = rel_deter_func,
                                         batch_size = batch_size,
                                         n_actions=n_actions,
                                         input_dims=input_dims,
@@ -115,9 +117,9 @@ class RelationalSAC(object):
             next_acs.append(curr_next_ac)
             next_log_pis.append(curr_next_log_pi)
 
-        critic_rets = self.critic(unary_tensors=unary, actions=acs,
+        critic_rets = self.critic(obs=obs, unary_tensors=unary, actions=acs,
                                   logger=logger, niter=self.niter)
-        next_qs = self.target_critic(unary_tensors=next_unary, actions=next_acs)
+        next_qs = self.target_critic(obs=next_obs, unary_tensors=next_unary, actions=next_acs)
         q_loss = 0
         for a_i, nq, log_pi, pq in zip(range(self.n_agents), next_qs,
                                                next_log_pis, critic_rets):
@@ -168,7 +170,7 @@ class RelationalSAC(object):
             all_log_pis.append(log_pi)
             all_pol_regs.append(pol_regs)
 
-        critic_rets = self.critic(unary_tensors=unary,  actions=samp_acs,
+        critic_rets = self.critic(obs=obs, unary_tensors=unary,  actions=samp_acs,
                                   logger=logger, return_all_q=True)
 
         for a_i, probs, log_pi, pol_regs, (q, all_q) in zip(range(self.n_agents), all_probs,
@@ -303,6 +305,7 @@ class RelationalSAC(object):
                      'spatial_tensors':spatial_tensors,
                      'batch_size': batch_size,
                      'n_actions': a_size,
+                     'rel_deter_func': env.rel_deter_func,
                      # 's_size': s_size,
                      'input_dims': [env.obs_shape['unary'][-1], env.obs_shape['binary'][-1] ],
                      # 3 attributes and 14 relations
