@@ -15,11 +15,11 @@ class RelationalSAC(object):
     """
     def __init__(self,
                  agent_init_params,
-                 sa_size,
                  spatial_tensors,
                  batch_size,
                  n_actions,
                  input_dims,
+                 n_agents=2,
                  gamma=0.95,
                  tau=0.01,
                  pi_lr=0.01,
@@ -44,26 +44,28 @@ class RelationalSAC(object):
                                   policy entropy)
             hidden_dim (int): Number of hidden dimensions for networks
         """
-        self.nagents = len(sa_size)
+        self.n_agents = n_agents
         self.agents = [AttentionAgent(lr=pi_lr,
                                       hidden_dim=pol_hidden_dim,
                                       num_in_pol=params['num_in_pol'],
                                       num_out_pol=params['num_out_pol'])
                          for params in agent_init_params] # are input and output dims for agent
-        self.type = 'relational'
-        if self.type=='relational':
-            self.critic = RelationalCritic(sa_sizes=sa_size,
-                                           spatial_tensors=spatial_tensors,
-                                           batch_size = batch_size,
-                                           n_actions=n_actions,
-                                           input_dims=input_dims,
-                                           hidden_dim=critic_hidden_dim)
-            self.target_critic = RelationalCritic(sa_sizes=sa_size,
-                                            spatial_tensors=spatial_tensors,
-                                            batch_size = batch_size,
-                                            n_actions=n_actions,
-                                            input_dims=input_dims,
-                                            hidden_dim=critic_hidden_dim)
+        self.critic = RelationalCritic(
+                                        # sa_sizes=sa_size,
+                                        n_agents=self.n_agents,
+                                       spatial_tensors=spatial_tensors,
+                                       batch_size = batch_size,
+                                       n_actions=n_actions,
+                                       input_dims=input_dims,
+                                       hidden_dim=critic_hidden_dim)
+        self.target_critic = RelationalCritic(
+            # sa_sizes=sa_size,
+                                        n_agents = self.n_agents,
+                                        spatial_tensors=spatial_tensors,
+                                        batch_size = batch_size,
+                                        n_actions=n_actions,
+                                        input_dims=input_dims,
+                                        hidden_dim=critic_hidden_dim)
         hard_update(self.target_critic, self.critic) # hard update only at the beginning to initialise
         self.critic_optimizer = Adam(self.critic.parameters(), lr=q_lr,
                                      weight_decay=1e-3)
@@ -112,17 +114,12 @@ class RelationalSAC(object):
             curr_next_ac, curr_next_log_pi = pi(ob, return_log_pi=True)
             next_acs.append(curr_next_ac)
             next_log_pis.append(curr_next_log_pi)
-        if self.type == 'test':
-            critic_in = list(zip(obs, acs))
-            critic_rets = self.critic(critic_in)
-            trgt_critic_in = list(zip(next_obs, next_acs))
-            next_qs = self.target_critic(trgt_critic_in)
-        else:
-            critic_rets = self.critic(unary_tensors=unary, actions=acs,
-                                      logger=logger, niter=self.niter)
-            next_qs = self.target_critic(unary_tensors=next_unary, actions=next_acs)
+
+        critic_rets = self.critic(unary_tensors=unary, actions=acs,
+                                  logger=logger, niter=self.niter)
+        next_qs = self.target_critic(unary_tensors=next_unary, actions=next_acs)
         q_loss = 0
-        for a_i, nq, log_pi, pq in zip(range(self.nagents), next_qs,
+        for a_i, nq, log_pi, pq in zip(range(self.n_agents), next_qs,
                                                next_log_pis, critic_rets):
             target_q = (rews[a_i].view(-1, 1) +
                         self.gamma * nq *
@@ -142,7 +139,7 @@ class RelationalSAC(object):
 
         self.critic.scale_shared_grads()
         grad_norm = torch.nn.utils.clip_grad_norm_(
-            self.critic.parameters(), 10 * self.nagents)
+            self.critic.parameters(), 10 * self.n_agents)
 
 
         self.critic_optimizer.step()
@@ -160,7 +157,7 @@ class RelationalSAC(object):
         all_log_pis = []
         all_pol_regs = []
 
-        for a_i, pi, ob in zip(range(self.nagents), self.policies, obs):
+        for a_i, pi, ob in zip(range(self.n_agents), self.policies, obs):
             curr_ac, probs, log_pi, pol_regs, ent = pi(
                 ob, return_all_probs=True, return_log_pi=True,
                 regularize=True, return_entropy=True)
@@ -171,14 +168,10 @@ class RelationalSAC(object):
             all_log_pis.append(log_pi)
             all_pol_regs.append(pol_regs)
 
-        if self.type == 'test':
-            critic_in = list(zip(obs, samp_acs)) # that probably needs to change because we are only taking in one state information not obs from all agents
-            critic_rets = self.critic(critic_in, return_all_q=True)
-        else:
-            critic_rets = self.critic(unary_tensors=unary,  actions=samp_acs,
-                                      logger=logger, return_all_q=True)
+        critic_rets = self.critic(unary_tensors=unary,  actions=samp_acs,
+                                  logger=logger, return_all_q=True)
 
-        for a_i, probs, log_pi, pol_regs, (q, all_q) in zip(range(self.nagents), all_probs,
+        for a_i, probs, log_pi, pol_regs, (q, all_q) in zip(range(self.n_agents), all_probs,
                                                             all_log_pis, all_pol_regs,
                                                             critic_rets):
             curr_agent = self.agents[a_i]
@@ -286,15 +279,15 @@ class RelationalSAC(object):
         hidden_dim: number of hidden dimensions for networks
         """
         agent_init_params = []
-        sa_size = []
+        # sa_size = []
         s_size = []
         a_size = []
         for acsp, obsp in zip(env.action_space,
                               env.observation_space):
             agent_init_params.append({'num_in_pol': np.ones(shape=obsp['image'].shape).flatten().shape[0],
                                       'num_out_pol': acsp.n})
-            sa_size.append((obsp['image'].shape, acsp.n))
-            s_size.append(obsp['image'].shape)
+            # sa_size.append((obsp['image'].shape, acsp.n))
+            # s_size.append(obsp['image'].shape)
             a_size.append(acsp.n)
 
         init_dict = {'gamma': gamma,
@@ -305,11 +298,12 @@ class RelationalSAC(object):
                      'pol_hidden_dim': pol_hidden_dim,
                      'critic_hidden_dim': critic_hidden_dim,
                      'agent_init_params': agent_init_params,
-                     'sa_size': sa_size,
+                     'n_agents': env.n_agents,
+                     # 'sa_size': sa_size,
                      'spatial_tensors':spatial_tensors,
                      'batch_size': batch_size,
                      'n_actions': a_size,
-                     's_size': s_size,
+                     # 's_size': s_size,
                      'input_dims': [env.obs_shape['unary'][-1], env.obs_shape['binary'][-1] ],
                      # 3 attributes and 14 relations
 

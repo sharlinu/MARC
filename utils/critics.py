@@ -15,8 +15,10 @@ class RelationalCritic(nn.Module):
     Relational network, used as critic for all agents.
     """
     # TODO previously embedding_size = 16, now we have hidden_dim and 32
-    def __init__(self, sa_sizes: list,  # TODO at the end we should not need sa_sizes anymore?
+    def __init__(self,
+                 # sa_sizes: list,  # TODO at the end we should not need sa_sizes anymore?
                   #obj_n: int,
+                 n_agents: int,
                  spatial_tensors,
                  batch_size: int,
                  n_actions: int,
@@ -33,8 +35,8 @@ class RelationalCritic(nn.Module):
             norm_in (bool): Whether to apply BatchNorm to input
         """
         super(RelationalCritic, self).__init__()
-        self.sa_sizes = sa_sizes
-        self.nagents = len(sa_sizes)
+        # self.sa_sizes = sa_sizes # TODO sa_sizes not needed in here anymore
+        self.n_agents = n_agents
         self.num_actions = n_actions[0]
         self.critics_head = nn.ModuleList()
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -50,10 +52,11 @@ class RelationalCritic(nn.Module):
         self.gnn_layers = RGCNConv(hidden_dim, hidden_dim, self.nb_edge_types)
 
         # iterate over agents
-        for _ in range(self.nagents):
+        for _ in range(self.n_agents):
             critic = nn.Sequential()
-            critic.add_module('critic_fc1', nn.Linear(hidden_dim + self.num_actions * (self.nagents-1),
-                                                      hidden_dim))
+            critic.add_module('critic_fc1', nn.Linear(hidden_dim + self.num_actions * (self.n_agents-1),
+                                                      hidden_dim)) # takes in 128+6*2 , out 128
+
             critic.add_module('critic_nl', nn.LeakyReLU())
             critic.add_module('critic_fc2', nn.Linear(hidden_dim, self.num_actions))
             self.critics_head.append(critic) # one critic for each agent
@@ -73,7 +76,7 @@ class RelationalCritic(nn.Module):
         gradients from the critic loss function multiple times
         """
         for p in self.shared_parameters():
-            p.grad.data.mul_(1. / self.nagents)
+            p.grad.data.mul_(1. / self.n_agents)
 
     def forward(self,
                 unary_tensors,
@@ -100,7 +103,17 @@ class RelationalCritic(nn.Module):
         """
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
         if agents is None:
-            agents = range(self.nagents)
+            agents = range(self.n_agents)
+        # state = None
+        # inputs = [[],
+        #           torch.flatten(unary_tensor, 0, 1).float(), #flattens obs["unary_tensor"] only in 0th and 1st dim
+        #           #torch.flatten(binary_tensor, 0, 1).permute(0,3,1,2).float()]
+        #           binary_tensor.permute(0, 3, 1, 2).float()
+        #           ]
+        # for i in [1,2]:
+        #     inputs[i] = inputs[i].to(device=device)
+        # adj_matrices = inputs[2]
+
         all_rets = []
 
         for a_i in agents:

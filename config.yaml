@@ -1,0 +1,25 @@
+env_id: 'lbf_8x8_2p_2f_simple'
+exp_id : 'try'
+
+player: 2
+field: 8
+
+max_food: 2
+force_coop: False
+dense: False
+keep_food: False
+simple : True
+
+grid_observation: True
+batch_size : 1024
+n_episodes: 200000
+episode_length: 25
+test_n_episodes: 10
+test_episode_length: 25
+seeds: [4001]
+agent_alg: 'rmac'
+buffer_length: 10000
+
+#save_interval: 500
+
+

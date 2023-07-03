@@ -12,7 +12,7 @@ filterwarnings(action='ignore',
 from tensorboardX import SummaryWriter
 from utils.buffer import ReplayBuffer
 from algorithms.attention_sac import RelationalSAC
-from utils.rel_wrapper2 import AbsoluteVKBWrapper
+from utils.rel_wrapper_active import AbsoluteVKBWrapper
 import yaml
 from utils.plotting import plot_fig
 from lbforaging.foraging import ForagingEnv
@@ -36,11 +36,13 @@ def run(config):
         grid_observation=True,
         sight=config.field,
         max_episode_steps=25,
-        force_coop=config.force_coop
+        force_coop=config.force_coop,
+        keep_food=config.keep_food,
+        simple=config.simple,
     )
     env.seed(config.random_seed)
     np.random.seed(config.random_seed)
-    env = AbsoluteVKBWrapper(env)
+    env = AbsoluteVKBWrapper(env, config.dense)
     env.agents = [None] * len(env.action_space)
     # nullary_dim = env.obs_shape[0]
     unary_dim = env.obs_shape['unary']
@@ -59,10 +61,10 @@ def run(config):
                                        reward_scale=config.reward_scale)
 
     replay_buffer = ReplayBuffer(max_steps=config.buffer_length,
-                                 num_agents=model.nagents,
+                                 num_agents=model.n_agents,
                                  obs_dims=[np.prod(obsp['image'].shape) for obsp in env.observation_space],
                                  # nullary_dims=[nullary_dim for _ in range(model.nagents)],
-                                 unary_dims=[unary_dim for _ in range(model.nagents)],
+                                 unary_dims=[unary_dim for _ in range(model.n_agents)],
                                  # binary_dims=[binary_dim for _ in range(model.nagents)],
                                  ac_dims= [acsp.shape[0] if isinstance(acsp, Box) else acsp.n
                                   for acsp in env.action_space])
@@ -74,6 +76,8 @@ def run(config):
     path_ckpt_best_avg = ''
     for ep_i in range(0, config.n_episodes, config.n_rollout_threads):
         obs = env.reset()
+        # print('player level',[p.level for p in env.players])
+        # print('field', env.field)
         #print('initial', obs['image'][0],obs['image'][1])
         model.prep_rollouts(device='cpu')
         episode_reward_total = 0
@@ -86,7 +90,7 @@ def run(config):
             #agent_obs = np.expand_dims(agent_obs, axis=0)
             torch_obs = [Variable(torch.Tensor(agent_obs[i]),
                                   requires_grad=False)
-                         for i in range(model.nagents)]
+                         for i in range(model.n_agents)]
             # get actions as torch Variables
             try:
                 torch_agent_actions = model.step(torch_obs, explore=True)
@@ -98,6 +102,9 @@ def run(config):
             # rearrange actions to be per environment
             actions = [np.argmax(ac) for ac in agent_actions]
             next_obs, rewards, dones, infos = env.step(actions)
+            # print('player level', [p.level for p in env.players])
+            # print('field', env.field)
+            # print('reward', rewards)
             replay_buffer.push(obs, agent_actions, rewards, next_obs, dones)
             episode_reward_total += rewards.sum()
 

@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import torch
 import numpy as np
 
+
 def plot_fig(record, name, path_summary, show = False):
     durations_t = torch.FloatTensor(np.asarray(record))
 
@@ -24,7 +25,6 @@ def plot_fig(record, name, path_summary, show = False):
 
     plt.draw()
     # plt.ylim([-200,10])
-
     if show:
         plt.show()
     fig.savefig('{}/{}.png'.format(path_summary, name))

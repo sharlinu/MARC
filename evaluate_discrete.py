@@ -10,6 +10,8 @@ import json
 import sys
 # sys.path.insert(0, '/Users/sharlinu/Desktop/github/MABoxWorld/environments')
 # sys.path.insert(0, '/Users/sharlinu/Desktop/github/MABoxWorld/Images')
+# sys.path.insert(0, '/Users/sharlinu/Desktop/github/MABoxWorld/')
+# from environments.box import BoxWorldEnv
 sys.path.insert(0, '/home/utke_s@WMGDS.WMG.WARWICK.AC.UK/github/MABoxWorld')
 sys.path.insert(0, '/home/utke_s@WMGDS.WMG.WARWICK.AC.UK/github/MABoxWorld/environments')
 
@@ -18,8 +20,7 @@ from lbforaging.foraging import ForagingEnv
 import numpy as np
 from enum import Enum
 import yaml
-import matplotlib.pyplot as plt
-import matplotlib.animation as animation
+from lbforaging.foraging import ForagingEnv
 class Action(Enum):
     NONE = 0
     NORTH = 1
@@ -68,7 +69,6 @@ def run(config):
         )
     else:
         raise ValueError(f'Cannot cater for the environment {config.env_id}')
-
     model.prep_rollouts(device='cpu')
     ifi = 1 / config.fps  # inter-frame interval
     collect_data = {}
@@ -86,40 +86,31 @@ def run(config):
         l_rewards = []
         ep_rew = 0
 
+        from utils.rel_wrapper_active import AbsoluteVKBWrapper
+        env = AbsoluteVKBWrapper(env, config.dense)
 
-        from utils.rel_wrapper2 import AbsoluteVKBWrapper
-        env = AbsoluteVKBWrapper(env)
         obs = env.reset()
         if render:
             env.render()
 
-        if config.save_gifs:
-            frames = []
-            frames.append(env.render('rgb_array')[0])
-
         for t_i in range(config.test_episode_length):
-            #print('unary', obs[0]['unary_tensor'][:,0])
             calc_start = time.time()
-
-            #if config.no_render != False:
-            #    frames.append(env.render(mode='rgb_array', close=False)[0])
 
             # rearrange observations to be per agent, and convert to torch Variable
             if config.grid_observation:
                 obs = [np.expand_dims(ob['image'].flatten(), axis=0) for ob in obs]
-            torch_obs = [Variable(torch.Tensor(obs[i]).view(1,-1),
+            torch_obs = [Variable(torch.Tensor(obs[i]).view(1, -1),
                                   requires_grad=False)
-                         for i in range(model.nagents)]
+                         for i in range(model.n_agents)]
             # get actions as torch Variables
             torch_actions = model.step(torch_obs, explore=False)
             # convert actions to numpy arrays
             actions = [np.argmax(ac.data.numpy().flatten()) for ac in torch_actions]
+            print('actions', actions)
             obs, rewards, dones, infos = env.step(actions)
             if render:
                 env.render()
                 time.sleep(0.5)
-            #collect_item['final_reward'] = sum(rewards)
-            #collect_item['l_rewards'].append(sum(rewards))
             collect_item['l_infos'].append(infos)
 
             calc_end = time.time()
@@ -132,11 +123,7 @@ def run(config):
                 collect_item['finished'] = 1
                 break
 
-        if config.save_gifs:
-            print('{}/{}.gif'.format(gif_path, ep_i))
-            imageio.mimsave('{}/{}.gif'.format(gif_path, ep_i),
-                            frames, duration=ifi)
-        
+
         l_ep_rew.append(ep_rew)
         print("Reward: {}".format(ep_rew))
 
@@ -151,11 +138,7 @@ def run(config):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    #parser.add_argument("env_id", help="Name of environment")
     parser.add_argument("model_path", help="model_path")
-    # parser.add_argument("model_name",
-    #                     help="Name of model")
-    # parser.add_argument("run_num", default=1, type=int)
     parser.add_argument("--save_gifs", action="store_true",
                         help="Saves gif of each episode into model directory")
     parser.add_argument("--incremental", default=None, type=int,

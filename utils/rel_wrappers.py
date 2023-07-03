@@ -278,7 +278,7 @@ if __name__ == "__main__":
         actions = env.action_space.sample()
         nobs, nreward, ndone, _ = env.step(actions)
 
-        print(nobs)
+        print('obs', nobs)
         # print('player pos', env.players[0].position, '----', env.players[1].position )
         # nobs, nreward, ndone, _ = env.step((1,1))
         if sum(nreward) != 0:

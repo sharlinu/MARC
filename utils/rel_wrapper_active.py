@@ -1,11 +1,10 @@
+from gym_minigrid.minigrid import DIR_TO_VEC  # DIR vec is [array([1, 0]), array([0, 1]), array([-1,  0]), array([ 0, -1])]
 import numpy as np
-from gym_minigrid.minigrid import * # imports DIR_TO_VEC as [array([1, 0]), array([0, 1]), array([-1,  0]), array([ 0, -1])]
+import gym
 import time
 import pygame
-from collections import namedtuple
-#OBJECTS = ind_dict2list(OBJECT_TO_IDX)
 
-class GridObject():
+class GridObject:
     "object is specified by its location"
     def __init__(self, x, y):
         self.x = x
@@ -18,31 +17,61 @@ class GridObject():
 
     @property
     def name(self):
-        return str(self.type)+"_"+str(self.x)+str(self.y)
+        return "_"+str(self.x)+str(self.y)
 
-from random import randint
+# from random import randint
 class AbsoluteVKBWrapper(gym.ObservationWrapper):
     """
     Add a vkb key-value pair, which represents the state as a vectorised knowledge base.
     Entities are objects in the gird-world, predicates represents the properties of them and relations between them.
     """
-    def __init__(self, env, background_id="b3"):
+    def __init__(self, env, dense, background_id="b3"):
         super().__init__(env, new_step_api=True)
-
-        self.attribute_labels = ['agents', 'id', 'colour'] # TODO generalise where colour is general attribute
+        self.attribute_labels = ['agents', 'id', 'feature']
         self.n_attr = len(self.attribute_labels)
-        self.attributes = namedtuple('attr', ' '.join(self.attribute_labels))
-
+        # self.attributes = namedtuple('attr', ' '.join(self.attribute_labels))
+        self.dense = dense
         self.env_type = "boxworld" # TODO generalise
         self.background_id = background_id
 
         self.rel_deter_func = self.id_to_rule_list(self.background_id)
 
         # number of objects/entities are the number of cells on the grid
-        self.obj_n = np.prod(env.observation_space[0]['image'].shape[:-1]) #physical entities
-        self.obs_shape = {'unary':(self.obj_n, self.n_attr),
-                          'binary':(self.obj_n, self.obj_n, len(self.rel_deter_func))}
+        if not self.dense:
+            self.obj_n = np.prod(env.observation_space[0]['image'].shape[:-1]) #physical entities
+        else:
+            self.obj_n = env.n_agents + env.n_objects
+        self.obs_shape = {'unary': (self.obj_n, self.n_attr),
+                          'binary': (self.obj_n, self.obj_n, len(self.rel_deter_func))}
         self.spatial_tensors = None
+
+    def extract_dense_attributes(self, data):
+        # Compute the sum of attributes along the last dimension
+        attribute_sum = np.sum(data, axis=2)
+
+        non_zero_count = np.count_nonzero(attribute_sum)
+        # Find the indices of non-zero attribute sums
+        non_zero_indices = np.nonzero(attribute_sum)
+
+        # Filter out elements whose attributes sum to zero
+        filtered_data = data[non_zero_indices]
+
+        attribute_vectors = []
+
+        for i in range(self.n_attr):
+            attribute_vectors.append(np.reshape(filtered_data[:, i], non_zero_count))
+        return attribute_vectors
+
+    def extract_attributes(self, data):
+            # Get the size of the grid and number of attributes
+            n_rows, n_cols, n_attr = data.shape
+
+            # Initialize a list of attribute vectors, each with length n_rows * n_cols
+            attribute_vectors = []
+
+            for i in range(n_attr):
+                attribute_vectors.append(np.reshape(data[:, :, i], (n_rows * n_cols)))
+            return attribute_vectors
 
     def img2vkb(self, img, direction=None):
         """
@@ -58,22 +87,18 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
 
         """
         img = img.astype(np.int32)
+        # data = filter_non_zero_elements(img) if self.dense else img
 
-        def extract_attributes(data):
-            # Get the size of the grid and number of attributes
-            n_rows, n_cols, n_attr = data.shape
-
-            # Initialize a list of attribute vectors, each with length n_rows * n_cols
-            attribute_vectors = []
-            for i in range(n_attr):
-                attribute_vectors.append(np.reshape(data[:, :, i], (n_rows * n_cols)))
-
-            return attribute_vectors
-        unary_tensors = extract_attributes(img)
-        # unary_tensors = [np.zeros(self.obj_n) for _ in range(self.n_attr)] # so this is a list of binary vectors for each color, indicating what entities have the colour
+        if self.dense:
+            unary_tensors = self.extract_dense_attributes(img)
+        else:
+            unary_tensors = self.extract_attributes(img)
         objs = []
         for y, row in enumerate(img):
             for x, pixel in enumerate(row):
+                # print(pixel)
+                if self.dense and np.sum(pixel)==0:
+                    continue
                 obj = GridObject(x,y)
                 objs.append(obj)
 
@@ -255,7 +280,7 @@ def fan_left(obj1, obj2, direction_vec)->bool:
 
 
 if __name__ == "__main__":
-    from MABoxWorld.environments.box2 import BoxWorldEnv
+    from MABoxWorld.environments.box import BoxWorldEnv
     env = BoxWorldEnv(
         players=2,
         field_size=(5,5),
@@ -282,7 +307,7 @@ if __name__ == "__main__":
         actions = env.action_space.sample()
         nobs, nreward, ndone, _ = env.step(actions)
 
-        print(nobs)
+        print('printing obs', nobs)
         # print('player pos', env.players[0].position, '----', env.players[1].position )
         # nobs, nreward, ndone, _ = env.step((1,1))
         if sum(nreward) != 0:
