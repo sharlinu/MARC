@@ -11,7 +11,7 @@ import sys
 sys.path.insert(0, '/Users/sharlinu/Desktop/github/MABoxWorld/environments')
 sys.path.insert(0, '/Users/sharlinu/Desktop/github/MABoxWorld/Images')
 sys.path.insert(0, '/Users/sharlinu/Desktop/github/MABoxWorld/')
-from environments.box import BoxWorldEnv
+# from environments.box import BoxWorldEnv
 import numpy as np
 from enum import Enum
 import yaml
@@ -147,7 +147,7 @@ if __name__ == '__main__':
     parser.add_argument("--benchmark", action="store_false",
                         help="benchmark mode")
     config = parser.parse_args()
-    render = True
+    render = False
     args = vars(config)
     eval_path = Path(config.model_path)
     dir_exp = Path(*eval_path.parts[:-2])

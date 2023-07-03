@@ -1,23 +1,18 @@
-env_id: 'lbf_8x8_2p_2f_coop'
+env_id: 'lbf_8x8_2p_2f_simple'
 exp_id : 'try'
 
 player: 2
 field: 8
 
 max_food: 2
-force_coop: True
+force_coop: False
 dense: False
-
-num_colours: 2
-fixed: False
-goal_length: 2
-simple: False
-deterministic: False
-single: False
+keep_food: False
+simple : True
 
 grid_observation: True
-batch_size : 128
-n_episodes: 100000
+batch_size : 1024
+n_episodes: 200000
 episode_length: 25
 test_n_episodes: 10
 test_episode_length: 25

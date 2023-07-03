@@ -38,7 +38,9 @@ def run(config):
         grid_observation=True,
         sight=config.field,
         max_episode_steps=25,
-        force_coop=config.force_coop
+        force_coop=config.force_coop,
+        keep_food=config.keep_food,
+        simple=config.simple,
     )
     env.seed(config.random_seed)
     np.random.seed(config.random_seed)
@@ -76,6 +78,8 @@ def run(config):
     path_ckpt_best_avg = ''
     for ep_i in range(0, config.n_episodes, config.n_rollout_threads):
         obs = env.reset()
+        # print('player level',[p.level for p in env.players])
+        # print('field', env.field)
         #print('initial', obs['image'][0],obs['image'][1])
         model.prep_rollouts(device='cpu')
         episode_reward_total = 0
@@ -100,6 +104,9 @@ def run(config):
             # rearrange actions to be per environment
             actions = [np.argmax(ac) for ac in agent_actions]
             next_obs, rewards, dones, infos = env.step(actions)
+            # print('player level', [p.level for p in env.players])
+            # print('field', env.field)
+            # print('reward', rewards)
             replay_buffer.push(obs, agent_actions, rewards, next_obs, dones)
             episode_reward_total += rewards.sum()
 
