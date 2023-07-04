@@ -119,7 +119,7 @@ class RelationalSAC(object):
 
         critic_rets = self.critic(obs=obs, unary_tensors=unary, binary_tensors=binary, actions=acs,
                                   logger=logger, niter=self.niter)
-        next_qs = self.target_critic(obs=next_obs, unary_tensors=next_unary, binary_tensors=binary, actions=next_acs)
+        next_qs = self.target_critic(obs=next_obs, unary_tensors=next_unary, binary_tensors=next_binary, actions=next_acs)
         q_loss = 0
         for a_i, nq, log_pi, pq in zip(range(self.n_agents), next_qs,
                                                next_log_pis, critic_rets):

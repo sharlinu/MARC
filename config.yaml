@@ -1,4 +1,4 @@
-env_id: 'lbf_6x6_2p_1f'
+env_id: 'lbf_6x6_2p_1f_sparse'
 exp_id : 'try'
 
 player: 2
@@ -6,7 +6,7 @@ field: 6
 
 max_food: 1
 force_coop: False
-dense: True
+dense: false
 
 #num_colours: 2
 #fixed: False

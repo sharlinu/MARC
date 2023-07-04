@@ -128,12 +128,13 @@ class RelationalCritic(nn.Module):
 
 
             # RGCN module
-            if binary_tensors:
+            if all(binary_tensors):
 
                 # single_gd, self.slices = to_gd(binary_t)  # makes adjs geometric data usable for torch geometric
                 # batch_data = [to_gd(instance) for instance in binary_tensors]
 
-                gd = Batch.from_data_list(binary_tensors[a_i]).to(device = self.device)
+                gd = Batch.from_data_list(binary_tensors[a_i])
+                gd = gd.to(device = self.device)
                 # max_node = max(i + 1 for b in batch_data for i in b.x[:, 0].cpu().numpy())
                 # slices = [max_node for _ in batch_data]
 

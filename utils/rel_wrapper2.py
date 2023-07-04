@@ -106,7 +106,7 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
                 obj = GridObject(x,y)
                 objs.append(obj)
 
-        if not self.spatial_tensors:
+        if not self.spatial_tensors or self.dense:
             # create spatial tensors that gives for every rel. det rule a binary indicator between the entities
             self.spatial_tensors = [np.zeros([len(objs), len(objs)]) for _ in range(len(self.rel_deter_func))] # 14  81x81 vectors for each relation
             for obj_idx1, obj1 in enumerate(objs):
@@ -116,8 +116,11 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
                         if func(obj1, obj2, direction_vec):
                             self.spatial_tensors[rel_idx][obj_idx1, obj_idx2] = 1.0
 
-        binary_tensors = torch.tensor(self.spatial_tensors)
+        self.prev = self.spatial_tensors
 
+        binary_tensors = torch.tensor(self.spatial_tensors)
+        if np.array_equal(self.prev, binary_tensors):
+            pass
         unary_t = np.stack(unary_tensors, axis=-1)
         gd = to_gd(binary_tensors, nb_objects=self.obj_n)
         return unary_t, gd

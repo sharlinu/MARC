@@ -33,9 +33,7 @@ class ReplayBuffer(object):
         self.ac_buffs = []
         self.rew_buffs = []
         self.next_obs_buffs = []
-        # self.next_obs_nullary_buffs = []
         self.next_obs_unary_buffs = []
-        # self.next_obs_binary_buffs = []
         self.done_buffs = []
         for odim, unary_dim, adim in zip(obs_dims, unary_dims, ac_dims):
             self.obs_buffs.append(np.zeros((max_steps, odim), dtype=np.float32))
@@ -218,16 +216,14 @@ class ReplayBuffer2(object):
              dones):
         nentries = 1    # usually for multiple parallel environments, but now just one anyways
 
-        # these are all missing the dimension in the beginning compared to parallel env set up of maac. e.g. obs (12,) instead of (1,2,12)
         if self.curr_i + nentries > self.max_steps:
+            print('rollover')
             rollover = self.max_steps - self.curr_i  # num of indices to roll over
             for agent_i in range(self.num_agents):
                 self.obs_buffs[agent_i] = np.roll(self.obs_buffs[agent_i],
                                                   rollover, axis=0)
                 self.obs_unary_buffs[agent_i] = np.roll(self.obs_unary_buffs[agent_i],
                                                   rollover, axis=0)
-                # self.obs_binary_buffs[agent_i] = np.roll(self.obs_binary_buffs[agent_i],
-                #                                   rollover, axis=0)
                 self.ac_buffs[agent_i] = np.roll(self.ac_buffs[agent_i],
                                                  rollover, axis=0)
                 self.rew_buffs[agent_i] = np.roll(self.rew_buffs[agent_i],
@@ -237,8 +233,6 @@ class ReplayBuffer2(object):
                     self.next_obs_buffs[agent_i], rollover, axis=0)
                 self.next_obs_unary_buffs[agent_i] = np.roll(
                     self.next_obs_unary_buffs[agent_i], rollover, axis=0)
-                # self.next_obs_binary_buffs[agent_i] = np.roll(
-                #     self.next_obs_binary_buffs[agent_i], rollover, axis=0)
 
                 self.done_buffs[agent_i] = np.roll(self.done_buffs[agent_i],
                                                    rollover)
@@ -248,8 +242,17 @@ class ReplayBuffer2(object):
             self.obs_buffs[agent_i][self.curr_i:self.curr_i + nentries] = observation[agent_i]['image'].flatten()
             self.obs_unary_buffs[agent_i][self.curr_i:self.curr_i + nentries] = observation[agent_i]['unary_tensor']
             if self.dense:
-                self.obs_binary_buffs[agent_i].append(observation[agent_i]['binary_tensor'])
-                self.next_obs_binary_buffs[agent_i].append(next_observation[agent_i]['binary_tensor'])
+
+                # print('obs g', observation[agent_i]['binary_tensor'])
+                # print('next_obs g', next_observation[agent_i]['binary_tensor'])
+                try:
+                    self.obs_binary_buffs[agent_i].insert(self.curr_i, observation[agent_i]['binary_tensor'])
+                    self.next_obs_binary_buffs[agent_i].insert(self.curr_i, next_observation[agent_i]['binary_tensor'])
+                except IndexError:
+                    self.obs_binary_buffs[agent_i][self.curr_i] = observation[agent_i]['binary_tensor']
+                    self.next_obs_binary_buffs[agent_i][self.curr_i] = next_observation[agent_i]['binary_tensor']
+                # print('binary buffer length:', len(self.obs_binary_buffs[0]), len(self.next_obs_binary_buffs[0]))
+                # print('general buffer length', self.curr_i, self.filled_i)
             self.ac_buffs[agent_i][self.curr_i:self.curr_i + nentries] = actions[agent_i]
             self.rew_buffs[agent_i][self.curr_i:self.curr_i + nentries] = rewards[agent_i]
 
@@ -284,12 +287,12 @@ class ReplayBuffer2(object):
         if self.dense:
             out =  ([cast(self.obs_buffs[i][inds]) for i in range(self.num_agents)],
                     [cast(self.obs_unary_buffs[i][inds]) for i in range(self.num_agents)],
-                    [[self.obs_binary_buffs[0][i] for i in inds] for _ in range(self.num_agents)],
+                    [[self.obs_binary_buffs[i][ind] for ind in inds] for i in range(self.num_agents)],
                     [cast(self.ac_buffs[i][inds]) for i in range(self.num_agents)],
                     ret_rews,
                     [cast(self.next_obs_buffs[i][inds]) for i in range(self.num_agents)],
                     [cast(self.next_obs_unary_buffs[i][inds]) for i in range(self.num_agents)],
-                    [[self.next_obs_binary_buffs[0][i] for i in inds] for _ in range(self.num_agents)],
+                    [[self.next_obs_binary_buffs[i][ind] for ind in inds] for i in range(self.num_agents)],
                     [cast(self.done_buffs[i][inds]) for i in range(self.num_agents)])
         else:
             out =  ([cast(self.obs_buffs[i][inds]) for i in range(self.num_agents)],
