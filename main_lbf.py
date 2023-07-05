@@ -10,9 +10,9 @@ filterwarnings(action='ignore',
                         category=DeprecationWarning,
                         module='tensorboardX')
 from tensorboardX import SummaryWriter
-from utils.buffer import ReplayBuffer
+from utils.buffer import ReplayBuffer, ReplayBuffer2
 from algorithms.attention_sac import RelationalSAC
-from utils.rel_wrapper_active import AbsoluteVKBWrapper
+from utils.rel_wrapper2 import AbsoluteVKBWrapper
 import yaml
 from utils.plotting import plot_fig
 from lbforaging.foraging import ForagingEnv
@@ -60,14 +60,15 @@ def run(config):
                                        critic_hidden_dim=config.critic_hidden_dim,
                                        reward_scale=config.reward_scale)
 
-    replay_buffer = ReplayBuffer(max_steps=config.buffer_length,
+    replay_buffer = ReplayBuffer2(max_steps=config.buffer_length,
                                  num_agents=model.n_agents,
                                  obs_dims=[np.prod(obsp['image'].shape) for obsp in env.observation_space],
                                  # nullary_dims=[nullary_dim for _ in range(model.nagents)],
                                  unary_dims=[unary_dim for _ in range(model.n_agents)],
                                  # binary_dims=[binary_dim for _ in range(model.nagents)],
                                  ac_dims= [acsp.shape[0] if isinstance(acsp, Box) else acsp.n
-                                  for acsp in env.action_space])
+                                  for acsp in env.action_space],
+                                  dense = config.dense)
     t = 0
     l_rewards = []
     reward_best = float("-inf")
@@ -180,6 +181,7 @@ def run(config):
 if __name__ == '__main__':
     import shutil
     import datetime
+    import time
     import json
     import glob as glob
 
@@ -212,13 +214,14 @@ if __name__ == '__main__':
     parser.add_argument('--dir_base', default='./experiments',
                         help='path of the experiment directory')
     config = parser.parse_args()
-    args = vars(config)
+
     if torch.cuda.is_available():
+        print('cuda is available')
         config.use_gpu = True
     else:
         config.use_gpu = False
 
-    print('use gpu', config.use_gpu)
+    args = vars(config)
     with open("config.yaml", "r") as file:
         params = yaml.load(file, Loader=yaml.FullLoader)
 
@@ -282,11 +285,14 @@ if __name__ == '__main__':
         list_exp_dir.append(args['dir_exp'])
 
         if os.path.exists('{}/collected_data_seed_{}.json'.format(dir_collected_data, seed)) == False:
+            st = time.time()
             run(config)
 
             # test
             # model_path = '{}/'.format(args['dir_exp'])
             model_path = glob.glob('{}/saved_models/ckpt_best_*'.format(args['dir_exp']))[0]
+            t_min = (time.time() - st)/60
+            print(f'{args["n_episodes"]} episode on gpu:{args["use_gpu"]} with max {args["episode_length"]} steps ran in {t_min:.2f} minutes - {t_min*60/args["n_episodes"]:.2f} sec/episode')
             cmd_test = 'python evaluate_discrete.py {} --no_render'.format(model_path)
             print(cmd_test)
             os.system(cmd_test)

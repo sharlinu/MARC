@@ -7,7 +7,7 @@ from itertools import chain
 from typing import List
 from torch_geometric.nn import RGCNConv
 from torch_geometric.data import Data as GeometricData, Batch
-
+from gym_minigrid.minigrid import DIR_TO_VEC
 
 
 class RelationalCritic(nn.Module):
@@ -23,6 +23,7 @@ class RelationalCritic(nn.Module):
                  batch_size: int,
                  n_actions: int,
                  input_dims: list,
+                 rel_deter_func: list,
                  hidden_dim: int = 32,
                  norm_in: object = True,
                  net_code: object = "1g0f",
@@ -42,6 +43,9 @@ class RelationalCritic(nn.Module):
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         self.batch_size = batch_size
         self.max_reduce = True # TODO hardcoded
+        # self.dense = True
+        self.rel_deter_func = rel_deter_func
+
         self.spatial_tensors = np.array(spatial_tensors)
         self.binary_batch = torch.tensor([self.spatial_tensors for _ in range(self.batch_size)])
         self.gd, self.slices = batch_to_gd(self.binary_batch, self.device)  # makes adjs geometric data usable for torch geometric
@@ -79,9 +83,10 @@ class RelationalCritic(nn.Module):
             p.grad.data.mul_(1. / self.n_agents)
 
     def forward(self,
+                obs,
                 unary_tensors,
-                # binary_tensor,
                 actions,
+                binary_tensors = None,
                 agents=None,
                 return_q=True,
                 return_all_q=False,
@@ -101,7 +106,6 @@ class RelationalCritic(nn.Module):
             logger (TensorboardX SummaryWriter): If passed in, important values
                                                  are logged
         """
-        device = 'cuda' if torch.cuda.is_available() else 'cpu'
         if agents is None:
             agents = range(self.n_agents)
         # state = None
@@ -119,13 +123,25 @@ class RelationalCritic(nn.Module):
         for a_i in agents:
             # feature embedding
             #embedds = torch.flatten(inputs[1], 0, 1)
-            embedds = torch.flatten(unary_tensors[a_i], 0, 1).float().to(device=device)
+            embedds = torch.flatten(unary_tensors[a_i], 0, 1).float().to(device=self.device)
             #embedds = self.embedding_linear(embedds)
             embedds = self.embedder(embedds) # seems right so far
 
 
             # RGCN module
-            embedds = self.gnn_layers(embedds, self.gd.edge_index, self.gd.edge_attr)
+            if all(binary_tensors):
+
+                # single_gd, self.slices = to_gd(binary_t)  # makes adjs geometric data usable for torch geometric
+                # batch_data = [to_gd(instance) for instance in binary_tensors]
+
+                gd = Batch.from_data_list(binary_tensors[a_i])
+                gd = gd.to(device = self.device)
+                # max_node = max(i + 1 for b in batch_data for i in b.x[:, 0].cpu().numpy())
+                # slices = [max_node for _ in batch_data]
+
+                embedds = self.gnn_layers(embedds, gd.edge_index, gd.edge_attr)
+            else:
+                embedds = self.gnn_layers(embedds, self.gd.edge_index, self.gd.edge_attr)
             embedds = torch.relu(embedds)
 
             chunks = torch.split(embedds, self.slices, dim=0) # splits it in slices/entities
@@ -155,6 +171,34 @@ class RelationalCritic(nn.Module):
             else:
                 all_rets.append(agent_rets)
         return all_rets
+
+    def preprocess(self, img_batch: np.array):
+        spatial_tensors_list = []
+        for pic in img_batch:
+            pic = np.reshape(pic, (6,6,3)) #TODO hardcoded
+            pic = pic.astype(np.int32) #1024, 108
+        # data = filter_non_zero_elements(img) if self.dense else img
+            objs = []
+            for y, row in enumerate(pic):
+                for x, pixel in enumerate(row):
+                    # print(pixel)
+                    if np.sum(pixel) == 0:
+                        continue
+                    obj = GridObject(x, y)
+                    objs.append(obj)
+
+            spatial_tensors = [np.zeros([len(objs), len(objs)]) for _ in
+                               range(self.nb_edge_types)]
+            for obj_idx1, obj1 in enumerate(objs):
+                for obj_idx2, obj2 in enumerate(objs):
+                    direction_vec = DIR_TO_VEC[1]
+                    for rel_idx, func in enumerate(self.rel_deter_func):
+                        if func(obj1, obj2, direction_vec):
+                            spatial_tensors[rel_idx][obj_idx1, obj_idx2] = 1.0
+            spatial_tensors_list.append(spatial_tensors)
+        binary_batch = torch.tensor([spatial_tensors_list[i] for i in range(self.batch_size)])
+        return binary_batch
+
 
 def parse_code(net_code: str):
     """
@@ -201,3 +245,14 @@ def batch_to_gd(batch: torch.Tensor, device: str):
     max_node = max(i + 1 for b in batch_data for i in b.x[:, 0].cpu().numpy())
     slices = [max_node for _ in batch_data]
     return geometric_batch.to(device=device), slices
+
+
+class GridObject:
+    "object is specified by its location"
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        # self.attributes = attributes
+    @property
+    def pos(self):
+        return np.array([self.x, self.y])

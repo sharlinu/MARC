@@ -8,9 +8,9 @@ from algorithms.attention_sac import RelationalSAC
 import os
 import json
 import sys
-# sys.path.insert(0, '/Users/sharlinu/Desktop/github/MABoxWorld/environments')
-# sys.path.insert(0, '/Users/sharlinu/Desktop/github/MABoxWorld/Images')
-# sys.path.insert(0, '/Users/sharlinu/Desktop/github/MABoxWorld/')
+sys.path.insert(0, '/Users/sharlinu/Desktop/github/MABoxWorld/environments')
+sys.path.insert(0, '/Users/sharlinu/Desktop/github/MABoxWorld/Images')
+sys.path.insert(0, '/Users/sharlinu/Desktop/github/MABoxWorld/')
 # from environments.box import BoxWorldEnv
 sys.path.insert(0, '/home/utke_s@WMGDS.WMG.WARWICK.AC.UK/github/MABoxWorld')
 sys.path.insert(0, '/home/utke_s@WMGDS.WMG.WARWICK.AC.UK/github/MABoxWorld/environments')
@@ -86,7 +86,7 @@ def run(config):
         l_rewards = []
         ep_rew = 0
 
-        from utils.rel_wrapper_active import AbsoluteVKBWrapper
+        from utils.rel_wrapper2 import AbsoluteVKBWrapper
         env = AbsoluteVKBWrapper(env, config.dense)
 
         obs = env.reset()

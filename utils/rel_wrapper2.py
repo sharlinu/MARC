@@ -3,7 +3,8 @@ import numpy as np
 import gym
 import time
 import pygame
-
+import torch
+from torch_geometric.data import Data as GeometricData, Batch
 class GridObject:
     "object is specified by its location"
     def __init__(self, x, y):
@@ -35,7 +36,7 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
         self.background_id = background_id
 
         self.rel_deter_func = self.id_to_rule_list(self.background_id)
-
+        self.n_rel_rules = len(self.rel_deter_func)
         # number of objects/entities are the number of cells on the grid
         if not self.dense:
             self.obj_n = np.prod(env.observation_space[0]['image'].shape[:-1]) #physical entities
@@ -44,12 +45,14 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
         self.obs_shape = {'unary': (self.obj_n, self.n_attr),
                           'binary': (self.obj_n, self.obj_n, len(self.rel_deter_func))}
         self.spatial_tensors = None
+        self.prev = None
 
     def extract_dense_attributes(self, data):
         # Compute the sum of attributes along the last dimension
         attribute_sum = np.sum(data, axis=2)
 
         non_zero_count = np.count_nonzero(attribute_sum)
+        assert non_zero_count == self.obj_n, 'object mismatch'
         # Find the indices of non-zero attribute sums
         non_zero_indices = np.nonzero(attribute_sum)
 
@@ -59,7 +62,8 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
         attribute_vectors = []
 
         for i in range(self.n_attr):
-            attribute_vectors.append(np.reshape(filtered_data[:, i], non_zero_count))
+            attribute_vectors.append(np.reshape(filtered_data[:,i], non_zero_count))
+        assert len(attribute_vectors) == self.obj_n, 'object mismatch'
         return attribute_vectors
 
     def extract_attributes(self, data):
@@ -102,7 +106,7 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
                 obj = GridObject(x,y)
                 objs.append(obj)
 
-        if not self.spatial_tensors:
+        if not self.spatial_tensors or self.dense:
             # create spatial tensors that gives for every rel. det rule a binary indicator between the entities
             self.spatial_tensors = [np.zeros([len(objs), len(objs)]) for _ in range(len(self.rel_deter_func))] # 14  81x81 vectors for each relation
             for obj_idx1, obj1 in enumerate(objs):
@@ -112,9 +116,14 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
                         if func(obj1, obj2, direction_vec):
                             self.spatial_tensors[rel_idx][obj_idx1, obj_idx2] = 1.0
 
-        binary_tensors = self.spatial_tensors
-        unary_t, binary_t = np.stack(unary_tensors, axis=-1), np.stack(binary_tensors, axis=-1)
-        return unary_t, binary_t
+        self.prev = self.spatial_tensors
+
+        binary_tensors = torch.tensor(self.spatial_tensors)
+        if np.array_equal(self.prev, binary_tensors):
+            pass
+        unary_t = np.stack(unary_tensors, axis=-1)
+        gd = to_gd(binary_tensors, nb_objects=self.obj_n)
+        return unary_t, gd
 
     def observation(self, obs):
         """
@@ -170,7 +179,31 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
                                    is_down_adj, is_right_adj, is_down_left_adj, is_down_right_adj,
                                    is_left, is_right, is_front, is_back, top_right, top_left,
                                    down_left, down_right]
+        else:
+            rel_deter_func = None
         return rel_deter_func
+
+def to_gd(data: torch.Tensor, nb_objects) -> GeometricData:
+    """
+    takes batch of adjacency geometric data and transforms it to a GeometricData object for torch.geometric
+
+    Parameters
+    --------
+    data : heterogeneous adjacency matrix (nb_relations, nb_objects, nb_objects)
+    """
+    nb_objects = nb_objects
+    x = torch.arange(nb_objects).view(-1, 1) # TODO change to actual node features i.e. the unary tensors
+    nz = torch.nonzero(data)
+
+    # list of all edges and what relationtype they have
+    edge_attr = nz[:, 0]
+
+    # list of node to node indicating an edge
+    edge_index = nz[:, 1:].T
+    return GeometricData(x=x, edge_index=edge_index, edge_attr=edge_attr)
+
+
+
 
 def rotate_vec2d(vec, degrees):
     """
