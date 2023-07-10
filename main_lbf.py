@@ -10,7 +10,7 @@ filterwarnings(action='ignore',
                         category=DeprecationWarning,
                         module='tensorboardX')
 from tensorboardX import SummaryWriter
-from utils.buffer import ReplayBuffer, ReplayBuffer2
+from utils.buffer import ReplayBuffer2
 from algorithms.attention_sac import RelationalSAC
 from utils.rel_wrapper2 import AbsoluteVKBWrapper
 import yaml
@@ -20,11 +20,21 @@ from lbforaging.foraging import ForagingEnv
 def run(config):
     torch.set_num_threads(1)
 
+
+    if config['resume'] != '':
+        resume_path = config['resume']
+        n_episodes = config['n_episodes']
+        saver = Saver.Saver(config) # TODO read through Saver
+        config, start_episode, save_dict = saver.resume_ckpt()
+        config['resume'] = resume_path
+        config['n_episodes'] = n_episodes
+
     run_num = 1
     run_dir = config.dir_exp
     log_dir = config.dir_summary
 
     logger = SummaryWriter(str(log_dir))
+    saver = Saver.Saver(config)
 
     torch.manual_seed(config.random_seed)
     np.random.seed(config.random_seed)
@@ -49,16 +59,20 @@ def run(config):
     # binary_dim = env.obs_shape[2]
     env.reset()
     spatial_tensors = env.spatial_tensors
-    model = RelationalSAC.init_from_env(env,
-                                        spatial_tensors=spatial_tensors,
-                                        batch_size = config.batch_size,
-                                       tau=config.tau,
-                                       pi_lr=config.pi_lr,
-                                       q_lr=config.q_lr,
-                                       gamma=config.gamma,
-                                       pol_hidden_dim=config.pol_hidden_dim,
-                                       critic_hidden_dim=config.critic_hidden_dim,
-                                       reward_scale=config.reward_scale)
+    if config['resume'] != '':
+        model, start_episode = RelationalSAC.init_from_save(save_dict), start_episode
+    else:
+        start_episode = 0
+        model = RelationalSAC.init_from_env(env,
+                                            spatial_tensors=spatial_tensors,
+                                            batch_size = config.batch_size,
+                                           tau=config.tau,
+                                           pi_lr=config.pi_lr,
+                                           q_lr=config.q_lr,
+                                           gamma=config.gamma,
+                                           pol_hidden_dim=config.pol_hidden_dim,
+                                           critic_hidden_dim=config.critic_hidden_dim,
+                                           reward_scale=config.reward_scale)
 
     replay_buffer = ReplayBuffer2(max_steps=config.buffer_length,
                                  num_agents=model.n_agents,
@@ -75,7 +89,7 @@ def run(config):
     avg_reward = float("-inf")
     avg_reward_best = float("-inf")
     path_ckpt_best_avg = ''
-    for ep_i in range(0, config.n_episodes, config.n_rollout_threads):
+    for ep_i in range(start_episode, config.n_episodes, config.n_rollout_threads):
         obs = env.reset()
         # print('player level',[p.level for p in env.players])
         # print('field', env.field)
@@ -163,7 +177,7 @@ def run(config):
             if is_best_avg:
                 path_ckpt_best_avg_tmp = os.path.join(config.dir_saved_models,
                                                       'ckpt_best_avg_r{}.pth.tar'.format(avg_reward_best))
-                model.save(path_ckpt_best_avg_tmp)
+                model.save(filename=path_ckpt_best_avg_tmp, episode=ep_i)
                 # torch.save(ckpt, path_ckpt_best_avg_tmp)
                 if os.path.exists(path_ckpt_best_avg):
                     os.remove(path_ckpt_best_avg)
@@ -172,7 +186,7 @@ def run(config):
     plot_fig(l_rewards, 'reward_total', config.dir_summary, show=True)
     path_ckpt_final = os.path.join(config.dir_saved_models,
                                           'ckpt_final.pth.tar')
-    model.save(path_ckpt_final)
+    model.save(filename=path_ckpt_final, episode=ep_i)
     # model.save('{}/model.pt'.format(config.dir_saved_models))
     env.close()
     logger.export_scalars_to_json('{}/summary.json'.format(run_dir))

@@ -1,4 +1,4 @@
-env_id: 'lbf_6x6_2p_1f_sparse'
+env_id: 'lbf_6x6_2p_1f_coop'
 exp_id : 'try'
 
 player: 2
@@ -6,8 +6,9 @@ field: 6
 
 
 max_food: 1
-force_coop: False
+force_coop: True
 dense: false
+keep_food: false
 
 #num_colours: 2
 #fixed: False
@@ -18,7 +19,7 @@ dense: false
 
 grid_observation: True
 batch_size : 1024
-n_episodes: 560000
+n_episodes: 100000
 episode_length: 25
 test_n_episodes: 10
 test_episode_length: 25
