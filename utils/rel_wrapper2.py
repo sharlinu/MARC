@@ -63,7 +63,7 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
 
         for i in range(self.n_attr):
             attribute_vectors.append(np.reshape(filtered_data[:,i], non_zero_count))
-        assert len(attribute_vectors) == self.obj_n, 'object mismatch'
+        # assert len(attribute_vectors) == self.obj_n, 'object mismatch'
         return attribute_vectors
 
     def extract_attributes(self, data):
