@@ -1,4 +1,4 @@
-env_id: 'lbf_6x6_2p_1f_coop'
+env_id: 'TEST'
 exp_id : 'try'
 
 player: 2
@@ -19,11 +19,11 @@ keep_food: false
 
 grid_observation: True
 batch_size : 1024
-n_episodes: 100000
+n_episodes: 10
 episode_length: 25
-test_n_episodes: 10
+test_n_episodes: 0
 test_episode_length: 25
-seeds: [4001]
+seeds: [2001, 4001]
 agent_alg: 'rmac'
 buffer_length: 10000
 

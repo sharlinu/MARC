@@ -318,6 +318,8 @@ class RelationalSAC(object):
         Instantiate instance of this class from file created by 'save' method
         """
         save_dict = torch.load(filename, map_location=torch.device('cpu'))
+        # episode = save_dict['episode']
+        episode = 400
         instance = cls(**save_dict['init_dict'])
         instance.init_dict = save_dict['init_dict']
         for a, params in zip(instance.agents, save_dict['agent_params']):
@@ -328,4 +330,4 @@ class RelationalSAC(object):
             instance.critic.load_state_dict(critic_params['critic'])
             instance.target_critic.load_state_dict(critic_params['target_critic'])
             instance.critic_optimizer.load_state_dict(critic_params['critic_optimizer'])
-        return instance
+        return instance, episode
