@@ -27,6 +27,7 @@ class Action(Enum):
     SOUTH = 2
     WEST = 3
     EAST = 4
+
 def run(config):
     model_path = config.model_path
 
@@ -59,13 +60,15 @@ def run(config):
         env = ForagingEnv(
             players=config.player,
             # max_player_level=config.max_player_level,
-            max_player_level=3,
+            max_player_level=config.max_player_level,
             field_size=(config.field, config.field),
             max_food=config.max_food,
             grid_observation=config.grid_observation,
             sight=config.field,
             max_episode_steps=25,
             force_coop=config.force_coop,
+            keep_food = config.keep_food,
+            simple=config.simple,
         )
     else:
         raise ValueError(f'Cannot cater for the environment {config.env_id}')
