@@ -33,7 +33,7 @@ def run(config):
         max_player_level=config.max_player_level,
         field_size=(config.field, config.field),
         max_food=config.max_food,
-        grid_observation=True,
+        grid_observation=config.grid_observation,
         sight=config.field,
         max_episode_steps=25,
         force_coop=config.force_coop,
@@ -50,8 +50,8 @@ def run(config):
     env.reset()
     spatial_tensors = env.spatial_tensors
     model = RelationalSAC.init_from_env(env,
-                                        spatial_tensors=spatial_tensors,
-                                        batch_size = config.batch_size,
+                                       spatial_tensors=spatial_tensors,
+                                       batch_size = config.batch_size,
                                        tau=config.tau,
                                        pi_lr=config.pi_lr,
                                        q_lr=config.q_lr,
@@ -67,8 +67,8 @@ def run(config):
                                  unary_dims=[unary_dim for _ in range(model.n_agents)],
                                  # binary_dims=[binary_dim for _ in range(model.nagents)],
                                  ac_dims= [acsp.shape[0] if isinstance(acsp, Box) else acsp.n
-                                  for acsp in env.action_space],
-                                  dense = config.dense)
+                                 for acsp in env.action_space],
+                                 dense = config.dense)
     t = 0
     l_rewards = []
     reward_best = float("-inf")
@@ -169,6 +169,48 @@ def run(config):
                     os.remove(path_ckpt_best_avg)
                 path_ckpt_best_avg = path_ckpt_best_avg_tmp
 
+            if ep_i % config.save_interval ==0:
+                l_ep_rew = []
+                for eval_ep_i in range(config.test_n_episodes):
+                    print("Episode %i of %i" % (eval_ep_i + 1, config.test_n_episodes))
+
+                    l_rewards = []
+                    ep_rew = 0
+
+                    # from utils.rel_wrapper2 import AbsoluteVKBWrapper
+                    # env = AbsoluteVKBWrapper(env, config.dense)
+
+                    obs = env.reset()
+
+                    for t_i in range(config.test_episode_length):
+
+                        # rearrange observations to be per agent, and convert to torch Variable
+                        if config.grid_observation:
+                            obs = [np.expand_dims(ob['image'].flatten(), axis=0) for ob in obs]
+                        torch_obs = [Variable(torch.Tensor(obs[i]).view(1, -1),
+                                              requires_grad=False)
+                                     for i in range(model.n_agents)]
+                        # get actions as torch Variables
+                        torch_actions = model.step(torch_obs, explore=False)
+                        # convert actions to numpy arrays
+                        actions = [np.argmax(ac.data.numpy().flatten()) for ac in torch_actions]
+                        # print('actions', actions)
+                        obs, rewards, dones, infos = env.step(actions)
+
+                        ep_rew += sum(rewards)
+
+                        if all(dones):
+                            break
+
+                    l_ep_rew.append(ep_rew)
+                    # print("Reward: {}".format(ep_rew))
+
+
+                avg_eval_rew = sum(l_ep_rew) / config.test_n_episodes
+                print("Average eval reward: {}".format(avg_eval_rew))
+                with open('{}/summary/eval_reward.txt'.format(run_dir), 'a') as file:
+                    file.write("{}\n".format(round(avg_eval_rew, 2)))
+
     plot_fig(l_rewards, 'reward_total', config.dir_summary, show=True)
     path_ckpt_final = os.path.join(config.dir_saved_models,
                                           'ckpt_final.pth.tar')
@@ -200,8 +242,9 @@ if __name__ == '__main__':
     parser.add_argument("--batch_size",
                         default=128, type=int,
                         help="Batch size for training")
-    parser.add_argument("--save_interval", default=10000, type=int)
+    parser.add_argument("--save_interval", default=1000, type=int)
     parser.add_argument("--save_interval_log", default=100, type=int)
+
     parser.add_argument("--pol_hidden_dim", default=128, type=int)
     parser.add_argument("--critic_hidden_dim", default=128, type=int)
     parser.add_argument("--attend_heads", default=4, type=int)
