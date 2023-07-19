@@ -23,7 +23,6 @@ class RelationalCritic(nn.Module):
                  batch_size: int,
                  n_actions: int,
                  input_dims: list,
-                 rel_deter_func: list,
                  hidden_dim: int = 32,
                  norm_in: object = True,
                  net_code: object = "1g0f",
@@ -44,7 +43,6 @@ class RelationalCritic(nn.Module):
         self.batch_size = batch_size
         self.max_reduce = True # TODO hardcoded
         # self.dense = True
-        self.rel_deter_func = rel_deter_func
 
         self.spatial_tensors = np.array(spatial_tensors)
         self.binary_batch = torch.tensor([self.spatial_tensors for _ in range(self.batch_size)])
@@ -171,33 +169,6 @@ class RelationalCritic(nn.Module):
             else:
                 all_rets.append(agent_rets)
         return all_rets
-
-    def preprocess(self, img_batch: np.array):
-        spatial_tensors_list = []
-        for pic in img_batch:
-            pic = np.reshape(pic, (6,6,3)) #TODO hardcoded
-            pic = pic.astype(np.int32) #1024, 108
-        # data = filter_non_zero_elements(img) if self.dense else img
-            objs = []
-            for y, row in enumerate(pic):
-                for x, pixel in enumerate(row):
-                    # print(pixel)
-                    if np.sum(pixel) == 0:
-                        continue
-                    obj = GridObject(x, y)
-                    objs.append(obj)
-
-            spatial_tensors = [np.zeros([len(objs), len(objs)]) for _ in
-                               range(self.nb_edge_types)]
-            for obj_idx1, obj1 in enumerate(objs):
-                for obj_idx2, obj2 in enumerate(objs):
-                    direction_vec = DIR_TO_VEC[1]
-                    for rel_idx, func in enumerate(self.rel_deter_func):
-                        if func(obj1, obj2, direction_vec):
-                            spatial_tensors[rel_idx][obj_idx1, obj_idx2] = 1.0
-            spatial_tensors_list.append(spatial_tensors)
-        binary_batch = torch.tensor([spatial_tensors_list[i] for i in range(self.batch_size)])
-        return binary_batch
 
 
 def parse_code(net_code: str):
