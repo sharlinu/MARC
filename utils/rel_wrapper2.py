@@ -4,7 +4,7 @@ import gym
 import time
 import pygame
 import torch
-from torch_geometric.data import Data as GeometricData, Batch
+from torch_geometric.data import Data as GeometricData
 class GridObject:
     "object is specified by its location"
     def __init__(self, x, y):
@@ -324,10 +324,9 @@ if __name__ == "__main__":
         max_episode_steps=500,
         grid_observation=True,
         simple=False,
-        relational = False,
         deterministic= True,
     )
-    env = AbsoluteVKBWrapper(env, num_colours=env.num_colours)
+    env = AbsoluteVKBWrapper(env, dense=True)
     obs = env.reset()
     render= True
     done = False
