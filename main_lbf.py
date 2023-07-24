@@ -271,8 +271,10 @@ if __name__ == '__main__':
     for k, v in params.items():
         args[k] = v
 
-    dir_collected_data = './experiments/MAAC_multipleseeds_data_{}_{}_{}'.format(config.agent_alg, config.env_id,
-                                                                                 config.exp_id)
+    args['env_id'] = f"{args['env']}_{args['field']}x{args['field']}_{args['player']}p_{args['food']}f{'_coop' if args['force_coop']}{args['other'] if {args['field']}}"
+
+    dir_collected_data = './experiments/MAAC_multipleseeds_data_{}_{}_{}'.format(args['agent_alg'], args['env_id'],
+                                                                                 args['exp_id'])
 
     if os.path.exists(dir_collected_data):
         #toDelete = input("{} already exists, delete it if do you want to continue. Delete it? (yes/no) ". \

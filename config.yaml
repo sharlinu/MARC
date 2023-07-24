@@ -1,31 +1,35 @@
-env_id: 'lbf_6x6_2p_1f_sparse'
-exp_id : 'try'
+#env_id: 'lbf_10x10_4p_4f_coop'
+env: 'lbf'
+exp_id : 'std'
+other: ''
 
-player: 2
-field: 6
+player: 4
+field: 10
+max_food: 4
+force_coop: True
+max_player_level: 2
 
+dense: True
+simple: False
 
-max_food: 1
-force_coop: False
-dense: false
+keep_food: True
+norm_rews : True
 
 #num_colours: 2
 #fixed: False
 #goal_length: 2
-#simple: False
 #deterministic: False
 #single: False
 
 grid_observation: True
 batch_size : 1024
-n_episodes: 560000
-episode_length: 25
+n_episodes: 5600000
+episode_length: 50
 test_n_episodes: 10
-test_episode_length: 25
+test_episode_length: 50
 seeds: [4001]
 agent_alg: 'rmac'
-buffer_length: 10000
+#buffer_length: 10000
 
-#save_interval: 500
 
 
