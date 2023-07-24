@@ -243,7 +243,6 @@ class ReplayBuffer2(object):
             self.obs_buffs[agent_i][self.curr_i:self.curr_i + nentries] = observation[agent_i]['image'].flatten()
             self.obs_unary_buffs[agent_i][self.curr_i:self.curr_i + nentries] = observation[agent_i]['unary_tensor']
             if self.dense:
-
                 # print('obs g', observation[agent_i]['binary_tensor'])
                 # print('next_obs g', next_observation[agent_i]['binary_tensor'])
                 try:
@@ -262,7 +261,6 @@ class ReplayBuffer2(object):
                 self.next_obs_unary_buffs[agent_i][self.curr_i:self.curr_i + nentries] = next_observation[agent_i]['unary_tensor']
             except:
                 print('Something wrong with the storage of unary tensors')
-
 
             self.done_buffs[agent_i][self.curr_i:self.curr_i + nentries] = dones[agent_i]
         self.curr_i += nentries

@@ -5,7 +5,7 @@ import torch.nn.functional as F
 import numpy as np
 from itertools import chain
 from typing import List
-from torch_geometric.nn import RGCNConv
+from torch_geometric.nn import RGCNConv, GCNConv
 from torch_geometric.data import Data as GeometricData, Batch
 from gym_minigrid.minigrid import DIR_TO_VEC
 
@@ -51,8 +51,10 @@ class RelationalCritic(nn.Module):
 
 
         self.embedder = nn.Linear(input_dims[0], hidden_dim) # TODO - hardcoding needed?
-        self.gnn_layers = RGCNConv(hidden_dim, hidden_dim, self.nb_edge_types)
-
+        if self.rgcn:
+            self.gnn_layers = RGCNConv(hidden_dim, hidden_dim, self.nb_edge_types)
+        else:
+            self.gnn_layers =
         # iterate over agents
         for _ in range(self.n_agents):
             critic = nn.Sequential()
