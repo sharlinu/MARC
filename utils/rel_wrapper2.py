@@ -30,11 +30,9 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
         super().__init__(env, new_step_api=True)
         self.attribute_labels = ['agents', 'id', 'feature']
         self.n_attr = len(self.attribute_labels)
-        # self.attributes = namedtuple('attr', ' '.join(self.attribute_labels))
         self.dense = dense
-        self.env_type = "boxworld" # TODO generalise
         self.background_id = background_id
-
+        self.rgcn = False
         self.rel_deter_func = self.id_to_rule_list(self.background_id)
         self.n_rel_rules = len(self.rel_deter_func)
         # number of objects/entities are the number of cells on the grid
@@ -42,6 +40,7 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
             self.obj_n = np.prod(env.observation_space[0]['image'].shape[:-1]) #physical entities
         else:
             self.obj_n = env.n_agents + env.n_objects
+
         self.obs_shape = {'unary': (self.obj_n, self.n_attr),
                           'binary': (self.obj_n, self.obj_n, len(self.rel_deter_func))}
         self.spatial_tensors = None
@@ -110,12 +109,14 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
         if not self.spatial_tensors or self.dense:
             # create spatial tensors that gives for every rel. det rule a binary indicator between the entities
             self.spatial_tensors = [np.zeros([len(objs), len(objs)]) for _ in range(len(self.rel_deter_func))] # 14  81x81 vectors for each relation
+            # self.relational_vectors = [np.zeros(len(self.rel_deter_func)) for _ in range(self.n_edges)]
             for obj_idx1, obj1 in enumerate(objs):
                 for obj_idx2, obj2 in enumerate(objs):
                     direction_vec = DIR_TO_VEC[1]
                     for rel_idx, func in enumerate(self.rel_deter_func):
                         if func(obj1, obj2, direction_vec):
                             self.spatial_tensors[rel_idx][obj_idx1, obj_idx2] = 1.0
+                            # self.relational_vectors[][rel_idx]
 
         self.prev = self.spatial_tensors
 
@@ -123,7 +124,13 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
         if np.array_equal(self.prev, binary_tensors):
             pass
         unary_t = np.stack(unary_tensors, axis=-1)
-        gd = to_gd(binary_tensors, nb_objects=self.obj_n)
+        if self.rgcn:
+            gd = to_gd(binary_tensors, nb_objects=self.obj_n)
+        else:
+            x = torch.arange(self.obj_n).view(-1, 1)
+            edge_list = generate_directed_edge_list(self.obj_n)
+            edge_attr = create_edge_attributes(objs=objs, edge_list=edge_list, rel_rules= self.rel_deter_func)
+            gd = GeometricData(x=x, edge_index=edge_list, edge_attr=edge_attr)
         return unary_t, gd
 
     def observation(self, obs):
@@ -184,7 +191,7 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
             rel_deter_func = None
         return rel_deter_func
 
-def to_gd(data: torch.Tensor, nb_objects) -> GeometricData:
+def to_gd(spatial_tensors: torch.Tensor, nb_objects) -> GeometricData:
     """
     takes batch of adjacency geometric data and transforms it to a GeometricData object for torch.geometric
 
@@ -192,15 +199,14 @@ def to_gd(data: torch.Tensor, nb_objects) -> GeometricData:
     --------
     data : heterogeneous adjacency matrix (nb_relations, nb_objects, nb_objects)
     """
-    nb_objects = nb_objects
-    x = torch.arange(nb_objects).view(-1, 1) # TODO change to actual node features i.e. the unary tensors
-    nz = torch.nonzero(data)
+    x = torch.arange(nb_objects).view(-1, 1)
+    nz = torch.nonzero(spatial_tensors)
 
     # list of all edges and what relationtype they have
-    edge_attr = nz[:, 0]
+    edge_attr = nz[:, 0] # T(num_edges, )
 
     # list of node to node indicating an edge
-    edge_index = nz[:, 1:].T
+    edge_index = nz[:, 1:].T # T(2, num_edges)
     return GeometricData(x=x, edge_index=edge_index, edge_attr=edge_attr)
 
 
@@ -356,3 +362,21 @@ if __name__ == "__main__":
     # print(env.players[0].score, env.players[1].score)
 
 
+def generate_directed_edge_list(n):
+    edge_list = []
+    for src in range(0, n):
+        for tgt in range(0, n):
+            if src != tgt:
+                edge_list.append((src, tgt))
+    return edge_list
+
+def create_edge_attributes(objs, edge_list, rel_rules):
+    edge_attributes = np.zeros((len(edge_list), len(rel_rules)))
+    direction_vec = DIR_TO_VEC[1]
+    for idx, edge in enumerate(edge_list):
+        src_idx, tgt_idx = edge
+        src, tgt = objs[src_idx], objs[tgt_idx]
+        attribute = [1 if rule(src, tgt, direction_vec) else 0 for rule in rel_rules]
+        edge_attributes[idx,:] = attribute
+    edge_attributes = torch.tensor(edge_attributes)
+    return edge_attributes

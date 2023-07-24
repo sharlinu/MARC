@@ -3,9 +3,9 @@ env: 'lbf'
 exp_id : 'std'
 other: ''
 
-player: 4
-field: 10
-max_food: 4
+player: 2
+field: 5
+max_food: 1
 force_coop: True
 max_player_level: 2
 
