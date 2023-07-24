@@ -270,8 +270,7 @@ if __name__ == '__main__':
 
     for k, v in params.items():
         args[k] = v
-
-    args['env_id'] = f"{args['env']}_{args['field']}x{args['field']}_{args['player']}p_{args['food']}f{'_coop' if args['force_coop']}{args['other'] if {args['field']}}"
+    args['env_id'] = f"{args['env']}_{args['field']}x{args['field']}_{args['player']}p_{args['max_food']}f{'_coop' if args['force_coop'] else ''}{args['other']}"
 
     dir_collected_data = './experiments/MAAC_multipleseeds_data_{}_{}_{}'.format(args['agent_alg'], args['env_id'],
                                                                                  args['exp_id'])
