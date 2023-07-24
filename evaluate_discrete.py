@@ -60,12 +60,12 @@ def run(config):
         env = ForagingEnv(
             players=config.player,
             # max_player_level=config.max_player_level,
-            max_player_level=config.max_player_level,
+            # max_player_level=2,
             field_size=(config.field, config.field),
             max_food=config.max_food,
             grid_observation=config.grid_observation,
             sight=config.field,
-            max_episode_steps=25,
+            max_episode_steps=config.test_episode_length,
             force_coop=config.force_coop,
             keep_food = config.keep_food,
             simple=config.simple,
@@ -109,7 +109,7 @@ def run(config):
             torch_actions = model.step(torch_obs, explore=False)
             # convert actions to numpy arrays
             actions = [np.argmax(ac.data.numpy().flatten()) for ac in torch_actions]
-            print('actions', actions)
+            # print('actions', actions)
             obs, rewards, dones, infos = env.step(actions)
             if render:
                 env.render()
