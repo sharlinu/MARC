@@ -35,7 +35,7 @@ def run(config):
         max_food=config.max_food,
         grid_observation=config.grid_observation,
         sight=config.field,
-        max_episode_steps=25,
+        max_episode_steps=config.episode_length,
         force_coop=config.force_coop,
         keep_food=config.keep_food,
         simple=config.simple,
@@ -130,7 +130,7 @@ def run(config):
             # TODO change back
 
         if ('box' or 'collect') in config.env_id:
-            ep_rews = replay_buffer.get_average_rewards(et_i) #TODO what is this reward? seems standardized
+            ep_rews = replay_buffer.get_average_rewards(et_i)
         else:
             ep_rews = replay_buffer.get_average_rewards(config.episode_length * config.n_rollout_threads)
         for a_i, a_ep_rew in enumerate(ep_rews):
@@ -174,7 +174,7 @@ def run(config):
                 for eval_ep_i in range(config.test_n_episodes):
                     print("Episode %i of %i" % (eval_ep_i + 1, config.test_n_episodes))
 
-                    l_rewards = []
+                    # l_rewards = []
                     ep_rew = 0
 
                     # from utils.rel_wrapper2 import AbsoluteVKBWrapper
@@ -242,7 +242,7 @@ if __name__ == '__main__':
     parser.add_argument("--batch_size",
                         default=128, type=int,
                         help="Batch size for training")
-    parser.add_argument("--save_interval", default=1000, type=int)
+    parser.add_argument("--save_interval", default=200, type=int)
     parser.add_argument("--save_interval_log", default=100, type=int)
 
     parser.add_argument("--pol_hidden_dim", default=128, type=int)
