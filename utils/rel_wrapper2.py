@@ -52,7 +52,8 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
         attribute_sum = np.sum(data, axis=2)
 
         non_zero_count = np.count_nonzero(attribute_sum)
-        assert non_zero_count == self.obj_n, 'object mismatch'
+        if non_zero_count != self.obj_n:
+            print( f'object mismatch: {non_zero_count} non_zerocount but {self.obj_n} objects')
         # Find the indices of non-zero attribute sums
         non_zero_indices = np.nonzero(attribute_sum)
 
@@ -63,7 +64,7 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
 
         for i in range(self.n_attr):
             attribute_vectors.append(np.reshape(filtered_data[:,i], non_zero_count))
-        # assert len(attribute_vectors) == self.obj_n, 'object mismatch'
+        assert len(attribute_vectors[0]) == self.obj_n, f'{len(attribute_vectors[0])} attribute vectors but {self.obj_n} objects'
         return attribute_vectors
 
     def extract_attributes(self, data):
