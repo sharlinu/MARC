@@ -127,11 +127,11 @@ class ReplayBuffer(object):
             cast = lambda x: Variable(Tensor(x), requires_grad=False).cuda()
         else:
             cast = lambda x: Variable(Tensor(x), requires_grad=False)
-        if norm_rews and sum([self.rew_buffs[i][:self.filled_i].mean() for i in range(self.num_agents)]) !=0:
+        if norm_rews:
             ret_rews = [cast((self.rew_buffs[i][inds] -
                               self.rew_buffs[i][:self.filled_i].mean()) /
                              self.rew_buffs[i][:self.filled_i].std()) if self.rew_buffs[i][:self.filled_i].mean() != 0
-                        else  cast(self.rew_buffs[i][inds])
+                        else cast(self.rew_buffs[i][inds])
                         for i in range(self.num_agents)]
         else:
             ret_rews = [cast(self.rew_buffs[i][inds]) for i in range(self.num_agents)]
@@ -278,10 +278,11 @@ class ReplayBuffer2(object):
             cast = lambda x: Variable(Tensor(x), requires_grad=False).cuda()
         else:
             cast = lambda x: Variable(Tensor(x), requires_grad=False)
-        if norm_rews and sum([self.rew_buffs[i][:self.filled_i].mean() for i in range(self.num_agents)]) !=0 :
+        if norm_rews:
             ret_rews = [cast((self.rew_buffs[i][inds] -
                               self.rew_buffs[i][:self.filled_i].mean()) /
-                             self.rew_buffs[i][:self.filled_i].std())
+                             self.rew_buffs[i][:self.filled_i].std()) if self.rew_buffs[i][:self.filled_i].mean() != 0
+                        else cast(self.rew_buffs[i][inds])
                         for i in range(self.num_agents)]
         else:
             ret_rews = [cast(self.rew_buffs[i][inds]) for i in range(self.num_agents)]
