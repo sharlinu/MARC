@@ -10,7 +10,7 @@ filterwarnings(action='ignore',
                         category=DeprecationWarning,
                         module='tensorboardX')
 from tensorboardX import SummaryWriter
-from utils.buffer import ReplayBuffer, ReplayBuffer2
+from utils.buffer import ReplayBuffer2
 from algorithms.attention_sac import RelationalSAC
 from utils.rel_wrapper2 import AbsoluteVKBWrapper
 import yaml
@@ -20,11 +20,17 @@ from lbforaging.foraging import ForagingEnv
 def run(config):
     torch.set_num_threads(1)
 
+
+    if config.resume != '':
+        resume_path = config.resume
+        n_episodes = config.n_episodes
+
     run_num = 1
     run_dir = config.dir_exp
     log_dir = config.dir_summary
 
     logger = SummaryWriter(str(log_dir))
+    # saver = Saver.Saver(config)
 
     torch.manual_seed(config.random_seed)
     np.random.seed(config.random_seed)
@@ -49,16 +55,21 @@ def run(config):
     # binary_dim = env.obs_shape[2]
     env.reset()
     spatial_tensors = env.spatial_tensors
-    model = RelationalSAC.init_from_env(env,
-                                       spatial_tensors=spatial_tensors,
-                                       batch_size = config.batch_size,
-                                       tau=config.tau,
-                                       pi_lr=config.pi_lr,
-                                       q_lr=config.q_lr,
-                                       gamma=config.gamma,
-                                       pol_hidden_dim=config.pol_hidden_dim,
-                                       critic_hidden_dim=config.critic_hidden_dim,
-                                       reward_scale=config.reward_scale)
+    if config.resume != '':
+        model_path = glob.glob('{}/saved_models/ckpt_best_avg*'.format(config.resume))[0]
+        model, start_episode = RelationalSAC.init_from_save(model_path)
+    else:
+        start_episode = 0
+        model = RelationalSAC.init_from_env(env,
+                                            spatial_tensors=spatial_tensors,
+                                            batch_size = config.batch_size,
+                                           tau=config.tau,
+                                           pi_lr=config.pi_lr,
+                                           q_lr=config.q_lr,
+                                           gamma=config.gamma,
+                                           pol_hidden_dim=config.pol_hidden_dim,
+                                           critic_hidden_dim=config.critic_hidden_dim,
+                                           reward_scale=config.reward_scale)
 
     replay_buffer = ReplayBuffer2(max_steps=config.buffer_length,
                                  num_agents=model.n_agents,
@@ -75,11 +86,8 @@ def run(config):
     avg_reward = float("-inf")
     avg_reward_best = float("-inf")
     path_ckpt_best_avg = ''
-    for ep_i in range(0, config.n_episodes, config.n_rollout_threads):
+    for ep_i in range(start_episode, config.n_episodes, config.n_rollout_threads):
         obs = env.reset()
-        # print('player level',[p.level for p in env.players])
-        # print('field', env.field)
-        #print('initial', obs['image'][0],obs['image'][1])
         model.prep_rollouts(device='cpu')
         episode_reward_total = 0
         is_best_avg          = False
@@ -163,7 +171,7 @@ def run(config):
             if is_best_avg:
                 path_ckpt_best_avg_tmp = os.path.join(config.dir_saved_models,
                                                       'ckpt_best_avg_r{}.pth.tar'.format(avg_reward_best))
-                model.save(path_ckpt_best_avg_tmp)
+                model.save(filename=path_ckpt_best_avg_tmp, episode=ep_i)
                 # torch.save(ckpt, path_ckpt_best_avg_tmp)
                 if os.path.exists(path_ckpt_best_avg):
                     os.remove(path_ckpt_best_avg)
@@ -174,7 +182,7 @@ def run(config):
                 for eval_ep_i in range(config.test_n_episodes):
                     print("Episode %i of %i" % (eval_ep_i + 1, config.test_n_episodes))
 
-                    # l_rewards = []
+
                     ep_rew = 0
 
                     # from utils.rel_wrapper2 import AbsoluteVKBWrapper
@@ -214,7 +222,7 @@ def run(config):
     plot_fig(l_rewards, 'reward_total', config.dir_summary, show=True)
     path_ckpt_final = os.path.join(config.dir_saved_models,
                                           'ckpt_final.pth.tar')
-    model.save(path_ckpt_final)
+    model.save(filename=path_ckpt_final, episode=ep_i)
     # model.save('{}/model.pt'.format(config.dir_saved_models))
     env.close()
     logger.export_scalars_to_json('{}/summary.json'.format(run_dir))
@@ -228,6 +236,7 @@ if __name__ == '__main__':
     import glob as glob
 
     parser = argparse.ArgumentParser()
+    parser.add_argument("--resume", default='', type=str)
     parser.add_argument("--random_seed", default=1, type=int)
     # parser.add_argument("model_name",
     #                     help="Name of directory to store " +
@@ -265,8 +274,12 @@ if __name__ == '__main__':
         config.use_gpu = False
 
     args = vars(config)
-    with open("config.yaml", "r") as file:
-        params = yaml.load(file, Loader=yaml.FullLoader)
+    if args['resume'] == '':
+        with open('config.yaml', "r") as file:
+            params = yaml.load(file, Loader=yaml.FullLoader)
+    else:
+        with open(f"{args['resume']}/config.yaml", "r") as file:
+            params = yaml.load(file, Loader=yaml.FullLoader)
 
     for k, v in params.items():
         args[k] = v
@@ -287,66 +300,85 @@ if __name__ == '__main__':
         os.makedirs(dir_collected_data)
 
     list_exp_dir = []
-    for seed in args['seeds']:
-        args['random_seed'] = seed
+    if args['resume'] == '':
+        for seed in args['seeds']:
+            args['random_seed'] = seed
 
-        dir_exp_name = '{}_{}_{}_seed{}'.format(str([datetime.date.today()][0]),
-                                                args['env_id'],
-                                                args['exp_id'],
-                                                args['random_seed'])
-        args['dir_exp'] = '{}/{}'.format(args['dir_base'], dir_exp_name)
-        args['dir_summary'] = '{}/summary'.format(args['dir_exp'])
-        args['dir_saved_models'] = '{}/saved_models'.format(args['dir_exp'])
-        args['dir_monitor'] = '{}/monitor'.format(args['dir_exp'])
+            dir_exp_name = '{}_{}_{}_seed{}'.format(str([datetime.date.today()][0]),
+                                                    args['env_id'],
+                                                    args['exp_id'],
+                                                    args['random_seed'])
+            args['dir_exp'] = '{}/{}'.format(args['dir_base'], dir_exp_name)
+            args['dir_summary'] = '{}/summary'.format(args['dir_exp'])
+            args['dir_saved_models'] = '{}/saved_models'.format(args['dir_exp'])
+            args['dir_monitor'] = '{}/monitor'.format(args['dir_exp'])
 
-        # creating folders:
-        directory = args['dir_exp']
-        if os.path.exists(directory):
-            # toDelete= input("{} already exists, delete it if do you want to continue. Delete it? (yes/no) ".\
-            #     format(directory))
-            toDelete = 'yes'
-            if toDelete.lower() == 'yes':
-                shutil.rmtree(directory)
-                print("Directory removed")
-            if toDelete.lower() == 'no':
-                print("It was not possible to continue, an experiment \
-                        folder is required.Terminiting here.")
-                import sys
+            # creating folders:
+            directory = args['dir_exp']
+            if os.path.exists(directory):
+                # toDelete= input("{} already exists, delete it if do you want to continue. Delete it? (yes/no) ".\
+                #     format(directory))
+                toDelete = 'yes'
+                if toDelete.lower() == 'yes':
+                    shutil.rmtree(directory)
+                    print("Directory removed")
+                if toDelete.lower() == 'no':
+                    print("It was not possible to continue, an experiment \
+                            folder is required.Terminiting here.")
+                    import sys
 
-                sys.exit()
-        if os.path.exists(directory) == False:
-            os.makedirs(directory)
-            os.makedirs(args['dir_summary'])
-            os.makedirs(args['dir_saved_models'])
-            os.makedirs(args['dir_monitor'])
-            with open(os.path.expanduser('{}/arguments.txt'.format(args['dir_exp'])), 'w+') as file:
-                file.write(json.dumps(args, indent=4, sort_keys=True))
-            with open(os.path.expanduser('{}/config.yaml'.format(args['dir_exp'])), 'w+') as file:
-                documents = yaml.dump(args, file)
+                    sys.exit()
+
+            if os.path.exists(directory) == False:
+                os.makedirs(directory)
+                os.makedirs(args['dir_summary'])
+                os.makedirs(args['dir_saved_models'])
+                os.makedirs(args['dir_monitor'])
+                with open(os.path.expanduser('{}/arguments.txt'.format(args['dir_exp'])), 'w+') as file:
+                    file.write(json.dumps(args, indent=4, sort_keys=True))
+                with open(os.path.expanduser('{}/config.yaml'.format(args['dir_exp'])), 'w+') as file:
+                    documents = yaml.dump(args, file)
 
 
-        # train
-        list_exp_dir.append(args['dir_exp'])
+            # train
+            list_exp_dir.append(args['dir_exp'])
 
-        if os.path.exists('{}/collected_data_seed_{}.json'.format(dir_collected_data, seed)) == False:
+            if os.path.exists('{}/collected_data_seed_{}.json'.format(dir_collected_data, seed)) == False:
+                st = time.time()
+                run(config)
+
+                # test
+                # model_path = '{}/'.format(args['dir_exp'])
+                model_path = glob.glob('{}/saved_models/ckpt_best_*'.format(args['dir_exp']))[0]
+                t_min = (time.time() - st)/60
+                print(f'{args["n_episodes"]} episode on gpu:{args["use_gpu"]} with max {args["episode_length"]} steps ran in {t_min:.2f} minutes - {t_min*60/args["n_episodes"]:.2f} sec/episode')
+
+                cmd_test = 'python evaluate_discrete.py {} --no_render'.format(model_path)
+                print(cmd_test)
+
+                os.system(cmd_test)
+
+                shutil.copyfile('{}/summary/reward_total.txt'.format(args['dir_exp']), # TODO check if this works - changed  list_exp_dir[-1]
+                                '{}/reward_training_seed{}.txt'.format(dir_collected_data, seed)
+                                )
+    else:
+        if os.path.exists('{}/collected_data_seed_{}.json'.format(dir_collected_data, args['random_seed'])) == False:
             st = time.time()
             run(config)
 
             # test
             # model_path = '{}/'.format(args['dir_exp'])
             model_path = glob.glob('{}/saved_models/ckpt_best_*'.format(args['dir_exp']))[0]
-            t_min = (time.time() - st)/60
-            print(f'{args["n_episodes"]} episode on gpu:{args["use_gpu"]} with max {args["episode_length"]} steps ran in {t_min:.2f} minutes - {t_min*60/args["n_episodes"]:.2f} sec/episode')
+            t_min = (time.time() - st) / 60
+            print(
+                f'{args["n_episodes"]} episode on gpu:{args["use_gpu"]} with max {args["episode_length"]} steps ran in {t_min:.2f} minutes - {t_min * 60 / args["n_episodes"]:.2f} sec/episode')
+
             cmd_test = 'python evaluate_discrete.py {} --no_render'.format(model_path)
             print(cmd_test)
+
             os.system(cmd_test)
 
-            # save files to dir collected data
-            #            shutil.copyfile('{}/evaluate/collected_data.json'.format(list_exp_dir[-1]),
-            #                    '{}/collected_data_seed_{}.json'.format(dir_collected_data,seed)
-            #                    )
-
-            # save files to dir collected data
-            shutil.copyfile('{}/summary/reward_total.txt'.format(list_exp_dir[-1]),
+            shutil.copyfile('{}/summary/reward_total.txt'.format(args['dir_exp']),
+                            # TODO check if this works - changed  list_exp_dir[-1]
                             '{}/reward_training_seed{}.txt'.format(dir_collected_data, seed)
                             )

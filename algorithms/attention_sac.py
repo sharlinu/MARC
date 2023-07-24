@@ -246,7 +246,7 @@ class RelationalSAC(object):
                 a.policy = fn(a.policy)
             self.pol_dev = device
 
-    def save(self, filename):
+    def save(self, filename, episode = None):
         """
         Save trained parameters of all agents into one file
         """
@@ -255,7 +255,8 @@ class RelationalSAC(object):
                      'agent_params': [a.get_params() for a in self.agents],
                      'critic_params': {'critic': self.critic.state_dict(),
                                        'target_critic': self.target_critic.state_dict(),
-                                       'critic_optimizer': self.critic_optimizer.state_dict()}}
+                                       'critic_optimizer': self.critic_optimizer.state_dict()},
+                     'episode': episode}
         torch.save(save_dict, filename)
 
     @classmethod
@@ -317,6 +318,8 @@ class RelationalSAC(object):
         Instantiate instance of this class from file created by 'save' method
         """
         save_dict = torch.load(filename, map_location=torch.device('cpu'))
+        # episode = save_dict['episode']
+        episode = 400
         instance = cls(**save_dict['init_dict'])
         instance.init_dict = save_dict['init_dict']
         for a, params in zip(instance.agents, save_dict['agent_params']):
@@ -327,4 +330,4 @@ class RelationalSAC(object):
             instance.critic.load_state_dict(critic_params['critic'])
             instance.target_critic.load_state_dict(critic_params['target_critic'])
             instance.critic_optimizer.load_state_dict(critic_params['critic_optimizer'])
-        return instance
+        return instance, episode

@@ -68,15 +68,15 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
         return attribute_vectors
 
     def extract_attributes(self, data):
-            # Get the size of the grid and number of attributes
-            n_rows, n_cols, n_attr = data.shape
+        # Get the size of the grid and number of attributes
+        n_rows, n_cols, n_attr = data.shape
 
-            # Initialize a list of attribute vectors, each with length n_rows * n_cols
-            attribute_vectors = []
+        # Initialize a list of attribute vectors, each with length n_rows * n_cols
+        attribute_vectors = []
 
-            for i in range(n_attr):
-                attribute_vectors.append(np.reshape(data[:, :, i], (n_rows * n_cols)))
-            return attribute_vectors
+        for i in range(n_attr):
+            attribute_vectors.append(np.reshape(data[:, :, i], (n_rows * n_cols)))
+        return attribute_vectors
 
     def img2vkb(self, img, direction=None):
         """
