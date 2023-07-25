@@ -5,7 +5,7 @@ import torch.nn.functional as F
 import numpy as np
 from itertools import chain
 from typing import List
-from torch_geometric.nn import RGCNConv, GCNConv
+from torch_geometric.nn import RGCNConv, MessagePassing
 from torch_geometric.data import Data as GeometricData, Batch
 from gym_minigrid.minigrid import DIR_TO_VEC
 
@@ -42,7 +42,7 @@ class RelationalCritic(nn.Module):
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         self.batch_size = batch_size
         self.max_reduce = True # TODO hardcoded
-        # self.dense = True
+        self.rgcn = False
 
         self.spatial_tensors = np.array(spatial_tensors)
         self.binary_batch = torch.tensor([self.spatial_tensors for _ in range(self.batch_size)])
@@ -54,7 +54,7 @@ class RelationalCritic(nn.Module):
         if self.rgcn:
             self.gnn_layers = RGCNConv(hidden_dim, hidden_dim, self.nb_edge_types)
         else:
-            self.gnn_layers =
+            self.gnn_layers = MPLayer(hidden_dim)
         # iterate over agents
         for _ in range(self.n_agents):
             critic = nn.Sequential()
@@ -108,37 +108,18 @@ class RelationalCritic(nn.Module):
         """
         if agents is None:
             agents = range(self.n_agents)
-        # state = None
-        # inputs = [[],
-        #           torch.flatten(unary_tensor, 0, 1).float(), #flattens obs["unary_tensor"] only in 0th and 1st dim
-        #           #torch.flatten(binary_tensor, 0, 1).permute(0,3,1,2).float()]
-        #           binary_tensor.permute(0, 3, 1, 2).float()
-        #           ]
-        # for i in [1,2]:
-        #     inputs[i] = inputs[i].to(device=device)
-        # adj_matrices = inputs[2]
 
         all_rets = []
 
         for a_i in agents:
             # feature embedding
-            #embedds = torch.flatten(inputs[1], 0, 1)
             embedds = torch.flatten(unary_tensors[a_i], 0, 1).float().to(device=self.device)
-            #embedds = self.embedding_linear(embedds)
             embedds = self.embedder(embedds) # seems right so far
-
 
             # RGCN module
             if all(binary_tensors):
-
-                # single_gd, self.slices = to_gd(binary_t)  # makes adjs geometric data usable for torch geometric
-                # batch_data = [to_gd(instance) for instance in binary_tensors]
-
                 gd = Batch.from_data_list(binary_tensors[a_i])
                 gd = gd.to(device = self.device)
-                # max_node = max(i + 1 for b in batch_data for i in b.x[:, 0].cpu().numpy())
-                # slices = [max_node for _ in batch_data]
-
                 embedds = self.gnn_layers(embedds, gd.edge_index, gd.edge_attr)
             else:
                 embedds = self.gnn_layers(embedds, self.gd.edge_index, self.gd.edge_attr)
@@ -171,19 +152,6 @@ class RelationalCritic(nn.Module):
             else:
                 all_rets.append(agent_rets)
         return all_rets
-
-
-def parse_code(net_code: str):
-    """
-    :param net_code: format <a>g[m]<b>f
-    """
-    assert net_code[1]=="g"
-    assert net_code[-1]=="f"
-    nb_gnn_layers = int(net_code[0])
-    nb_dense_layers = int(net_code[-2])
-    is_max = True if net_code[2] == "m" else False
-    return nb_gnn_layers, nb_dense_layers, is_max
-
 
 
 def batch_to_gd(batch: torch.Tensor, device: str):
@@ -219,3 +187,39 @@ def batch_to_gd(batch: torch.Tensor, device: str):
     slices = [max_node for _ in batch_data]
     return geometric_batch.to(device=device), slices
 
+class MPLayer(MessagePassing):
+    def __init__(self, in_channels):
+        """
+        in_channels: embedding size for nodes and edges
+        """
+        super(MPLayer, self).__init__(aggr="add")
+
+        self.message_mlp = nn.Linear(in_channels * 3, in_channels) # 3 because we have two node embeddings and one edge embedding feeding in
+        self.node_update = nn.Linear(in_channels * 2, in_channels) # 1 previous embedding and one aggregated message
+
+    def message(self, x_j, x_i, edge_attr):
+        """
+        Constructs a message to node i got each edge (by default from j to i) given the edge attributes and node embeddings
+        """
+        x = torch.cat((x_i, x_j, edge_attr), dim=1)
+        return torch.relu(self.message_mlp(x))
+
+    def update(self, aggr_out, x):
+        '''
+        Updates node embedding.
+        Parameters:
+            aggr_out: output of aggregation
+            x: any other argument that was initially passed to propagate, so I believe the node feauture?
+        Returns:
+            Updated node embedding
+        '''
+        x = torch.cat((x, aggr_out), dim=1)
+        return torch.relu(self.node_update(x))
+
+    def forward(self, edge_index, node_features, edge_attr):
+        """
+        Takes in x=node_features [N, in_channels], edge_index [2, E], edge_attr [E, in_channels ]
+        Parameters:
+            node_features: also denotes as x [N, in_channels] with N being the number of nodes
+        """
+        return self.propagate(edge_index, x=node_features, edge_attr=edge_attr)
