@@ -217,13 +217,3 @@ def batch_to_gd(batch: torch.Tensor, device: str):
     slices = [max_node for _ in batch_data]
     return geometric_batch.to(device=device), slices
 
-
-class GridObject:
-    "object is specified by its location"
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
-        # self.attributes = attributes
-    @property
-    def pos(self):
-        return np.array([self.x, self.y])
