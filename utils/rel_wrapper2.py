@@ -116,7 +116,6 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
                     for rel_idx, func in enumerate(self.rel_deter_func):
                         if func(obj1, obj2, direction_vec):
                             self.spatial_tensors[rel_idx][obj_idx1, obj_idx2] = 1.0
-                            # self.relational_vectors[][rel_idx]
 
         self.prev = self.spatial_tensors
 
@@ -130,7 +129,7 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
             x = torch.arange(self.obj_n).view(-1, 1)
             edge_list = generate_directed_edge_list(self.obj_n)
             edge_attr = create_edge_attributes(objs=objs, edge_list=edge_list, rel_rules= self.rel_deter_func)
-            gd = GeometricData(x=x, edge_index=edge_list, edge_attr=edge_attr)
+            gd = GeometricData(x=x, edge_index=torch.tensor(edge_list).T, edge_attr=edge_attr)
         return unary_t, gd
 
     def observation(self, obs):
