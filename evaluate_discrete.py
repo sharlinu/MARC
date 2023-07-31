@@ -59,8 +59,7 @@ def run(config):
     elif 'lbf' in  config.env_id:
         env = ForagingEnv(
             players=config.player,
-            # max_player_level=config.max_player_level,
-            # max_player_level=2,
+            max_player_level=config.max_player_level,
             field_size=(config.field, config.field),
             max_food=config.max_food,
             grid_observation=config.grid_observation,
