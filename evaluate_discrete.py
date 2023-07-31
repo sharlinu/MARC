@@ -59,8 +59,7 @@ def run(config):
     elif 'lbf' in  config.env_id:
         env = ForagingEnv(
             players=config.player,
-            # max_player_level=config.max_player_level,
-            # max_player_level=2,
+            max_player_level=config.max_player_level,
             field_size=(config.field, config.field),
             max_food=config.max_food,
             grid_observation=config.grid_observation,
@@ -155,7 +154,7 @@ if __name__ == '__main__':
     parser.add_argument("--benchmark", action="store_false",
                         help="benchmark mode")
     config = parser.parse_args()
-    render = False
+    render = True
     args = vars(config)
     eval_path = Path(config.model_path)
     dir_exp = Path(*eval_path.parts[:-2])
