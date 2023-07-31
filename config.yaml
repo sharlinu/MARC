@@ -22,11 +22,11 @@ norm_rews : True
 
 grid_observation: True
 batch_size : 1024
-n_episodes: 5600000
+n_episodes: 560000
 episode_length: 50
 test_n_episodes: 10
 test_episode_length: 50
-seeds: [4001]
+seeds: [6001]
 agent_alg: 'rmac'
 #buffer_length: 10000
 
