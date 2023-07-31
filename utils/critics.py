@@ -49,8 +49,9 @@ class RelationalCritic(nn.Module):
         self.gd, self.slices = batch_to_gd(self.binary_batch, self.device)  # makes adjs geometric data usable for torch geometric
         self.nb_edge_types = len(spatial_tensors)
 
-
-        self.embedder = nn.Linear(input_dims[0], hidden_dim) # TODO - hardcoding needed?
+        # hidden_dim = 14
+        self.rel_embedder = nn.Linear(14, hidden_dim) # TODO hardcoded
+        self.embedder = nn.Linear(input_dims[0], hidden_dim)
         if self.rgcn:
             self.gnn_layers = RGCNConv(hidden_dim, hidden_dim, self.nb_edge_types)
         else:
@@ -120,7 +121,8 @@ class RelationalCritic(nn.Module):
             if all(binary_tensors):
                 gd = Batch.from_data_list(binary_tensors[a_i])
                 gd = gd.to(device = self.device)
-                embedds = self.gnn_layers(embedds, gd.edge_index, gd.edge_attr)
+                rel = self.rel_embedder(gd.edge_attr)
+                embedds = self.gnn_layers(embedds, gd.edge_index, rel)
             else:
                 embedds = self.gnn_layers(embedds, self.gd.edge_index, self.gd.edge_attr)
             embedds = torch.relu(embedds)
@@ -216,10 +218,10 @@ class MPLayer(MessagePassing):
         x = torch.cat((x, aggr_out), dim=1)
         return torch.relu(self.node_update(x))
 
-    def forward(self, edge_index, node_features, edge_attr):
+    def forward(self, node_features, edge_index, edge_attr):
         """
         Takes in x=node_features [N, in_channels], edge_index [2, E], edge_attr [E, in_channels ]
         Parameters:
             node_features: also denotes as x [N, in_channels] with N being the number of nodes
         """
-        return self.propagate(edge_index, x=node_features, edge_attr=edge_attr)
+        return self.propagate(edge_index=edge_index, x=node_features, edge_attr=edge_attr)

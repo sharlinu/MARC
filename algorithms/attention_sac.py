@@ -128,12 +128,13 @@ class RelationalSAC(object):
             q_loss += MSELoss(pq, target_q.detach())
 
         q_loss.backward()
-        for n,p in self.critic.named_parameters():
+        # for n,p in self.critic.named_parameters():
+        #     print(n,p)
             #if n[-6:] == 'weight':
             #print('===========\ngradient:{}\n----------\n{}'.format(n, p.grad))
-            logger.add_scalar(f'grad/sum_{n}', p.grad.sum(), self.niter)
-            logger.add_scalar(f'grad/mean_{n}', p.grad.mean(), self.niter)
-            logger.add_scalar(f'weight/mean_{n}', p.mean(), self.niter)
+            # logger.add_scalar(f'grad/sum_{n}', p.grad.sum(), self.niter)
+            # logger.add_scalar(f'grad/mean_{n}', p.grad.mean(), self.niter)
+            # logger.add_scalar(f'weight/mean_{n}', p.mean(), self.niter)
 
 
         self.critic.scale_shared_grads()
