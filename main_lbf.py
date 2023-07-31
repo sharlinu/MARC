@@ -184,7 +184,6 @@ def run(config):
                 for eval_ep_i in range(config.test_n_episodes):
                     print("Episode %i of %i" % (eval_ep_i + 1, config.test_n_episodes))
 
-
                     ep_rew = 0
 
                     # from utils.rel_wrapper2 import AbsoluteVKBWrapper
