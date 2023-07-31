@@ -377,5 +377,5 @@ def create_edge_attributes(objs, edge_list, rel_rules):
         src, tgt = objs[src_idx], objs[tgt_idx]
         attribute = [1 if rule(src, tgt, direction_vec) else 0 for rule in rel_rules]
         edge_attributes[idx,:] = attribute
-    edge_attributes = torch.tensor(edge_attributes)
+    edge_attributes = torch.tensor(edge_attributes, dtype=torch.float32)
     return edge_attributes
