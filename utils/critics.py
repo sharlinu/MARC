@@ -24,6 +24,7 @@ class RelationalCritic(nn.Module):
                  n_actions: int,
                  input_dims: list,
                  hidden_dim: int = 32,
+                 relational_embedding : bool = False,
                  norm_in: object = True,
                  net_code: object = "1g0f",
                  mp_rounds: object = 1) -> object:
@@ -42,7 +43,7 @@ class RelationalCritic(nn.Module):
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         self.batch_size = batch_size
         self.max_reduce = True # TODO hardcoded
-        self.rgcn = False
+        self.relational_embedding = relational_embedding
 
         self.spatial_tensors = np.array(spatial_tensors)
         self.binary_batch = torch.tensor([self.spatial_tensors for _ in range(self.batch_size)])
@@ -52,9 +53,10 @@ class RelationalCritic(nn.Module):
         # hidden_dim = 14
         self.rel_embedder = nn.Linear(14, hidden_dim) # TODO hardcoded
         self.embedder = nn.Linear(input_dims[0], hidden_dim)
-        if self.rgcn:
+        if not self.relational_embedding:
             self.gnn_layers = RGCNConv(hidden_dim, hidden_dim, self.nb_edge_types)
         else:
+            print(f'We are using relational embeddings')
             self.gnn_layers = MPLayer(hidden_dim)
         # iterate over agents
         for _ in range(self.n_agents):

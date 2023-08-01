@@ -58,7 +58,8 @@ def run(config):
                                        gamma=config.gamma,
                                        pol_hidden_dim=config.pol_hidden_dim,
                                        critic_hidden_dim=config.critic_hidden_dim,
-                                       reward_scale=config.reward_scale)
+                                       reward_scale=config.reward_scale,
+                                        relational_embedding = config.relational_embedding)
 
     replay_buffer = ReplayBuffer2(max_steps=config.buffer_length,
                                  num_agents=model.n_agents,
@@ -228,9 +229,9 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--random_seed", default=1, type=int)
-    # parser.add_argument("model_name",
-    #                     help="Name of directory to store " +
-    #                          "model/training contents")
+    # parser.add_argument("--see")
+    parser.add_argument("--relational_embedding", default=False, type=bool)
+
     parser.add_argument("--n_rollout_threads", default=1, type=int)
     parser.add_argument("--buffer_length", default=int(1e6), type=int)
     parser.add_argument("--n_episodes", default=20000, type=int)
@@ -266,7 +267,6 @@ if __name__ == '__main__':
     args = vars(config)
     with open("config.yaml", "r") as file:
         params = yaml.load(file, Loader=yaml.FullLoader)
-
     for k, v in params.items():
         args[k] = v
     args['env_id'] = f"{args['env']}_{args['field']}x{args['field']}_{args['player']}p_{args['max_food']}f{'_coop' if args['force_coop'] else ''}{args['other']}"
