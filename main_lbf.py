@@ -62,15 +62,16 @@ def run(config):
     else:
         start_episode = 0
         model = RelationalSAC.init_from_env(env,
-                                            spatial_tensors=spatial_tensors,
-                                            batch_size = config.batch_size,
-                                           tau=config.tau,
-                                           pi_lr=config.pi_lr,
-                                           q_lr=config.q_lr,
-                                           gamma=config.gamma,
-                                           pol_hidden_dim=config.pol_hidden_dim,
-                                           critic_hidden_dim=config.critic_hidden_dim,
-                                           reward_scale=config.reward_scale)
+                                       spatial_tensors=spatial_tensors,
+                                       batch_size = config.batch_size,
+                                       tau=config.tau,
+                                       pi_lr=config.pi_lr,
+                                       q_lr=config.q_lr,
+                                       gamma=config.gamma,
+                                       pol_hidden_dim=config.pol_hidden_dim,
+                                       critic_hidden_dim=config.critic_hidden_dim,
+                                       reward_scale=config.reward_scale,
+                                        relational_embedding = config.relational_embedding)
 
     replay_buffer = ReplayBuffer2(max_steps=config.buffer_length,
                                  num_agents=model.n_agents,
@@ -239,9 +240,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--resume", default='', type=str)
     parser.add_argument("--random_seed", default=1, type=int)
-    # parser.add_argument("model_name",
-    #                     help="Name of directory to store " +
-    #                          "model/training contents")
+    # parser.add_argument("--see")
+    parser.add_argument("--relational_embedding", default=False, type=bool)
+
     parser.add_argument("--n_rollout_threads", default=1, type=int)
     parser.add_argument("--buffer_length", default=int(1e6), type=int)
     parser.add_argument("--n_episodes", default=20000, type=int)

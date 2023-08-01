@@ -27,6 +27,7 @@ class RelationalSAC(object):
                  reward_scale=10.,
                  pol_hidden_dim=128,
                  critic_hidden_dim=128,
+                 relational_embedding = False,
                  **kwargs):
         """
         Inputs:
@@ -51,12 +52,12 @@ class RelationalSAC(object):
                                       num_out_pol=params['num_out_pol'])
                          for params in agent_init_params] # are input and output dims for agent
         self.critic = RelationalCritic(n_agents=self.n_agents,
-                                       # obs = obs,
                                        spatial_tensors=spatial_tensors,
                                        batch_size = batch_size,
-                                       n_actions=n_actions,
-                                       input_dims=input_dims,
-                                       hidden_dim=critic_hidden_dim)
+                                       n_actions = n_actions,
+                                       input_dims = input_dims,
+                                       hidden_dim = critic_hidden_dim,
+                                       relational_embedding = relational_embedding)
         self.target_critic = RelationalCritic(
                                         n_agents = self.n_agents,
                                         # obs = obs,
@@ -64,7 +65,8 @@ class RelationalSAC(object):
                                         batch_size = batch_size,
                                         n_actions=n_actions,
                                         input_dims=input_dims,
-                                        hidden_dim=critic_hidden_dim)
+                                        hidden_dim=critic_hidden_dim,
+                                        relational_embedding = relational_embedding)
         hard_update(self.target_critic, self.critic) # hard update only at the beginning to initialise
         self.critic_optimizer = Adam(self.critic.parameters(), lr=q_lr,
                                      weight_decay=1e-3)
@@ -267,7 +269,10 @@ class RelationalSAC(object):
                       gamma=0.95, tau=0.01,
                       pi_lr=0.01, q_lr=0.01,
                       reward_scale=10.,
-                      pol_hidden_dim=64, critic_hidden_dim=64, attend_heads=4,
+                      pol_hidden_dim=64,
+                      critic_hidden_dim=64,
+                      attend_heads=4,
+                      relational_embedding = False,
                       **kwargs):
         # TODO changed the hidden dim from 128 to 64
         """
@@ -280,15 +285,11 @@ class RelationalSAC(object):
         hidden_dim: number of hidden dimensions for networks
         """
         agent_init_params = []
-        # sa_size = []
-        s_size = []
         a_size = []
         for acsp, obsp in zip(env.action_space,
                               env.observation_space):
             agent_init_params.append({'num_in_pol': np.ones(shape=obsp['image'].shape).flatten().shape[0],
                                       'num_out_pol': acsp.n})
-            # sa_size.append((obsp['image'].shape, acsp.n))
-            # s_size.append(obsp['image'].shape)
             a_size.append(acsp.n)
 
         init_dict = {'gamma': gamma,
@@ -300,14 +301,11 @@ class RelationalSAC(object):
                      'critic_hidden_dim': critic_hidden_dim,
                      'agent_init_params': agent_init_params,
                      'n_agents': env.n_agents,
-                     # 'sa_size': sa_size,
                      'spatial_tensors':spatial_tensors,
                      'batch_size': batch_size,
                      'n_actions': a_size,
-                     # 's_size': s_size,
                      'input_dims': [env.obs_shape['unary'][-1], env.obs_shape['binary'][-1] ],
-                     # 3 attributes and 14 relations
-
+                     'relational_embedding': relational_embedding,
                      }
         instance = cls(**init_dict)
         instance.init_dict = init_dict

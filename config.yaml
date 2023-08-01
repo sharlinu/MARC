@@ -1,11 +1,11 @@
 #env_id: 'lbf_10x10_4p_4f_coop'
 env: 'lbf'
 exp_id : 'std'
-other: ''
+other: '_rel_embedd'
 
-player: 2
-field: 5
-max_food: 1
+player: 4
+field: 10
+max_food: 4
 force_coop: True
 max_player_level: 2
 
@@ -14,12 +14,8 @@ simple: False
 keep_food: True
 norm_rews : True
 
-#num_colours: 2
-#fixed: False
-#goal_length: 2
-#deterministic: False
-#single: False
 
+relational_embedding : True
 grid_observation: True
 batch_size : 1024
 n_episodes: 560000
