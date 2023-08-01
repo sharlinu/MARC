@@ -57,6 +57,7 @@ def run(config):
     spatial_tensors = env.spatial_tensors
     if config.resume != '':
         model_path = glob.glob('{}/saved_models/ckpt_best_avg*'.format(config.resume))[0]
+        print(f'Using model: {model_path}')
         model, start_episode = RelationalSAC.init_from_save(model_path)
     else:
         start_episode = 0
@@ -178,6 +179,7 @@ def run(config):
                 path_ckpt_best_avg = path_ckpt_best_avg_tmp
 
             if ep_i % config.save_interval ==0:
+                model.prep_rollouts(device='cpu')
                 l_ep_rew = []
                 for eval_ep_i in range(config.test_n_episodes):
                     print("Episode %i of %i" % (eval_ep_i + 1, config.test_n_episodes))
@@ -266,7 +268,6 @@ if __name__ == '__main__':
     parser.add_argument('--dir_base', default='./experiments',
                         help='path of the experiment directory')
     config = parser.parse_args()
-
     if torch.cuda.is_available():
         print('cuda is available')
         config.use_gpu = True
@@ -280,6 +281,7 @@ if __name__ == '__main__':
     else:
         with open(f"{args['resume']}/config.yaml", "r") as file:
             params = yaml.load(file, Loader=yaml.FullLoader)
+            params['resume'] = args['resume']
 
     for k, v in params.items():
         args[k] = v
