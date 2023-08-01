@@ -58,7 +58,8 @@ def run(config):
     if config.resume != '':
         model_path = glob.glob('{}/saved_models/ckpt_best_avg*'.format(config.resume))[0]
         print(f'Using model: {model_path}')
-        model, start_episode = RelationalSAC.init_from_save(model_path)
+        model, start_episode = RelationalSAC.init_from_save(model_path, load_critic=True)
+        print(f'starting from episode {start_episode}')
     else:
         start_episode = 0
         model = RelationalSAC.init_from_env(env,
@@ -90,8 +91,9 @@ def run(config):
     for ep_i in range(start_episode, config.n_episodes, config.n_rollout_threads):
         obs = env.reset()
         model.prep_rollouts(device='cpu')
+
         episode_reward_total = 0
-        is_best_avg          = False
+        is_best_avg = False
 
         for et_i in range(1, config.episode_length + 1):
             # rearrange observations to be per agent, and convert to torch Variable
@@ -122,6 +124,7 @@ def run(config):
             t += config.n_rollout_threads
             if (len(replay_buffer) >= config.batch_size and
                     (t % config.steps_per_update) < config.n_rollout_threads):
+
                 if config.use_gpu:
                     model.prep_training(device='gpu')
                 else:
@@ -253,7 +256,7 @@ if __name__ == '__main__':
     parser.add_argument("--batch_size",
                         default=128, type=int,
                         help="Batch size for training")
-    parser.add_argument("--save_interval", default=200, type=int)
+    parser.add_argument("--save_interval", default=1000, type=int)
     parser.add_argument("--save_interval_log", default=100, type=int)
 
     parser.add_argument("--pol_hidden_dim", default=128, type=int)
@@ -273,7 +276,6 @@ if __name__ == '__main__':
         config.use_gpu = True
     else:
         config.use_gpu = False
-
     args = vars(config)
     if args['resume'] == '':
         with open('config.yaml', "r") as file:
@@ -285,6 +287,7 @@ if __name__ == '__main__':
 
     for k, v in params.items():
         args[k] = v
+
     args['env_id'] = f"{args['env']}_{args['field']}x{args['field']}_{args['player']}p_{args['max_food']}f{'_coop' if args['force_coop'] else ''}{args['other']}"
 
     dir_collected_data = './experiments/MAAC_multipleseeds_data_{}_{}_{}'.format(args['agent_alg'], args['env_id'],

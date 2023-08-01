@@ -317,17 +317,29 @@ class RelationalSAC(object):
         """
         Instantiate instance of this class from file created by 'save' method
         """
-        save_dict = torch.load(filename, map_location=torch.device('cpu'))
+        save_dict = torch.load(filename, map_location="cuda")
         # episode = save_dict['episode']
-        episode = 400
+        episode = 29001 +8200
         instance = cls(**save_dict['init_dict'])
         instance.init_dict = save_dict['init_dict']
         for a, params in zip(instance.agents, save_dict['agent_params']):
             a.load_params(params)
-
+        instance.pol_dev = 'gpu'
+        instance.trgt_pol_dev = 'gpu'
         if load_critic:
             critic_params = save_dict['critic_params']
+
             instance.critic.load_state_dict(critic_params['critic'])
+            instance.critic = instance.critic.to('cuda')
+
             instance.target_critic.load_state_dict(critic_params['target_critic'])
+            instance.target_critic = instance.target_critic.to('cuda')
+            instance.critic_optimizer = Adam(instance.critic.parameters(), lr=0.01, weight_decay=1e-3)
             instance.critic_optimizer.load_state_dict(critic_params['critic_optimizer'])
+            instance.critic_dev = 'gpu'
+            instance.trgt_critic_dev = 'gpu'
+
+
         return instance, episode
+
+
