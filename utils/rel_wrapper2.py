@@ -44,7 +44,7 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
         else:
             self.obj_n = env.n_agents + env.n_objects
         self.obs_shape = {'unary': (self.obj_n, self.n_attr),
-                          'binary': (self.obj_n, self.obj_n, self.n_rel_rules))}
+                          'binary': (self.obj_n, self.obj_n, self.n_rel_rules)}
         self.spatial_tensors = None
         self.prev = None
 
@@ -65,10 +65,8 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
 
         for i in range(self.n_attr):
             attribute_vectors.append(np.reshape(filtered_data[:,i], non_zero_count))
-        if len(attribute_vectors[0])!= self.obj_n:
-            pass
 
-        assert len(attribute_vectors[0]) == self.obj_n, f'{len(attribute_vectors[0])} attribute vectors but {self.obj_n} objects'
+        # assert len(attribute_vectors[0]) == self.obj_n, f'{len(attribute_vectors[0])} attribute vectors but {self.obj_n} objects'
         return attribute_vectors
 
     def extract_attributes(self, data):
@@ -124,7 +122,10 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
         self.prev = self.spatial_tensors
 
         binary_tensors = torch.tensor(self.spatial_tensors)
-        unary_t = np.stack(unary_tensors, axis=-1)
+        if len(unary_tensors[0]) != self.obj_n:
+            unary_t =  np.array([])
+        else:
+            unary_t = np.stack(unary_tensors, axis=-1)
         gd = to_gd(binary_tensors, nb_objects=self.obj_n)
         return unary_t, gd
 
@@ -327,48 +328,5 @@ def fan_right(obj1, obj2, direction_vec)->bool:
 
 def fan_left(obj1, obj2, direction_vec)->bool:
     return fan_right(obj2, obj1, direction_vec)
-
-
-if __name__ == "__main__":
-    from MABoxWorld.environments.box import BoxWorldEnv
-    env = BoxWorldEnv(
-        players=2,
-        field_size=(5,5),
-        num_colours=5,
-        goal_length=2,
-        sight=5,
-        max_episode_steps=500,
-        grid_observation=True,
-        simple=False,
-        deterministic= True,
-    )
-    env = AbsoluteVKBWrapper(env, dense=True)
-    obs = env.reset()
-    render = True
-    done = False
-    if render:
-        env.render()
-        # pygame.display.update()  # update window
-        time.sleep(0.5)
-
-    while not done:
-        # for i in range(100):
-        actions = env.action_space.sample()
-        nobs, nreward, ndone, _ = env.step(actions)
-
-        print('printing obs', nobs)
-        # print('player pos', env.players[0].position, '----', env.players[1].position )
-        # nobs, nreward, ndone, _ = env.step((1,1))
-        if sum(nreward) != 0:
-            print(nreward)
-
-        if render:
-            env.render()
-            # pygame.display.update()  # update window
-            time.sleep(0.5)
-
-        done = np.all(ndone)
-        pygame.event.pump()  # process event queue
-    # print(env.players[0].score, env.players[1].score)
 
 

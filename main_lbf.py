@@ -116,10 +116,10 @@ def run(config):
             # rearrange actions to be per environment
             actions = [np.argmax(ac) for ac in agent_actions]
             next_obs, rewards, dones, infos = env.step(actions)
-            # print('player level', [p.level for p in env.players])
-            # print('field', env.field)
-            # print('reward', rewards)
-            replay_buffer.push(obs, agent_actions, rewards, next_obs, dones)
+            if all([ob['unary_tensor'].any() for ob in obs + next_obs]):
+                replay_buffer.push(obs, agent_actions, rewards, next_obs, dones)
+            else:
+                continue
             episode_reward_total += rewards.sum()
 
             obs = next_obs
