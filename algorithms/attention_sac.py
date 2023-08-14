@@ -128,12 +128,6 @@ class RelationalSAC(object):
             q_loss += MSELoss(pq, target_q.detach())
 
         q_loss.backward()
-        for n,p in self.critic.named_parameters():
-            #if n[-6:] == 'weight':
-            #print('===========\ngradient:{}\n----------\n{}'.format(n, p.grad))
-            logger.add_scalar(f'grad/sum_{n}', p.grad.sum(), self.niter)
-            logger.add_scalar(f'grad/mean_{n}', p.grad.mean(), self.niter)
-            logger.add_scalar(f'weight/mean_{n}', p.mean(), self.niter)
 
 
         self.critic.scale_shared_grads()
@@ -160,8 +154,8 @@ class RelationalSAC(object):
             curr_ac, probs, log_pi, pol_regs, ent = pi(
                 ob, return_all_probs=True, return_log_pi=True,
                 regularize=True, return_entropy=True)
-            logger.add_scalar('agent%i/policy_entropy' % a_i, ent,
-                              self.niter)
+            # logger.add_scalar('agent%i/policy_entropy' % a_i, ent,
+            #                   self.niter)
             samp_acs.append(curr_ac)
             all_probs.append(probs)
             all_log_pis.append(log_pi)

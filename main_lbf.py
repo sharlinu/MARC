@@ -9,27 +9,31 @@ from warnings import filterwarnings  # noqa
 filterwarnings(action='ignore',
                         category=DeprecationWarning,
                         module='tensorboardX')
-from tensorboardX import SummaryWriter
+# from tensorboardX import SummaryWriter
 from utils.buffer import ReplayBuffer2
 from algorithms.attention_sac import RelationalSAC
 from utils.rel_wrapper2 import AbsoluteVKBWrapper
 import yaml
 from utils.plotting import plot_fig
 from lbforaging.foraging import ForagingEnv
-
+import wandb
 def run(config):
     torch.set_num_threads(1)
-
+    wandb.init(
+        project='MARC',
+        name=f'{config.env_id}-erice',
+        config=vars(config),
+    )
 
     if config.resume != '':
         resume_path = config.resume
         n_episodes = config.n_episodes
 
-    run_num = 1
+    # run_num = 1
     run_dir = config.dir_exp
     log_dir = config.dir_summary
 
-    logger = SummaryWriter(str(log_dir))
+    # logger = SummaryWriter(str(log_dir))
     # saver = Saver.Saver(config)
 
     torch.manual_seed(config.random_seed)
@@ -48,7 +52,7 @@ def run(config):
     )
     env.seed(config.random_seed)
     np.random.seed(config.random_seed)
-    env = AbsoluteVKBWrapper(env, config.dense)
+    env = AbsoluteVKBWrapper(env, config.dense, background_id=config.background_id)
     env.agents = [None] * len(env.action_space)
     # nullary_dim = env.obs_shape[0]
     unary_dim = env.obs_shape['unary']
@@ -129,21 +133,21 @@ def run(config):
                 for u_i in range(config.num_updates):
                     sample = replay_buffer.sample(config.batch_size,
                                                   to_gpu=config.use_gpu)
-                    model.update_critic(sample, logger=logger)
-                    model.update_policies(sample, logger=logger)
+                    model.update_critic(sample)
+                    model.update_policies(sample)
                     model.update_all_targets()
                 model.prep_rollouts(device='cpu')
             if dones.all() == True:
                 print('done with time step', et_i)
                 break
             # TODO change back
-
+        wandb.log({"rew": episode_reward_total, "steps": et_i})
         if ('box' or 'collect') in config.env_id:
             ep_rews = replay_buffer.get_average_rewards(et_i)
         else:
             ep_rews = replay_buffer.get_average_rewards(config.episode_length * config.n_rollout_threads)
-        for a_i, a_ep_rew in enumerate(ep_rews):
-             logger.add_scalar('agent%i/mean_episode_rewards' % a_i, a_ep_rew, ep_i)
+        # for a_i, a_ep_rew in enumerate(ep_rews):
+        #      logger.add_scalar('agent%i/mean_episode_rewards' % a_i, a_ep_rew, ep_i)
         print("%s - %s - Episodes %i of %i - Reward %.1f" % (config.env_id, config.random_seed, ep_i + 1,
                                         config.n_episodes,  episode_reward_total))
         l_rewards.append(episode_reward_total)
@@ -167,7 +171,7 @@ def run(config):
                 with open('{}/summary/reward_total.txt'.format(run_dir), 'w') as fp:
                     for el in l_rewards:
                         fp.write("{}\n".format(round(el, 2)))
-                plot_fig(l_rewards, 'reward_total', config.dir_summary)
+                # plot_fig(l_rewards, 'reward_total', config.dir_summary)
 
             if is_best_avg:
                 path_ckpt_best_avg_tmp = os.path.join(config.dir_saved_models,
@@ -220,6 +224,15 @@ def run(config):
                 print("Average eval reward: {}".format(avg_eval_rew))
                 with open('{}/summary/eval_reward.txt'.format(run_dir), 'a') as file:
                     file.write("{}\n".format(round(avg_eval_rew, 2)))
+                wandb.log({'avg_eval_return': avg_eval_rew, 'eval_at_step': ep_i})
+                if ep_i % 10000:
+                    # 🐝 Send the wandb Alert
+                    wandb.alert(
+                        title=f'Temporary {config.env_id} results',
+                        text=f'{config.env_id} reached {avg_reward_best:.2f} at {ep_i} episodes',
+                    )
+                    print(f'Alert triggered - best avg is {avg_reward_best}')
+
 
     plot_fig(l_rewards, 'reward_total', config.dir_summary, show=True)
     path_ckpt_final = os.path.join(config.dir_saved_models,
@@ -227,8 +240,9 @@ def run(config):
     model.save(filename=path_ckpt_final, episode=ep_i)
     # model.save('{}/model.pt'.format(config.dir_saved_models))
     env.close()
-    logger.export_scalars_to_json('{}/summary.json'.format(run_dir))
-    logger.close()
+    # logger.export_scalars_to_json('{}/summary.json'.format(run_dir))
+    # logger.close()
+    wandb.finish()
 
 if __name__ == '__main__':
     import shutil
