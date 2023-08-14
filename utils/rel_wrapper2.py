@@ -32,18 +32,19 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
         self.n_attr = len(self.attribute_labels)
         # self.attributes = namedtuple('attr', ' '.join(self.attribute_labels))
         self.dense = dense
-        self.env_type = "boxworld" # TODO generalise
+        self.env_type = "lbf" # TODO generalise
         self.background_id = background_id
 
         self.rel_deter_func = self.id_to_rule_list(self.background_id)
         self.n_rel_rules = len(self.rel_deter_func)
+        print('Number of relational rules', self.n_rel_rules)
         # number of objects/entities are the number of cells on the grid
         if not self.dense:
             self.obj_n = np.prod(env.observation_space[0]['image'].shape[:-1]) #physical entities
         else:
             self.obj_n = env.n_agents + env.n_objects
         self.obs_shape = {'unary': (self.obj_n, self.n_attr),
-                          'binary': (self.obj_n, self.obj_n, len(self.rel_deter_func))}
+                          'binary': (self.obj_n, self.obj_n, self.n_rel_rules))}
         self.spatial_tensors = None
         self.prev = None
 
@@ -64,6 +65,9 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
 
         for i in range(self.n_attr):
             attribute_vectors.append(np.reshape(filtered_data[:,i], non_zero_count))
+        if len(attribute_vectors[0])!= self.obj_n:
+            pass
+
         assert len(attribute_vectors[0]) == self.obj_n, f'{len(attribute_vectors[0])} attribute vectors but {self.obj_n} objects'
         return attribute_vectors
 
@@ -120,8 +124,6 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
         self.prev = self.spatial_tensors
 
         binary_tensors = torch.tensor(self.spatial_tensors)
-        if np.array_equal(self.prev, binary_tensors):
-            pass
         unary_t = np.stack(unary_tensors, axis=-1)
         gd = to_gd(binary_tensors, nb_objects=self.obj_n)
         return unary_t, gd
@@ -144,7 +146,7 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
             ob['unary_tensor'], ob['binary_tensor'] = spatial_VKB
         return obs
 
-    def id_to_rule_list(self,background_id):
+    def id_to_rule_list(self, background_id):
         if background_id in ["b0", "nolocal"]:
             rel_deter_func = [is_left, is_right, is_front, is_back, is_aligned, is_close]
         elif background_id in ["t0", "any"]:
@@ -171,15 +173,20 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
                                    is_down_adj, is_right_adj, is_down_left_adj, is_down_right_adj,
                                    is_left, is_right, is_front, is_back]
         elif background_id in ["b8"]:
+            # conv, remote, fan?
             rel_deter_func = [is_top_adj, is_left_adj, is_top_right_adj, is_top_left_adj,
                                    is_down_adj, is_right_adj, is_down_left_adj, is_down_right_adj,
                                    is_left, is_right, is_front, is_back, fan_top, fan_down,
                                    fan_left, fan_right]
         elif background_id in ["b9"]:
+            # conv, remote, quarters
             rel_deter_func = [is_top_adj, is_left_adj, is_top_right_adj, is_top_left_adj,
                                    is_down_adj, is_right_adj, is_down_left_adj, is_down_right_adj,
                                    is_left, is_right, is_front, is_back, top_right, top_left,
                                    down_left, down_right]
+        elif background_id in ['b10', 'essentials']:
+            rel_deter_func = [is_top_adj, is_left_adj, is_down_adj, is_right_adj, is_left, is_right, is_back, is_front]
+
         else:
             rel_deter_func = None
         return rel_deter_func
@@ -232,15 +239,16 @@ def is_any(obj1, obj2, _ )->bool:
         return True
     else:
         return False
+
+############ designed by previous authors
+
 def is_front(obj1, obj2, direction_vec)->bool:
     diff = obj2.pos - obj1.pos
     return diff@direction_vec > 0.1
 
-
 def is_back(obj1, obj2, direction_vec)->bool:
     diff = obj2.pos - obj1.pos
     return diff@direction_vec < -0.1
-
 
 def is_left(obj1, obj2, direction_vec)->bool:
     left_vec = rotate_vec2d(direction_vec, -90)
@@ -252,6 +260,8 @@ def is_right(obj1, obj2, direction_vec)->bool:
     diff = obj2.pos - obj1.pos
     return diff@left_vec > 0.1
 
+#### auxilliary rules
+
 def is_close(obj1, obj2, direction_vec=None)->bool:
     distance = np.abs(obj1.pos - obj2.pos)
     return np.sum(distance)==1
@@ -260,6 +270,7 @@ def is_aligned(obj1, obj2, direction_vec=None)->bool:
     diff = obj2.pos - obj1.pos
     return np.any(diff==0)
 
+#### convolutional rules
 def is_top_adj(obj1, obj2, direction_vec=None)->bool:
     return obj1.x==obj2.x and obj1.y==obj2.y+1
 
@@ -284,6 +295,8 @@ def is_down_right_adj(obj1, obj2, direction_vec=None)->bool:
 def is_down_left_adj(obj1, obj2, direction_vec=None)->bool:
     return is_top_right_adj(obj2, obj1)
 
+
+#### Another set of rules which quarters the grid into areas
 def top_left(obj1, obj2, direction_vec)->bool:
     return (obj1.x-obj2.x) <= (obj1.y-obj2.y)
 
@@ -296,7 +309,10 @@ def down_left(obj1, obj2, direction_vec)->bool:
 def down_right(obj1, obj2, direction_vec)->bool:
     return top_left(obj2, obj1, direction_vec)
 
+# weird relations - fan??
+
 def fan_top(obj1, obj2, direction_vec)->bool:
+    # top left and top right should not happen at the same time?? maybe meant top_left and down_right
     top_left = (obj1.x-obj2.x) <= (obj1.y-obj2.y)
     top_right = -(obj1.x-obj2.x) <= (obj1.y-obj2.y)
     return top_left and top_right
@@ -328,7 +344,7 @@ if __name__ == "__main__":
     )
     env = AbsoluteVKBWrapper(env, dense=True)
     obs = env.reset()
-    render= True
+    render = True
     done = False
     if render:
         env.render()
