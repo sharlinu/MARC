@@ -51,7 +51,7 @@ class RelationalCritic(nn.Module):
         self.nb_edge_types = len(spatial_tensors)
 
         # hidden_dim = 14
-        self.rel_embedder = nn.Linear(14, hidden_dim) # TODO hardcoded
+        self.rel_embedder = nn.Linear(14, hidden_dim)
         self.embedder = nn.Linear(input_dims[0], hidden_dim)
         if not self.relational_embedding:
             self.gnn_layers = RGCNConv(hidden_dim, hidden_dim, self.nb_edge_types)

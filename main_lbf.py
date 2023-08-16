@@ -6,6 +6,8 @@ from gym.spaces import Box
 from pathlib import Path
 from torch.autograd import Variable
 from warnings import filterwarnings  # noqa
+import wandb
+
 filterwarnings(action='ignore',
                         category=DeprecationWarning,
                         module='tensorboardX')
@@ -18,6 +20,15 @@ from utils.plotting import plot_fig
 from lbforaging.foraging import ForagingEnv
 
 def run(config):
+    wandb.init(
+        # set the wandb project where this run will be logged
+        project="MARC",
+        name = f'{config.env_id}-agrigento',
+        notes= 'Run to find where descrapancy between cpu-run and agrigento run model occurred. Changed back episode length = 50',
+        # track hyperparameters and run metadata
+        config=vars(config)
+    )
+
     torch.set_num_threads(1)
 
 
@@ -137,6 +148,7 @@ def run(config):
             if dones.all() == True:
                 print('done with time step', et_i)
                 break
+        wandb.log({"rew": episode_reward_total, "steps": et_i})
             # TODO change back
 
         if ('box' or 'collect') in config.env_id:
@@ -168,7 +180,6 @@ def run(config):
                 with open('{}/summary/reward_total.txt'.format(run_dir), 'w') as fp:
                     for el in l_rewards:
                         fp.write("{}\n".format(round(el, 2)))
-                plot_fig(l_rewards, 'reward_total', config.dir_summary)
 
             if is_best_avg:
                 path_ckpt_best_avg_tmp = os.path.join(config.dir_saved_models,
@@ -181,6 +192,7 @@ def run(config):
 
             if ep_i % config.save_interval ==0:
                 model.prep_rollouts(device='cpu')
+                # plot_fig(l_rewards, 'reward_total', config.dir_summary)
                 l_ep_rew = []
                 for eval_ep_i in range(config.test_n_episodes):
                     print("Episode %i of %i" % (eval_ep_i + 1, config.test_n_episodes))
@@ -220,6 +232,14 @@ def run(config):
                 print("Average eval reward: {}".format(avg_eval_rew))
                 with open('{}/summary/eval_reward.txt'.format(run_dir), 'a') as file:
                     file.write("{}\n".format(round(avg_eval_rew, 2)))
+                wandb.log({'avg_eval_return': avg_eval_rew, 'eval_at_step': ep_i})
+                if ep_i % 10000 :
+                    # 🐝 Send the wandb Alert
+                    wandb.alert(
+                        title=f'Temporary {config.env_id} results',
+                        text=f'{config.env_id} reached {avg_reward_best:.2f} at {ep_i} episodes',
+                    )
+                    print(f'Alert triggered - best avg is {avg_reward_best}')
 
     plot_fig(l_rewards, 'reward_total', config.dir_summary, show=True)
     path_ckpt_final = os.path.join(config.dir_saved_models,
@@ -229,6 +249,8 @@ def run(config):
     env.close()
     logger.export_scalars_to_json('{}/summary.json'.format(run_dir))
     logger.close()
+    wandb.finish()
+
 
 if __name__ == '__main__':
     import shutil
@@ -240,7 +262,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--resume", default='', type=str)
     parser.add_argument("--random_seed", default=1, type=int)
-    # parser.add_argument("--see")
     parser.add_argument("--relational_embedding", default=False, type=bool)
 
     parser.add_argument("--n_rollout_threads", default=1, type=int)
