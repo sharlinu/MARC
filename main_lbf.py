@@ -1,6 +1,7 @@
 import argparse
 import torch
 import os
+import json
 import numpy as np
 from gym.spaces import Box
 from pathlib import Path
@@ -91,6 +92,7 @@ def run(config):
     avg_reward = float("-inf")
     avg_reward_best = float("-inf")
     path_ckpt_best_avg = ''
+    steps = 0
     for ep_i in range(start_episode, config.n_episodes, config.n_rollout_threads):
         obs = env.reset()
         model.prep_rollouts(device='cpu')
@@ -141,6 +143,7 @@ def run(config):
                 print('done with time step', et_i)
                 break
             # TODO change back
+        steps += et_i
         wandb.log({"rew": episode_reward_total, "steps": et_i})
         if ('box' or 'collect') in config.env_id:
             ep_rews = replay_buffer.get_average_rewards(et_i)
@@ -162,12 +165,19 @@ def run(config):
             avg_rewards = th_l_rewards.unfold(0, 100, 1).mean(1).view(-1)
             avg_rewards = torch.cat((torch.zeros(99), avg_rewards))
             avg_reward = avg_rewards[-1]
+
             if avg_reward > avg_reward_best:
                 avg_reward_best = avg_reward
                 is_best_avg = True
 
             if ep_i % config.save_interval_log == 0:
+                wandb.log({'return_mean': avg_reward, 'steps': steps})
+
                 os.makedirs('{}/summary/'.format(run_dir), exist_ok=True)
+
+                with open("{}/summary/reward_step.txt".format(run_dir), "a") as f:
+                    f.write("{},{} \n".format(steps, avg_reward))
+
                 with open('{}/summary/reward_total.txt'.format(run_dir), 'w') as fp:
                     for el in l_rewards:
                         fp.write("{}\n".format(round(el, 2)))
@@ -394,7 +404,6 @@ if __name__ == '__main__':
 
             os.system(cmd_test)
 
-            shutil.copyfile('{}/summary/reward_total.txt'.format(args['dir_exp']),
-                            # TODO check if this works - changed  list_exp_dir[-1]
-                            '{}/reward_training_seed{}.txt'.format(dir_collected_data, seed)
-                            )
+            # shutil.copyfile('{}/summary/reward_total.txt'.format(args['dir_exp']),
+            #                 '{}/reward_training_seed{}.txt'.format(dir_collected_data, seed)
+            #                 )
