@@ -88,6 +88,7 @@ def run(config):
                                  dense = config.dense)
     t = 0
     l_rewards = []
+    epymarl_rewards = []
     reward_best = float("-inf")
     avg_reward = float("-inf")
     avg_reward_best = float("-inf")
@@ -118,6 +119,7 @@ def run(config):
             # rearrange actions to be per environment
             actions = [np.argmax(ac) for ac in agent_actions]
             next_obs, rewards, dones, infos = env.step(actions)
+            rewards, dones = np.array(rewards), np.array(dones)
             if all([ob['unary_tensor'].any() for ob in obs + next_obs]):
                 replay_buffer.push(obs, agent_actions, rewards, next_obs, dones)
             else:
@@ -145,15 +147,11 @@ def run(config):
             # TODO change back
         steps += et_i
         wandb.log({"rew": episode_reward_total, "steps": et_i})
-        if ('box' or 'collect') in config.env_id:
-            ep_rews = replay_buffer.get_average_rewards(et_i)
-        else:
-            ep_rews = replay_buffer.get_average_rewards(config.episode_length * config.n_rollout_threads)
-        # for a_i, a_ep_rew in enumerate(ep_rews):
-        #      logger.add_scalar('agent%i/mean_episode_rewards' % a_i, a_ep_rew, ep_i)
+
         print("%s - %s - Episodes %i of %i - Reward %.1f" % (config.env_id, config.random_seed, ep_i + 1,
                                         config.n_episodes,  episode_reward_total))
         l_rewards.append(episode_reward_total)
+        epymarl_rewards.append(episode_reward_total)
         #print('terminal space', obs['image'])
 
 
@@ -170,13 +168,19 @@ def run(config):
                 avg_reward_best = avg_reward
                 is_best_avg = True
 
-            if ep_i % config.save_interval_log == 0:
+            os.makedirs('{}/summary/'.format(run_dir), exist_ok=True)
+
+            if steps % config.step_interval_log == 0:
+
                 wandb.log({'return_mean': avg_reward, 'steps': steps})
-
-                os.makedirs('{}/summary/'.format(run_dir), exist_ok=True)
-
+                wandb.log({'epymarl_return_mean': np.mean(epymarl_rewards), 'steps': steps})
                 with open("{}/summary/reward_step.txt".format(run_dir), "a") as f:
                     f.write("{},{} \n".format(steps, avg_reward))
+                with open("{}/summary/reward_epymarl.txt".format(run_dir), "a") as f:
+                    f.write("{},{} \n".format(steps, np.mean(epymarl_rewards)))
+                epymarl_rewards.clear()
+
+            if ep_i % config.save_interval_log == 0:
 
                 with open('{}/summary/reward_total.txt'.format(run_dir), 'w') as fp:
                     for el in l_rewards:
@@ -192,7 +196,7 @@ def run(config):
                     os.remove(path_ckpt_best_avg)
                 path_ckpt_best_avg = path_ckpt_best_avg_tmp
 
-            if ep_i % config.save_interval ==0:
+            if ep_i % config.test_interval ==0:
                 model.prep_rollouts(device='cpu')
                 l_ep_rew = []
                 for eval_ep_i in range(config.test_n_episodes):
@@ -277,8 +281,9 @@ if __name__ == '__main__':
     parser.add_argument("--batch_size",
                         default=128, type=int,
                         help="Batch size for training")
-    parser.add_argument("--save_interval", default=200, type=int)
+    parser.add_argument("--test_interval", default=1000, type=int)
     parser.add_argument("--save_interval_log", default=100, type=int)
+    parser.add_argument('--step_interval_log', default=10000, type=int)
 
     parser.add_argument("--pol_hidden_dim", default=128, type=int)
     parser.add_argument("--critic_hidden_dim", default=128, type=int)
