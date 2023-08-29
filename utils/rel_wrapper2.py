@@ -21,6 +21,39 @@ class GridObject:
         return "_"+str(self.x)+str(self.y)
 
 # from random import randint
+from gym.spaces import Tuple, Dict,Box
+class BPushWrapper(gym.ObservationWrapper):
+    def __init__(self, env):
+        super().__init__(env)
+        self.env = env
+        single_observation_space = Dict()
+        single_observation_space['image'] = Box(
+            low=-float("inf"),
+            high=float("inf"),
+            shape=(*env.grid_size, 4),
+            dtype=np.float32)
+        # self.env.observation_space = Dict()
+        self.env.observation_space = Tuple(
+            ([single_observation_space] * self.env.n_agents)
+        )
+        self.env.n_objects = self.env.n_agents * 2
+
+
+    def observation(self, observation):
+        obs = []
+        grid_transformed = np.moveaxis(self.env.grid, 0, -1)
+        for agent in self.env.agents:
+            ob = {}
+            x = agent.x
+            y = agent.y
+            id_layer =np.zeros((*self.env.grid_size,1), dtype=np.int32)
+            id_layer[y,x,0] = 1 # TODO work out if x,y ordering is correct
+            ob['image'] = np.append(grid_transformed, id_layer, axis=2)
+            obs.append(ob)
+        return obs
+
+
+
 class AbsoluteVKBWrapper(gym.ObservationWrapper):
     """
     Add a vkb key-value pair, which represents the state as a vectorised knowledge base.
@@ -33,10 +66,12 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
 
         self.field_size, _, self.n_attr = env.observation_space[0]['image'].shape
         print(self.field_size, 'field_size')
-        self.field_size = 10 
+
 
         self.attr_mapping = {'agent': 0, 'id': 1, 'food': 2}  # TODO hardcoded
         # self.attr_mapping = {'agent':0, 'goals':1, 'obstacle':2, 'id':3}
+        # self.attr_mapping = {'agent': 0, 'id': 1, 'food': 2}
+        self.attr_mapping = {'agent': 0, 'boulder': 1, 'goal': 2, 'id': 3}
         assert len(self.attr_mapping) == self.n_attr, f'Attribute mapping ({len(self.attr_mapping)}) needs to have a key for each attribute ({self.n_attr})'
 
         self.dense = dense

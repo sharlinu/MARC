@@ -22,7 +22,7 @@ def run(config):
     torch.set_num_threads(1)
     wandb.init(
         project='MARC',
-        name=f'{config.env_id}',
+        name=f'{config.agent_alg}-{config.env_id}-erice',
         config=vars(config),
     )
 
@@ -39,18 +39,30 @@ def run(config):
 
     torch.manual_seed(config.random_seed)
     np.random.seed(config.random_seed)
-    env = ForagingEnv(
-        players=config.player,
-        max_player_level=config.max_player_level,
-        field_size=(config.field, config.field),
-        max_food=config.max_food,
-        grid_observation=config.grid_observation,
-        sight=config.field,
-        max_episode_steps=config.episode_length,
-        force_coop=config.force_coop,
-        keep_food=config.keep_food,
-        simple=config.simple,
-    )
+    if config.env == 'lbf':
+        env = ForagingEnv(
+            players=config.player,
+            max_player_level=config.max_player_level,
+            field_size=(config.field, config.field),
+            max_food=config.max_food,
+            grid_observation=config.grid_observation,
+            sight=config.field,
+            max_episode_steps=config.episode_length,
+            force_coop=config.force_coop,
+            keep_food=config.keep_food,
+            simple=config.simple,
+        )
+    elif config.env == 'bpush':
+        from bpush.environment import BoulderPush
+        from utils.rel_wrapper2 import BPushWrapper
+        env = BoulderPush(
+            width= config.field,
+            height= config.field,
+            n_agents=config.player,
+            sensor_range=3,
+        )
+        env = BPushWrapper(env)
+
     env.seed(config.random_seed)
     np.random.seed(config.random_seed)
     env = AbsoluteVKBWrapper(env, config.dense, background_id=config.background_id, abs_id=config.abs_id)
@@ -318,8 +330,10 @@ if __name__ == '__main__':
     for k, v in params.items():
         args[k] = v
 
-    args['env_id'] = f"{args['env']}_{args['field']}x{args['field']}_{args['player']}p_{args['max_food']}f{'_coop' if args['force_coop'] else ''}{args['other']}"
-
+    if 'lbf' in args['env']:
+        args['env_id'] = f"{args['env']}_{args['field']}x{args['field']}_{args['player']}p_{args['max_food']}f{'_coop' if args['force_coop'] else ''}{args['other']}"
+    elif 'push' in args['env']:
+        args['env_id'] = f"{args['env']}_{args['field']}x{args['field']}_{args['player']}p"
     dir_collected_data = './experiments/MAAC_multipleseeds_data_{}_{}_{}'.format(args['agent_alg'], args['env_id'],
                                                                                  args['exp_id'])
 
