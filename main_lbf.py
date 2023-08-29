@@ -22,7 +22,7 @@ def run(config):
     torch.set_num_threads(1)
     wandb.init(
         project='MARC',
-        name=f'{config.env_id}-erice',
+        name=f'{config.env_id}',
         config=vars(config),
     )
 
@@ -53,29 +53,24 @@ def run(config):
     )
     env.seed(config.random_seed)
     np.random.seed(config.random_seed)
-    env = AbsoluteVKBWrapper(env, config.dense, background_id=config.background_id)
+    env = AbsoluteVKBWrapper(env, config.dense, background_id=config.background_id, abs_id=config.abs_id)
     env.agents = [None] * len(env.action_space)
     # nullary_dim = env.obs_shape[0]
     unary_dim = env.obs_shape['unary']
     # binary_dim = env.obs_shape[2]
     env.reset()
     spatial_tensors = env.spatial_tensors
-    if config.resume != '':
-        model_path = glob.glob('{}/saved_models/ckpt_best_avg*'.format(config.resume))[0]
-        print(f'Using model: {model_path}')
-        model, start_episode = RelationalSAC.init_from_save(model_path)
-    else:
-        start_episode = 0
-        model = RelationalSAC.init_from_env(env,
-                                            spatial_tensors=spatial_tensors,
-                                            batch_size = config.batch_size,
-                                           tau=config.tau,
-                                           pi_lr=config.pi_lr,
-                                           q_lr=config.q_lr,
-                                           gamma=config.gamma,
-                                           pol_hidden_dim=config.pol_hidden_dim,
-                                           critic_hidden_dim=config.critic_hidden_dim,
-                                           reward_scale=config.reward_scale)
+    start_episode = 0
+    model = RelationalSAC.init_from_env(env,
+                                        spatial_tensors=spatial_tensors,
+                                        batch_size = config.batch_size,
+                                       tau=config.tau,
+                                       pi_lr=config.pi_lr,
+                                       q_lr=config.q_lr,
+                                       gamma=config.gamma,
+                                       pol_hidden_dim=config.pol_hidden_dim,
+                                       critic_hidden_dim=config.critic_hidden_dim,
+                                       reward_scale=config.reward_scale)
 
     replay_buffer = ReplayBuffer2(max_steps=config.buffer_length,
                                  num_agents=model.n_agents,
