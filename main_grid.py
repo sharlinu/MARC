@@ -13,22 +13,22 @@ filterwarnings(action='ignore',
 # from tensorboardX import SummaryWriter
 from utils.buffer import ReplayBuffer2
 from algorithms.attention_sac import RelationalSAC
-from utils.rel_wrapper2 import AbsoluteVKBWrapper
+from utils.rel_wrapper2  import AbsoluteVKBWrapper
 import yaml
 from utils.plotting import plot_fig
 from lbforaging.foraging import ForagingEnv
 import wandb
+from Gridworld_Scripts.Connection import Connection as Conn
+from Gridworld_Scripts.UnityGridEnv import UnityGridEnv as Env
+
 def run(config):
     torch.set_num_threads(1)
     wandb.init(
-        project='MARC',
-        name=f'{config.env_id}',
+        project='WMG',
+        name='Gridworld_test',
         config=vars(config),
     )
 
-    if config.resume != '':
-        resume_path = config.resume
-        n_episodes = config.n_episodes
 
     # run_num = 1
     run_dir = config.dir_exp
@@ -39,21 +39,11 @@ def run(config):
 
     torch.manual_seed(config.random_seed)
     np.random.seed(config.random_seed)
-    env = ForagingEnv(
-        players=config.player,
-        max_player_level=config.max_player_level,
-        field_size=(config.field, config.field),
-        max_food=config.max_food,
-        grid_observation=config.grid_observation,
-        sight=config.field,
-        max_episode_steps=config.episode_length,
-        force_coop=config.force_coop,
-        keep_food=config.keep_food,
-        simple=config.simple,
-    )
-    env.seed(config.random_seed)
+    conn = Conn(["server"])
+    env = Env(0,conn)
+    # env.seed(config.random_seed)
     np.random.seed(config.random_seed)
-    env = AbsoluteVKBWrapper(env, config.dense, background_id=config.background_id, abs_id=config.abs_id)
+    env = AbsoluteVKBWrapper(env, dense=False, background_id=config.background_id, abs_id='None')
     env.agents = [None] * len(env.action_space)
     # nullary_dim = env.obs_shape[0]
     unary_dim = env.obs_shape['unary']
@@ -63,8 +53,7 @@ def run(config):
     if config.resume != '':
         model_path = glob.glob('{}/saved_models/ckpt_best_avg*'.format(config.resume))[0]
         print(f'Using model: {model_path}')
-        model, start_episode = RelationalSAC.init_from_save(model_path, load_critic=True)
-        print(f'starting from episode {start_episode}')
+        model, start_episode = RelationalSAC.init_from_save(model_path)
     else:
         start_episode = 0
         model = RelationalSAC.init_from_env(env,
@@ -98,9 +87,8 @@ def run(config):
     for ep_i in range(start_episode, config.n_episodes, config.n_rollout_threads):
         obs = env.reset()
         model.prep_rollouts(device='cpu')
-
         episode_reward_total = 0
-        is_best_avg = False
+        is_best_avg          = False
 
         for et_i in range(1, config.episode_length + 1):
             # rearrange observations to be per agent, and convert to torch Variable
@@ -132,7 +120,6 @@ def run(config):
             t += config.n_rollout_threads
             if (len(replay_buffer) >= config.batch_size and
                     (t % config.steps_per_update) < config.n_rollout_threads):
-
                 if config.use_gpu:
                     model.prep_training(device='gpu')
                 else:
@@ -148,6 +135,7 @@ def run(config):
                 print('done with time step', et_i)
                 break
             # TODO change back
+        print('done with time step', et_i)
         steps += et_i
         wandb.log({"rew": episode_reward_total, "steps": et_i})
 
@@ -257,6 +245,7 @@ def run(config):
     model.save(filename=path_ckpt_final, episode=ep_i)
     # model.save('{}/model.pt'.format(config.dir_saved_models))
     env.close()
+    conn.close()
     # logger.export_scalars_to_json('{}/summary.json'.format(run_dir))
     # logger.close()
     wandb.finish()
@@ -284,7 +273,6 @@ if __name__ == '__main__':
     parser.add_argument("--batch_size",
                         default=128, type=int,
                         help="Batch size for training")
-    parser.add_argument("--save_interval", default=1000, type=int)
     parser.add_argument("--test_interval", default=1000, type=int)
     parser.add_argument("--save_interval_log", default=100, type=int)
     parser.add_argument('--step_interval_log', default=10000, type=int)
@@ -306,6 +294,7 @@ if __name__ == '__main__':
         config.use_gpu = True
     else:
         config.use_gpu = False
+
     args = vars(config)
     if args['resume'] == '':
         with open('config.yaml', "r") as file:
@@ -317,8 +306,7 @@ if __name__ == '__main__':
 
     for k, v in params.items():
         args[k] = v
-
-    args['env_id'] = f"{args['env']}_{args['field']}x{args['field']}_{args['player']}p_{args['max_food']}f{'_coop' if args['force_coop'] else ''}{args['other']}"
+    args['env_id'] = f"{args['env']}"
 
     dir_collected_data = './experiments/MAAC_multipleseeds_data_{}_{}_{}'.format(args['agent_alg'], args['env_id'],
                                                                                  args['exp_id'])
