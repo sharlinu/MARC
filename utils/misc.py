@@ -131,3 +131,10 @@ def sep_clip_grad_norm(parameters, max_norm, norm_type=2):
         clip_coef = max_norm / (p_norm + 1e-6)
         if clip_coef < 1:
             p.grad.data.mul_(clip_coef)
+
+
+class Agent():
+    def __init__(self):
+        # agents are movable by default
+        pass
+
