@@ -1,7 +1,6 @@
 import argparse
 import torch
 import os
-import json
 import numpy as np
 from gym.spaces import Box
 from pathlib import Path
@@ -10,31 +9,34 @@ from warnings import filterwarnings  # noqa
 filterwarnings(action='ignore',
                         category=DeprecationWarning,
                         module='tensorboardX')
-# from tensorboardX import SummaryWriter
+from tensorboardX import SummaryWriter
 from utils.buffer import ReplayBuffer2
 from algorithms.attention_sac import RelationalSAC
 from utils.rel_wrapper2 import AbsoluteVKBWrapper
 import yaml
 from utils.plotting import plot_fig
 from lbforaging.foraging import ForagingEnv
-import wandb
+# import wandb
 def run(config):
+    # wandb.init(
+    #     set the wandb project where this run will be logged
+        # project="MARC",
+        # name = f'{config.env_id}-cpu',
+        # track hyperparameters and run metadata
+        # config=vars(config)
+    # )
     torch.set_num_threads(1)
-    wandb.init(
-        project='MARC',
-        name=f'{config.env_id}',
-        config=vars(config),
-    )
+
 
     if config.resume != '':
         resume_path = config.resume
         n_episodes = config.n_episodes
 
-    # run_num = 1
+    run_num = 1
     run_dir = config.dir_exp
     log_dir = config.dir_summary
 
-    # logger = SummaryWriter(str(log_dir))
+    logger = SummaryWriter(str(log_dir))
     # saver = Saver.Saver(config)
 
     torch.manual_seed(config.random_seed)
@@ -53,55 +55,34 @@ def run(config):
     )
     env.seed(config.random_seed)
     np.random.seed(config.random_seed)
-    env = AbsoluteVKBWrapper(env, config.dense, background_id=config.background_id, abs_id=config.abs_id)
+    env = AbsoluteVKBWrapper(env, config.dense)
     env.agents = [None] * len(env.action_space)
     # nullary_dim = env.obs_shape[0]
     unary_dim = env.obs_shape['unary']
     # binary_dim = env.obs_shape[2]
     env.reset()
     spatial_tensors = env.spatial_tensors
-    if config.resume != '':
-        model_path = glob.glob('{}/saved_models/ckpt_best_avg*'.format(config.resume))[0]
-        print(f'Using model: {model_path}')
-        model, start_episode = RelationalSAC.init_from_save(model_path, load_critic=True)
-        print(f'starting from episode {start_episode}')
-    else:
-        start_episode = 0
-        model = RelationalSAC.init_from_env(env,
-                                            spatial_tensors=spatial_tensors,
-                                            batch_size = config.batch_size,
-                                           tau=config.tau,
-                                           pi_lr=config.pi_lr,
-                                           q_lr=config.q_lr,
-                                           gamma=config.gamma,
-                                           pol_hidden_dim=config.pol_hidden_dim,
-                                           critic_hidden_dim=config.critic_hidden_dim,
-                                           reward_scale=config.reward_scale)
-
     replay_buffer = ReplayBuffer2(max_steps=config.buffer_length,
-                                 num_agents=model.n_agents,
+                                 num_agents=4,
                                  obs_dims=[np.prod(obsp['image'].shape) for obsp in env.observation_space],
                                  # nullary_dims=[nullary_dim for _ in range(model.nagents)],
-                                 unary_dims=[unary_dim for _ in range(model.n_agents)],
+                                 unary_dims=[unary_dim for _ in range(4)],
                                  # binary_dims=[binary_dim for _ in range(model.nagents)],
                                  ac_dims= [acsp.shape[0] if isinstance(acsp, Box) else acsp.n
                                  for acsp in env.action_space],
                                  dense = config.dense)
     t = 0
     l_rewards = []
-    epymarl_rewards = []
-    steps = 0
     reward_best = float("-inf")
     avg_reward = float("-inf")
     avg_reward_best = float("-inf")
     path_ckpt_best_avg = ''
-
+    start_episode = 0
     for ep_i in range(start_episode, config.n_episodes, config.n_rollout_threads):
         obs = env.reset()
-        model.prep_rollouts(device='cpu')
-
+        # model.prep_rollouts(device='cpu')
         episode_reward_total = 0
-        is_best_avg = False
+        is_best_avg          = False
 
         for et_i in range(1, config.episode_length + 1):
             # rearrange observations to be per agent, and convert to torch Variable
@@ -110,52 +91,54 @@ def run(config):
             #agent_obs = np.expand_dims(agent_obs, axis=0)
             torch_obs = [Variable(torch.Tensor(agent_obs[i]),
                                   requires_grad=False)
-                         for i in range(model.n_agents)]
+                         for i in range(4)]
             # get actions as torch Variables
-            try:
-                torch_agent_actions = model.step(torch_obs, explore=True)
-            except Exception as e:
-                print(e)
-                continue
+            # try:
+            #     torch_agent_actions = model.step(torch_obs, explore=True)
+            # except Exception as e:
+            #     print(e)
+            #     continue
             # convert actions to numpy arrays
-            agent_actions = [ac.data.numpy() for ac in torch_agent_actions]
-            # rearrange actions to be per environment
-            actions = [np.argmax(ac) for ac in agent_actions]
+            agent_actions = [np.ones(6) for i in range(4)]
+            actions = [5, 5, 5, 5]
             next_obs, rewards, dones, infos = env.step(actions)
-            rewards, dones = np.array(rewards), np.array(dones)
-            if all([ob['unary_tensor'].any() for ob in obs + next_obs]):
-                replay_buffer.push(obs, agent_actions, rewards, next_obs, dones)
-            else:
-                continue
+            # print('player level', [p.level for p in env.players])
+            # print('field', env.field)
+            # print('reward', rewards)
+            replay_buffer.push(obs, agent_actions, rewards, next_obs, dones)
             episode_reward_total += rewards.sum()
 
             obs = next_obs
             t += config.n_rollout_threads
-            if (len(replay_buffer) >= config.batch_size and
-                    (t % config.steps_per_update) < config.n_rollout_threads):
-
-                if config.use_gpu:
-                    model.prep_training(device='gpu')
-                else:
-                    model.prep_training(device='cpu')
-                for u_i in range(config.num_updates):
-                    sample = replay_buffer.sample(config.batch_size,
-                                                  to_gpu=config.use_gpu)
-                    model.update_critic(sample)
-                    model.update_policies(sample)
-                    model.update_all_targets()
-                model.prep_rollouts(device='cpu')
+            # if (len(replay_buffer) >= config.batch_size and
+            #         (t % config.steps_per_update) < config.n_rollout_threads):
+                # if config.use_gpu:
+                #     model.prep_training(device='gpu')
+                # else:
+                #     model.prep_training(device='cpu')
+                # for u_i in range(config.num_updates):
+                #     sample = replay_buffer.sample(config.batch_size,
+                #                                   to_gpu=config.use_gpu)
+                #     model.update_critic(sample, logger=logger)
+                #     model.update_policies(sample, logger=logger)
+                #     model.update_all_targets()
+                # model.prep_rollouts(device='cpu')
             if dones.all() == True:
                 print('done with time step', et_i)
                 break
-            # TODO change back
-        steps += et_i
-        wandb.log({"rew": episode_reward_total, "episode_steps": et_i})
+        # wandb.log({"rew": episode_reward_total, "steps": et_i})
 
+            # TODO change back
+
+        if ('box' or 'collect') in config.env_id:
+            ep_rews = replay_buffer.get_average_rewards(et_i)
+        else:
+            ep_rews = replay_buffer.get_average_rewards(config.episode_length * config.n_rollout_threads)
+        for a_i, a_ep_rew in enumerate(ep_rews):
+             logger.add_scalar('agent%i/mean_episode_rewards' % a_i, a_ep_rew, ep_i)
         print("%s - %s - Episodes %i of %i - Reward %.1f" % (config.env_id, config.random_seed, ep_i + 1,
                                         config.n_episodes,  episode_reward_total))
         l_rewards.append(episode_reward_total)
-        epymarl_rewards.append(episode_reward_total)
         #print('terminal space', obs['image'])
 
 
@@ -167,27 +150,12 @@ def run(config):
             avg_rewards = th_l_rewards.unfold(0, 100, 1).mean(1).view(-1)
             avg_rewards = torch.cat((torch.zeros(99), avg_rewards))
             avg_reward = avg_rewards[-1]
-
             if avg_reward > avg_reward_best:
                 avg_reward_best = avg_reward
                 is_best_avg = True
 
-            os.makedirs('{}/summary/'.format(run_dir), exist_ok=True)
-
-            if steps % config.step_interval_log == 0:
-                wandb.log({'return_mean_100': avg_reward,
-                           'epymarl_return_mean': np.mean(epymarl_rewards),
-                           'steps': steps}
-                          )
-                with open("{}/summary/reward_step.txt".format(run_dir), "a") as f:
-                    f.write("{},{} \n".format(steps, avg_reward))
-                with open("{}/summary/reward_epymarl.txt".format(run_dir), "a") as f:
-                    f.write("{},{} \n".format(steps, np.mean(epymarl_rewards)))
-                epymarl_rewards.clear()
-
-
             if ep_i % config.save_interval_log == 0:
-
+                os.makedirs('{}/summary/'.format(run_dir), exist_ok=True)
                 with open('{}/summary/reward_total.txt'.format(run_dir), 'w') as fp:
                     for el in l_rewards:
                         fp.write("{}\n".format(round(el, 2)))
@@ -196,18 +164,17 @@ def run(config):
             if is_best_avg:
                 path_ckpt_best_avg_tmp = os.path.join(config.dir_saved_models,
                                                       'ckpt_best_avg_r{}.pth.tar'.format(avg_reward_best))
-                model.save(filename=path_ckpt_best_avg_tmp, episode=ep_i)
+                # model.save(filename=path_ckpt_best_avg_tmp, episode=ep_i)
                 # torch.save(ckpt, path_ckpt_best_avg_tmp)
                 if os.path.exists(path_ckpt_best_avg):
                     os.remove(path_ckpt_best_avg)
                 path_ckpt_best_avg = path_ckpt_best_avg_tmp
 
-            if ep_i % config.test_interval ==0:
-                model.prep_rollouts(device='cpu')
+            if ep_i % config.save_interval ==0:
+                # model.prep_rollouts(device='cpu')
                 l_ep_rew = []
                 for eval_ep_i in range(config.test_n_episodes):
                     print("Episode %i of %i" % (eval_ep_i + 1, config.test_n_episodes))
-
 
                     ep_rew = 0
 
@@ -223,11 +190,10 @@ def run(config):
                             obs = [np.expand_dims(ob['image'].flatten(), axis=0) for ob in obs]
                         torch_obs = [Variable(torch.Tensor(obs[i]).view(1, -1),
                                               requires_grad=False)
-                                     for i in range(model.n_agents)]
+                                     for i in range(4)]
                         # get actions as torch Variables
-                        torch_actions = model.step(torch_obs, explore=False)
-                        # convert actions to numpy arrays
-                        actions = [np.argmax(ac.data.numpy().flatten()) for ac in torch_actions]
+                        agent_actions = [np.ones(6) for i in range(4)]
+                        actions = [5, 5, 5, 5]
                         # print('actions', actions)
                         obs, rewards, dones, infos = env.step(actions)
 
@@ -244,25 +210,24 @@ def run(config):
                 print("Average eval reward: {}".format(avg_eval_rew))
                 with open('{}/summary/eval_reward.txt'.format(run_dir), 'a') as file:
                     file.write("{}\n".format(round(avg_eval_rew, 2)))
-                wandb.log({'avg_eval_return': avg_eval_rew, 'eval_at_step': ep_i})
-                if ep_i % 10000:
-                    # 🐝 Send the wandb Alert
-                    wandb.alert(
-                        title=f'Temporary {config.env_id} results',
-                        text=f'{config.env_id} reached {avg_reward_best:.2f} at {ep_i} episodes',
-                    )
-                    print(f'Alert triggered - best avg is {avg_reward_best}')
-
+                # wandb.log({'avg_eval_return': avg_eval_rew, 'eval_at_step': ep_i})
+                # if ep_i % 10000 :
+                #     # 🐝 Send the wandb Alert
+                #     wandb.alert(
+                #         title=f'Temporary {config.env_id} results',
+                #         text=f'{config.env_id} reached {avg_reward_best:.2f} at {ep_i} episodes',
+                #     )
+                #     print(f'Alert triggered - best avg is {avg_reward_best}')
 
     plot_fig(l_rewards, 'reward_total', config.dir_summary, show=True)
     path_ckpt_final = os.path.join(config.dir_saved_models,
                                           'ckpt_final.pth.tar')
-    model.save(filename=path_ckpt_final, episode=ep_i)
+    # model.save(filename=path_ckpt_final, episode=ep_i)
     # model.save('{}/model.pt'.format(config.dir_saved_models))
     env.close()
-    # logger.export_scalars_to_json('{}/summary.json'.format(run_dir))
-    # logger.close()
-    wandb.finish()
+    logger.export_scalars_to_json('{}/summary.json'.format(run_dir))
+    logger.close()
+    # wandb.finish()
 
 if __name__ == '__main__':
     import shutil
@@ -274,11 +239,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--resume", default='', type=str)
     parser.add_argument("--random_seed", default=1, type=int)
-    # parser.add_argument("model_name",
-    #                     help="Name of directory to store " +
-    #                          "model/training contents")
+    # parser.add_argument("--see")
+    parser.add_argument("--relational_embedding", default=False, type=bool)
+
     parser.add_argument("--n_rollout_threads", default=1, type=int)
-    parser.add_argument("--buffer_length", default=int(1e6), type=int)
+    parser.add_argument("--buffer_length", default=1000000, type=int)
     parser.add_argument("--n_episodes", default=20000, type=int)
     parser.add_argument("--episode_length", default=25, type=int)
     parser.add_argument("--steps_per_update", default=100, type=int)
@@ -287,10 +252,8 @@ if __name__ == '__main__':
     parser.add_argument("--batch_size",
                         default=128, type=int,
                         help="Batch size for training")
-    parser.add_argument("--save_interval", default=1000, type=int)
-    parser.add_argument("--test_interval", default=1000, type=int)
+    parser.add_argument("--save_interval", default=200, type=int)
     parser.add_argument("--save_interval_log", default=100, type=int)
-    parser.add_argument('--step_interval_log', default=10000, type=int)
 
     parser.add_argument("--pol_hidden_dim", default=128, type=int)
     parser.add_argument("--critic_hidden_dim", default=128, type=int)
@@ -309,6 +272,7 @@ if __name__ == '__main__':
         config.use_gpu = True
     else:
         config.use_gpu = False
+
     args = vars(config)
     if args['resume'] == '':
         with open('config.yaml', "r") as file:
@@ -320,7 +284,6 @@ if __name__ == '__main__':
 
     for k, v in params.items():
         args[k] = v
-
     args['env_id'] = f"{args['env']}_{args['field']}x{args['field']}_{args['player']}p_{args['max_food']}f{'_coop' if args['force_coop'] else ''}{args['other']}"
 
     dir_collected_data = './experiments/MAAC_multipleseeds_data_{}_{}_{}'.format(args['agent_alg'], args['env_id'],
@@ -416,6 +379,7 @@ if __name__ == '__main__':
 
             os.system(cmd_test)
 
-            # shutil.copyfile('{}/summary/reward_total.txt'.format(args['dir_exp']),
-            #                 '{}/reward_training_seed{}.txt'.format(dir_collected_data, seed)
-            #                 )
+            shutil.copyfile('{}/summary/reward_total.txt'.format(args['dir_exp']),
+                            # TODO check if this works - changed  list_exp_dir[-1]
+                            '{}/reward_training_seed{}.txt'.format(dir_collected_data, seed)
+                            )
