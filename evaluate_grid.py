@@ -66,7 +66,8 @@ def run(config):
         #if render:
         #    env.render()
 
-        for t_i in range(config.test_episode_length):
+        #for t_i in range(config.test_episode_length):
+        for t_i in range(15):    
             calc_start = time.time()
 
             # rearrange observations to be per agent, and convert to torch Variable
@@ -92,7 +93,7 @@ def run(config):
                 time.sleep(ifi - elapsed)
             ep_rew += sum(rewards)
 
-            if all(dones):
+            if dones.any():
                 collect_item['finished'] = 1
                 break
 
