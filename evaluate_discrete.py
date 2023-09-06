@@ -1,7 +1,6 @@
 import argparse
 import torch
 import time
-import imageio
 from pathlib import Path
 from torch.autograd import Variable
 from algorithms.attention_sac import RelationalSAC
@@ -15,8 +14,6 @@ sys.path.insert(0, '/Users/sharlinu/Desktop/github/MABoxWorld/')
 sys.path.insert(0, '/home/utke_s@WMGDS.WMG.WARWICK.AC.UK/github/MABoxWorld')
 sys.path.insert(0, '/home/utke_s@WMGDS.WMG.WARWICK.AC.UK/github/MABoxWorld/environments')
 
-from environments.box import BoxWorldEnv
-from lbforaging.foraging import ForagingEnv
 import numpy as np
 from enum import Enum
 import yaml
@@ -69,6 +66,23 @@ def run(config):
             force_coop=config.force_coop,
             keep_food = config.keep_food,
             simple=config.simple,
+        )
+    elif 'bpush' in  config.env_id:
+        from bpush.environment import BoulderPush
+        env = BoulderPush(
+            height=config.field,
+            width=config.field,
+            n_agents=config.player,
+            sensor_range=3,
+        )
+    elif 'wolf' in config.env_id:
+        from Wolfpack_gym.envs.wolfpack import Wolfpack
+        env = Wolfpack(
+            grid_height=config.field,
+            grid_width=config.field,
+            num_players=config.player,
+            max_food_num=config.max_food,
+            obs_type='grid',
         )
     else:
         raise ValueError(f'Cannot cater for the environment {config.env_id}')
