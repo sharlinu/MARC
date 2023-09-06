@@ -59,19 +59,19 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
     Add a vkb key-value pair, which represents the state as a vectorised knowledge base.
     Entities are objects in the gird-world, predicates represents the properties of them and relations between them.
     """
-    def __init__(self, env, dense=False, background_id="b3", abs_id='None'):
+    def __init__(self, env, attr_mapping, dense=False, background_id="b3", abs_id='None'):
         super().__init__(env, new_step_api=True)
         # self.attribute_labels = ['agents', 'id', 'feature']
 
 
         self.field_size, _, self.n_attr = env.observation_space[0]['image'].shape
         print(self.field_size, 'field_size')
-
+        self.attr_mapping = attr_mapping
         # self.attr_mapping = {'agent': 0, 'id': 1, 'food': 2}  # TODO hardcoded
         # self.attr_mapping = {'agent':0, 'goals':1, 'obstacle':2, 'id':3}
         # self.attr_mapping = {'agent': 0, 'id': 1, 'food': 2}
         # self.attr_mapping = {'agent': 0, 'boulder': 1, 'goal': 2, 'id': 3}
-        self.attr_mapping = {'wolf': 0, 'sheep': 1, 'id': 2}
+        # self.attr_mapping = {'wolf': 0, 'sheep': 1, 'id': 2}
         assert len(self.attr_mapping) == self.n_attr, f'Attribute mapping ({len(self.attr_mapping)}) needs to have a key for each attribute ({self.n_attr})'
 
         self.dense = dense
