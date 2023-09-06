@@ -1,30 +1,30 @@
 import argparse
 import torch
 import os
-import json
 import numpy as np
 from gym.spaces import Box
-from pathlib import Path
 from torch.autograd import Variable
 from warnings import filterwarnings  # noqa
 filterwarnings(action='ignore',
                         category=DeprecationWarning,
-                        module='tensorboardX')
-# from tensorboardX import SummaryWriter
-from utils.buffer import ReplayBuffer2
-from algorithms.attention_sac import RelationalSAC
+                        module='gym') # TODO update
+from utils.buffer import ReplayBufferMARC, ReplayBufferMAAC
+from algorithms.attention_sac import AttentionSAC, RelationalSAC
 from utils.rel_wrapper2 import AbsoluteVKBWrapper
+from utils.env_wrappers import SubprocVecEnv, DummyVecEnv
 import yaml
+from utils.misc import Agent
 from utils.plotting import plot_fig
 from lbforaging.foraging import ForagingEnv
 import wandb
 def run(config):
     torch.set_num_threads(1)
-    wandb.init(
-        project='MARC',
-        name=f'{config.agent_alg}-{config.env_id}-erice',
-        config=vars(config),
-    )
+    # wandb.init(
+    #     project='MARC',
+    #     name=f'{config.alg}-{config.env_id}',
+    #     config=vars(config),
+    # )
+    env_name = config.env_name
 
     if config.resume != '':
         resume_path = config.resume
@@ -34,64 +34,25 @@ def run(config):
     run_dir = config.dir_exp
     log_dir = config.dir_summary
 
-    # logger = SummaryWriter(str(log_dir))
-    # saver = Saver.Saver(config)
+    start_episode = 0
 
     torch.manual_seed(config.random_seed)
     np.random.seed(config.random_seed)
-    if config.env == 'lbf':
-        env = ForagingEnv(
-            players=config.player,
-            max_player_level=config.max_player_level,
-            field_size=(config.field, config.field),
-            max_food=config.max_food,
-            grid_observation=config.grid_observation,
-            sight=config.field,
-            max_episode_steps=config.episode_length,
-            force_coop=config.force_coop,
-            keep_food=config.keep_food,
-            simple=config.simple,
-        )
-    elif config.env == 'bpush':
-        from bpush.environment import BoulderPush
-        from utils.rel_wrapper2 import BPushWrapper
-        env = BoulderPush(
-            width= config.field,
-            height= config.field,
-            n_agents=config.player,
-            penalty=config.penalty,
-            sensor_range=config.sensor_range,
-        )
-        env = BPushWrapper(env)
-    elif config.env == 'wolfpack':
-        from Wolfpack_gym.envs.wolfpack import Wolfpack
-        env = Wolfpack(
-            grid_width=config.field,
-            grid_height=config.field,
-            num_players=config.player,
-            max_food_num=config.max_food,
-            obs_type='grid'
-        )
-        env.n_agents = env.num_players
-
-    # env.seed(config.random_seed)
-    np.random.seed(config.random_seed)
-    env = AbsoluteVKBWrapper(env, config.dense, background_id=config.background_id, abs_id=config.abs_id)
-    env.agents = [None] * len(env.action_space)
-    # nullary_dim = env.obs_shape[0]
-    unary_dim = env.obs_shape['unary']
-    # binary_dim = env.obs_shape[2]
-    env.reset()
-    spatial_tensors = env.spatial_tensors
-    if config.resume != '':
-        model_path = glob.glob('{}/saved_models/ckpt_best_avg*'.format(config.resume))[0]
-        print(f'Using model: {model_path}')
-        model, start_episode = RelationalSAC.init_from_save(model_path, load_critic=True)
-        print(f'starting from episode {start_episode}')
-    else:
-        start_episode = 0
+    if config.alg == 'MARC':
+        env = make_env(config)
+        env.grid_observation = config.grid_observation
+        attr_mapping = getattr(config, env_name)['attr_mapping']
+        env = AbsoluteVKBWrapper(env=env,
+                                 attr_mapping=attr_mapping,
+                                 dense=config.marc['dense'],
+                                 background_id=config.marc['background_id'],
+                                 abs_id=config.marc['abs_id']
+                                 )
+        env.agents = [None] * len(env.action_space)
+        unary_dim = env.obs_shape['unary']
+        env.reset()
         model = RelationalSAC.init_from_env(env,
-                                            spatial_tensors=spatial_tensors,
+                                            spatial_tensors=env.spatial_tensors,
                                             batch_size = config.batch_size,
                                            tau=config.tau,
                                            pi_lr=config.pi_lr,
@@ -100,39 +61,78 @@ def run(config):
                                            pol_hidden_dim=config.pol_hidden_dim,
                                            critic_hidden_dim=config.critic_hidden_dim,
                                            reward_scale=config.reward_scale)
+        replay_buffer = ReplayBufferMARC(max_steps=config.buffer_length,
+                                         num_agents=model.n_agents,
+                                         obs_dims=[np.prod(obsp['image'].shape) for obsp in env.observation_space],
+                                         # nullary_dims=[nullary_dim for _ in range(model.nagents)],
+                                         unary_dims=[unary_dim for _ in range(model.n_agents)],
+                                         # binary_dims=[binary_dim for _ in range(model.nagents)],
+                                         ac_dims=[acsp.shape[0] if isinstance(acsp, Box) else acsp.n
+                                                  for acsp in env.action_space],
+                                         dense=config.marc['dense'])
 
-    replay_buffer = ReplayBuffer2(max_steps=config.buffer_length,
-                                 num_agents=model.n_agents,
-                                 obs_dims=[np.prod(obsp['image'].shape) for obsp in env.observation_space],
-                                 # nullary_dims=[nullary_dim for _ in range(model.nagents)],
-                                 unary_dims=[unary_dim for _ in range(model.n_agents)],
-                                 # binary_dims=[binary_dim for _ in range(model.nagents)],
-                                 ac_dims= [acsp.shape[0] if isinstance(acsp, Box) else acsp.n
-                                 for acsp in env.action_space],
-                                 dense = config.dense)
+    elif config.alg == 'MAAC':
+        env = make_parallel_MAAC_env(config,seed=1)
+        env.grid_observation = config.grid_observation
+        env.reset()
+        model = AttentionSAC.init_from_env(env,
+                                           tau=config.tau,
+                                           pi_lr=config.pi_lr,
+                                           q_lr=config.q_lr,
+                                           gamma=config.gamma,
+                                           pol_hidden_dim=config.pol_hidden_dim,
+                                           critic_hidden_dim=config.critic_hidden_dim,
+                                           attend_heads=config.attend_heads,
+                                           reward_scale=config.reward_scale)
+        replay_buffer = ReplayBufferMAAC(config.buffer_length, model.nagents,
+                                     [np.prod(obsp['image'].shape) if env.grid_observation else obsp.shape[0]
+                                      for obsp in env.observation_space],
+                                     [acsp.shape[0] if isinstance(acsp, Box) else acsp.n
+                                      for acsp in env.action_space])
+    else:
+        raise ValueError(f'Cannot identify algorithm {config.alg}')
+    # env.seed(config.random_seed)
+    # np.random.seed(config.random_seed)
+
+    # if config.resume != '':
+    #     model_path = glob.glob('{}/saved_models/ckpt_best_avg*'.format(config.resume))[0]
+    #     print(f'Using model: {model_path}')
+    #     model, start_episode = RelationalSAC.init_from_save(model_path, load_critic=True)
+    #     print(f'starting from episode {start_episode}')
+    # else:
+
     t = 0
     l_rewards = []
     epymarl_rewards = []
+    steps = 0
     reward_best = float("-inf")
     avg_reward = float("-inf")
     avg_reward_best = float("-inf")
     path_ckpt_best_avg = ''
-    steps = 0
     for ep_i in range(start_episode, config.n_episodes, config.n_rollout_threads):
         obs = env.reset()
+        if env.grid_observation and config.alg =='MAAC':
+            obs = tuple([obs[:, i][0]['image'].flatten() for i in range(model.nagents)])
+            obs = np.vstack(obs)
+            obs = np.expand_dims(obs, axis=0)
+
         model.prep_rollouts(device='cpu')
 
         episode_reward_total = 0
         is_best_avg = False
 
         for et_i in range(1, config.episode_length + 1):
-            # rearrange observations to be per agent, and convert to torch Variable
-            agent_obs = [np.expand_dims(ob['image'].flatten(), axis=0) for ob in obs]
-            #agent_obs = obs['image'].flatten()
-            #agent_obs = np.expand_dims(agent_obs, axis=0)
-            torch_obs = [Variable(torch.Tensor(agent_obs[i]),
-                                  requires_grad=False)
-                         for i in range(model.n_agents)]
+            if config.alg == 'MARC':
+                # rearrange observations to be per agent, and convert to torch Variable
+                agent_obs = [np.expand_dims(ob['image'].flatten(), axis=0) for ob in obs]
+                torch_obs = [Variable(torch.Tensor(agent_obs[i]),
+                                      requires_grad=False)
+                             for i in range(model.n_agents)]
+            else:
+                torch_obs = [Variable(torch.Tensor(np.vstack(obs[:, i])),
+                                      requires_grad=False)
+                             for i in range(model.nagents)]
+
             # get actions as torch Variables
             try:
                 torch_agent_actions = model.step(torch_obs, explore=True)
@@ -142,15 +142,22 @@ def run(config):
             # convert actions to numpy arrays
             agent_actions = [ac.data.numpy() for ac in torch_agent_actions]
             # rearrange actions to be per environment
-            actions = [np.argmax(ac) for ac in agent_actions]
-            next_obs, rewards, dones, infos = env.step(actions)
-            rewards, dones = np.array(rewards), np.array(dones)
-            if all([ob['unary_tensor'].any() for ob in obs + next_obs]):
-                replay_buffer.push(obs, agent_actions, rewards, next_obs, dones)
+            if config.alg == 'MARC':
+                actions = [np.argmax(ac) for ac in agent_actions]
             else:
-                continue
-            episode_reward_total += rewards.sum()
+                actions = [[np.argmax(ac[i]) for ac in agent_actions] for i in range(config.n_rollout_threads)]
+            next_obs, rewards, dones, infos = env.step(actions)
+            rewards, dones = np.array(rewards), np.array(dones) # TODO needed?
 
+            if config.alg == 'MAAC' and env.grid_observation:
+                next_obs = tuple([next_obs[:,i][0]['image'].flatten() for i in range(model.nagents)])
+                next_obs = np.vstack(next_obs)
+                next_obs = np.expand_dims(next_obs, axis=0)
+
+            if (config.alg == 'MARC' and all([ob['unary_tensor'].any() for ob in obs + next_obs])):
+                replay_buffer.push(obs, agent_actions, rewards, next_obs, dones)
+
+            episode_reward_total += rewards.sum()
             obs = next_obs
             t += config.n_rollout_threads
             if (len(replay_buffer) >= config.batch_size and
@@ -162,7 +169,7 @@ def run(config):
                     model.prep_training(device='cpu')
                 for u_i in range(config.num_updates):
                     sample = replay_buffer.sample(config.batch_size,
-                                                  to_gpu=config.use_gpu)
+                                                  to_gpu=config.use_gpu, norm_rews=config.norm_rews)
                     model.update_critic(sample)
                     model.update_policies(sample)
                     model.update_all_targets()
@@ -170,17 +177,13 @@ def run(config):
             if dones.all() == True:
                 print('done with time step', et_i)
                 break
-            # TODO change back
         steps += et_i
-        wandb.log({"rew": episode_reward_total, "steps": et_i})
+        # wandb.log({"rew": episode_reward_total, "steps": et_i})
 
         print("%s - %s - Episodes %i of %i - Reward %.2f" % (config.env_id, config.random_seed, ep_i + 1,
                                         config.n_episodes,  episode_reward_total))
         l_rewards.append(episode_reward_total)
         epymarl_rewards.append(episode_reward_total)
-        #print('terminal space', obs['image'])
-
-
         # check if it in average was the best model so far
         th_l_rewards = torch.FloatTensor(np.asarray(l_rewards))
 
@@ -189,7 +192,6 @@ def run(config):
             avg_rewards = th_l_rewards.unfold(0, 100, 1).mean(1).view(-1)
             avg_rewards = torch.cat((torch.zeros(99), avg_rewards))
             avg_reward = avg_rewards[-1]
-
             if avg_reward > avg_reward_best:
                 avg_reward_best = avg_reward
                 is_best_avg = True
@@ -197,9 +199,9 @@ def run(config):
             os.makedirs('{}/summary/'.format(run_dir), exist_ok=True)
 
             if steps % config.step_interval_log == 0:
-
-                wandb.log({'return_mean': avg_reward, 'steps': steps})
-                wandb.log({'epymarl_return_mean': np.mean(epymarl_rewards), 'steps': steps})
+                # wandb.log({'return_mean_100': avg_reward,
+                #            'epymarl_return_mean': np.mean(epymarl_rewards),
+                #            'steps': steps})
                 with open("{}/summary/reward_step.txt".format(run_dir), "a") as f:
                     f.write("{},{} \n".format(steps, avg_reward))
                 with open("{}/summary/reward_epymarl.txt".format(run_dir), "a") as f:
@@ -207,11 +209,9 @@ def run(config):
                 epymarl_rewards.clear()
 
             if ep_i % config.save_interval_log == 0:
-
                 with open('{}/summary/reward_total.txt'.format(run_dir), 'w') as fp:
                     for el in l_rewards:
                         fp.write("{}\n".format(round(el, 2)))
-                # plot_fig(l_rewards, 'reward_total', config.dir_summary)
 
             if is_best_avg:
                 path_ckpt_best_avg_tmp = os.path.join(config.dir_saved_models,
@@ -228,43 +228,50 @@ def run(config):
                 for eval_ep_i in range(config.test_n_episodes):
                     print("Episode %i of %i" % (eval_ep_i + 1, config.test_n_episodes))
 
-
                     ep_rew = 0
-
-                    # from utils.rel_wrapper2 import AbsoluteVKBWrapper
-                    # env = AbsoluteVKBWrapper(env, config.dense)
-
                     obs = env.reset()
-
-                    for t_i in range(config.test_episode_length):
+                    for t_i in range(config.episode_length):
 
                         # rearrange observations to be per agent, and convert to torch Variable
-                        if config.grid_observation:
-                            obs = [np.expand_dims(ob['image'].flatten(), axis=0) for ob in obs]
-                        torch_obs = [Variable(torch.Tensor(obs[i]).view(1, -1),
-                                              requires_grad=False)
-                                     for i in range(model.n_agents)]
-                        # get actions as torch Variables
-                        torch_actions = model.step(torch_obs, explore=False)
-                        # convert actions to numpy arrays
-                        actions = [np.argmax(ac.data.numpy().flatten()) for ac in torch_actions]
-                        # print('actions', actions)
+
+                        if config.alg == 'MARC':
+                            if config.grid_observation:
+                                obs = [np.expand_dims(ob['image'].flatten(), axis=0) for ob in obs]
+                            torch_obs = [Variable(torch.Tensor(obs[i]).view(1, -1),
+                                                  requires_grad=False)
+                                         for i in range(model.n_agents)]
+                            # get actions as torch Variables
+                            torch_actions = model.step(torch_obs, explore=False)
+                            # convert actions to numpy arrays
+                            actions = [np.argmax(ac.data.numpy().flatten()) for ac in torch_actions]
+                        else:
+                            if env.grid_observation:
+                                obs = tuple([obs[:, i][0]['image'].flatten() for i in range(model.nagents)])
+                                obs = np.vstack(obs)
+                                obs = np.expand_dims(obs, axis=0)
+                            torch_obs = [Variable(torch.Tensor(np.vstack(obs[:, i])),
+                                                  requires_grad=False)
+                                         for i in range(model.nagents)]
+                            torch_agent_actions = model.step(torch_obs, explore=False)
+                            # convert actions to numpy arrays
+                            agent_actions = [ac.data.numpy() for ac in torch_agent_actions]
+                            # rearrange actions to be per environment
+                            actions = [[np.argmax(ac[i]) for ac in agent_actions] for i in range(config.n_rollout_threads)]
+
                         obs, rewards, dones, infos = env.step(actions)
-
-                        ep_rew += sum(rewards)
-
-                        if all(dones):
+                        rewards, dones = np.array(rewards), np.array(dones)
+                        ep_rew += rewards.sum()
+                        if dones.all():
                             break
 
                     l_ep_rew.append(ep_rew)
-                    # print("Reward: {}".format(ep_rew))
 
 
                 avg_eval_rew = sum(l_ep_rew) / config.test_n_episodes
                 print("Average eval reward: {}".format(avg_eval_rew))
                 with open('{}/summary/eval_reward.txt'.format(run_dir), 'a') as file:
                     file.write("{}\n".format(round(avg_eval_rew, 2)))
-                wandb.log({'avg_eval_return': avg_eval_rew, 'eval_at_step': ep_i})
+                # wandb.log({'avg_eval_return': avg_eval_rew, 'eval_at_step': ep_i})
                 if ep_i % 10000:
                     # 🐝 Send the wandb Alert
                     wandb.alert(
@@ -284,6 +291,64 @@ def run(config):
     # logger.close()
     wandb.finish()
 
+def make_parallel_MAAC_env(args, seed):
+    def get_env_fn(rank):
+        def init_env():
+            env = make_env(args)
+            env.agents = [Agent() for _ in range(args.player)]
+            # env.grid_observation = args.grid_observation
+            # env.seed(args.random_seed + rank * 1000)
+            np.random.seed(args.random_seed + rank * 1000)
+            return env
+        return init_env
+    if config.n_rollout_threads == 1:
+        return DummyVecEnv([get_env_fn(0)])
+    else:
+        return SubprocVecEnv([get_env_fn(i) for i in range(config.n_rollout_threads)])
+
+def make_env(config):
+    if config.env_name == 'lbf':
+        env = ForagingEnv(
+            players=config.player,
+            max_player_level=config.lbf['max_player_level'],
+            field_size=(config.field, config.field),
+            max_food=config.lbf['max_food'],
+            grid_observation=config.grid_observation,
+            sight=config.field,
+            max_episode_steps=config.episode_length,
+            force_coop=config.lbf['force_coop'],
+            keep_food=config.lbf['keep_food'],
+            # simple=config.simple,
+        )
+    elif config.env_name == 'bpush':
+        from bpush.environment import BoulderPush
+        env = BoulderPush(
+            width=config.field,
+            height=config.field,
+            n_agents=config.player,
+            penalty=config.bpush['penalty'],
+            sensor_range=config.bpush['sensor_range'],
+        )
+        if config.alg == 'MARC':
+            from utils.rel_wrapper2 import BPushWrapper
+            env = BPushWrapper(env)
+    elif config.env_name == 'wolfpack':
+        from Wolfpack_gym.envs.wolfpack import Wolfpack
+        env = Wolfpack(
+            grid_width=config.field,
+            grid_height=config.field,
+            num_players=config.player,
+            max_food_num=config.wolfpack['max_food_num'],
+            obs_type=config.wolfpack['obs_type'],
+        )
+        env.n_agents = env.num_players
+        env.grid_observation = True
+    else:
+        raise ValueError(f'No known env {config.env_name} ')
+    return env
+
+
+
 if __name__ == '__main__':
     import shutil
     import datetime
@@ -294,9 +359,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--resume", default='', type=str)
     parser.add_argument("--random_seed", default=1, type=int)
-    # parser.add_argument("model_name",
-    #                     help="Name of directory to store " +
-    #                          "model/training contents")
     parser.add_argument("--n_rollout_threads", default=1, type=int)
     parser.add_argument("--buffer_length", default=int(1e6), type=int)
     parser.add_argument("--n_episodes", default=20000, type=int)
@@ -308,7 +370,7 @@ if __name__ == '__main__':
                         default=128, type=int,
                         help="Batch size for training")
     parser.add_argument("--save_interval", default=1000, type=int)
-    parser.add_argument("--test_interval", default=1000, type=int)
+    parser.add_argument("--test_interval", default=100, type=int)
     parser.add_argument("--save_interval_log", default=100, type=int)
     parser.add_argument('--step_interval_log', default=10000, type=int)
 
@@ -338,21 +400,29 @@ if __name__ == '__main__':
             params = yaml.load(file, Loader=yaml.FullLoader)
             params['resume'] = args['resume']
 
+
+
     for k, v in params.items():
         args[k] = v
 
-    if 'lbf' in args['env']:
-        args['env_id'] = f"{args['env']}_{args['field']}x{args['field']}_{args['player']}p_{args['max_food']}f{'_coop' if args['force_coop'] else ''}{args['other']}"
-    elif 'push' in args['env']:
-        args['env_id'] = f"{args['env']}_{args['field']}x{args['field']}_{args['player']}p"
-    elif 'wolf' in args['env']:
+    if params['exp_id'] == 'try':
+        args['n_episodes']= 1000
+        args['episode_length']= 25
+        args['test_n_episodes']= 10
+        args['buffer_length'] = 1000
+
+    if 'lbf' in args['env_name']:
+        args['env_id'] = f"{args['env_name']}_{args['field']}x{args['field']}_{args['player']}p_{args['lbf']['max_food']}f{'_coop' if args['lbf']['force_coop'] else ''}{args['other']}"
+    elif 'bpush' in args['env_name']:
+        args['env_id'] = f"{args['env_name']}_{args['field']}x{args['field']}_{args['player']}p"
+    elif 'wolf' in args['env_name']:
         args[
-            'env_id'] = f"{args['env']}" \
+            'env_id'] = f"{args['env_name']}" \
                         f"_{args['field']}x{args['field']}" \
                         f"_{args['player']}w" \
-                        f"_{args['max_food']}s" \
+                        f"_{args['wolfpack']['max_food_num']}s" \
                         f"{args['other']}"
-    dir_collected_data = './experiments/MAAC_multipleseeds_data_{}_{}_{}'.format(args['agent_alg'], args['env_id'],
+    dir_collected_data = './experiments/MAAC_multipleseeds_data_{}_{}_{}'.format(args['alg'], args['env_id'],
                                                                                  args['exp_id'])
 
     if os.path.exists(dir_collected_data):
@@ -445,6 +515,3 @@ if __name__ == '__main__':
 
             os.system(cmd_test)
 
-            # shutil.copyfile('{}/summary/reward_total.txt'.format(args['dir_exp']),
-            #                 '{}/reward_training_seed{}.txt'.format(dir_collected_data, seed)
-            #                 )
