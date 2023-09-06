@@ -68,10 +68,11 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
         print(self.field_size, 'field_size')
 
 
-        self.attr_mapping = {'agent': 0, 'id': 1, 'food': 2}  # TODO hardcoded
+        # self.attr_mapping = {'agent': 0, 'id': 1, 'food': 2}  # TODO hardcoded
         # self.attr_mapping = {'agent':0, 'goals':1, 'obstacle':2, 'id':3}
         # self.attr_mapping = {'agent': 0, 'id': 1, 'food': 2}
-        self.attr_mapping = {'agent': 0, 'boulder': 1, 'goal': 2, 'id': 3}
+        # self.attr_mapping = {'agent': 0, 'boulder': 1, 'goal': 2, 'id': 3}
+        self.attr_mapping = {'wolf': 0, 'sheep': 1, 'id': 2}
         assert len(self.attr_mapping) == self.n_attr, f'Attribute mapping ({len(self.attr_mapping)}) needs to have a key for each attribute ({self.n_attr})'
 
         self.dense = dense

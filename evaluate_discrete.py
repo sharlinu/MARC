@@ -70,6 +70,15 @@ def run(config):
             keep_food = config.keep_food,
             simple=config.simple,
         )
+    elif config.env == 'wolfpack':
+        from Wolfpack_gym.envs.wolfpack import Wolfpack
+        env = Wolfpack(
+            grid_width=config.field,
+            grid_height=config.field,
+            num_players=config.player,
+            max_food_num=config.max_food,
+            obs_type='grid'
+        )
     else:
         raise ValueError(f'Cannot cater for the environment {config.env_id}')
     model.prep_rollouts(device='cpu')
