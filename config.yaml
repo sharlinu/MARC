@@ -1,0 +1,31 @@
+#env_id: 'lbf_10x10_4p_4f_coop'
+env: 'lbf'
+exp_id : 'try'
+other: ''
+
+player: 2
+field: 10
+max_food: 3
+force_coop: False
+max_player_level: 2
+
+dense: False
+simple: False
+keep_food: True
+norm_rews : True
+relational_embedding : False
+
+background_id : 'b0'
+abs_id: 'None'
+
+grid_observation: True
+batch_size : 1024
+n_episodes: 300000
+episode_length: 50
+test_n_episodes: 100
+test_episode_length: 50
+seeds: [4001]
+agent_alg: 'rmac'
+buffer_length: 100000
+
+
