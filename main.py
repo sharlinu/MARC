@@ -422,7 +422,7 @@ if __name__ == '__main__':
                         f"_{args['player']}w" \
                         f"_{args['wolfpack']['max_food_num']}s" \
                         f"{args['other']}"
-    dir_collected_data = './experiments/MAAC_multipleseeds_data_{}_{}_{}'.format(args['alg'], args['env_id'],
+    dir_collected_data = './experiments/multipleseeds_data_{}_{}_{}'.format(args['alg'], args['env_id'],
                                                                                  args['exp_id'])
 
     if os.path.exists(dir_collected_data):
@@ -445,7 +445,7 @@ if __name__ == '__main__':
                                                     args['env_id'],
                                                     args['exp_id'],
                                                     args['random_seed'])
-            args['dir_exp'] = '{}/{}'.format(args['dir_base'], dir_exp_name)
+            args['dir_exp'] = '{}/{}/{}/{}'.format(args['dir_base'], args['alg'],args['env_name'], dir_exp_name)
             args['dir_summary'] = '{}/summary'.format(args['dir_exp'])
             args['dir_saved_models'] = '{}/saved_models'.format(args['dir_exp'])
             args['dir_monitor'] = '{}/monitor'.format(args['dir_exp'])
