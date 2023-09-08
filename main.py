@@ -341,7 +341,10 @@ def make_env(config):
             num_players=config.player,
             max_food_num=config.wolfpack['max_food_num'],
             obs_type=config.wolfpack['obs_type'],
+            close_penalty = config.wolfpack['close_penalty'],
+            sparse = config.wolfpack['sparse'],
         )
+
         env.n_agents = env.num_players
         env.grid_observation = True
     else:

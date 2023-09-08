@@ -83,6 +83,8 @@ def run(config):
             num_players=config.player,
             max_food_num=config.wolfpack['max_food_num'],
             obs_type='grid',
+            close_penalty=config.wolfpack['close_penalty'],
+            sparse=config.wolfpack['sparse'],
         )
     else:
         raise ValueError(f'Cannot cater for the environment {config.env_id}')

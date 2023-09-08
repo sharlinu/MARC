@@ -1,14 +1,14 @@
-env_name: 'bpush'
-exp_id : 'try'
-other: ''
+env_name: 'wolfpack'
+exp_id : 'std'
+other: '_pen+sparse'
 
-player: 2
+player: 3
 field: 10
-grid_observation: False
+grid_observation: True
 
 alg: 'MAAC'
-n_episodes: 50000
-episode_length: 50
+n_episodes: 100000
+episode_length: 200
 test_n_episodes: 100
 
 
@@ -27,6 +27,8 @@ bpush:
 wolfpack:
   max_food_num: 2
   obs_type: 'grid'
+  sparse: False
+  close_penalty : 0.0
   attr_mapping: {'wolf': 0, 'sheep': 1, 'id': 2}
 
 marc:
