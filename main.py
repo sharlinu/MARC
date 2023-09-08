@@ -19,11 +19,11 @@ from lbforaging.foraging import ForagingEnv
 import wandb
 def run(config):
     torch.set_num_threads(1)
-    # wandb.init(
-    #     project='MARC',
-    #     name=f'{config.alg}-{config.env_id}',
-    #     config=vars(config),
-    # )
+    wandb.init(
+        project='MARC',
+        name=f'{config.alg}-{config.env_id}',
+        config=vars(config),
+    )
     env_name = config.env_name
 
     if config.resume != '':
@@ -178,7 +178,7 @@ def run(config):
                 print('done with time step', et_i)
                 break
         steps += et_i
-        # wandb.log({"rew": episode_reward_total, "steps": et_i})
+        wandb.log({"rew": episode_reward_total, "steps": et_i})
 
         print("%s - %s - Episodes %i of %i - Reward %.2f" % (config.env_id, config.random_seed, ep_i + 1,
                                         config.n_episodes,  episode_reward_total))
@@ -199,9 +199,10 @@ def run(config):
             os.makedirs('{}/summary/'.format(run_dir), exist_ok=True)
 
             if steps % config.step_interval_log == 0:
-                # wandb.log({'return_mean_100': avg_reward,
-                #            'epymarl_return_mean': np.mean(epymarl_rewards),
-                #            'steps': steps})
+                wandb.log({
+                            # 'return_mean_100': avg_reward,
+                           'epymarl_return_mean': np.mean(epymarl_rewards),
+                           'steps': steps})
                 with open("{}/summary/reward_step.txt".format(run_dir), "a") as f:
                     f.write("{},{} \n".format(steps, avg_reward))
                 with open("{}/summary/reward_epymarl.txt".format(run_dir), "a") as f:
@@ -271,7 +272,7 @@ def run(config):
                 print("Average eval reward: {}".format(avg_eval_rew))
                 with open('{}/summary/eval_reward.txt'.format(run_dir), 'a') as file:
                     file.write("{}\n".format(round(avg_eval_rew, 2)))
-                # wandb.log({'avg_eval_return': avg_eval_rew, 'eval_at_step': ep_i})
+                wandb.log({'avg_eval_return': avg_eval_rew, 'eval_at_step': ep_i})
                 if ep_i % 10000:
                     # 🐝 Send the wandb Alert
                     wandb.alert(
