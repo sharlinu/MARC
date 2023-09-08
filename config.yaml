@@ -1,13 +1,14 @@
 env_name: 'wolfpack'
-exp_id : 'std'
-other: '_pen+sparse'
+exp_id : 'try'
+other: ''
+
 
 player: 3
 field: 10
 grid_observation: True
 
-alg: 'MAAC'
-n_episodes: 100000
+alg: 'MARC'
+n_episodes: 50000
 episode_length: 200
 test_n_episodes: 100
 

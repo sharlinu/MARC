@@ -236,9 +236,8 @@ def run(config):
                         # rearrange observations to be per agent, and convert to torch Variable
 
                         if config.alg == 'MARC':
-                            if config.grid_observation:
-                                obs = [np.expand_dims(ob['image'].flatten(), axis=0) for ob in obs]
-                            torch_obs = [Variable(torch.Tensor(obs[i]).view(1, -1),
+                            obs = [np.expand_dims(ob['image'].flatten(), axis=0) for ob in obs]
+                            torch_obs = [Variable(torch.Tensor(agent_obs[i]),
                                                   requires_grad=False)
                                          for i in range(model.n_agents)]
                             # get actions as torch Variables
