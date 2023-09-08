@@ -37,7 +37,7 @@ def run(config):
     gif_path = '{}/{}'.format(eval_path, 'gifs')
     os.makedirs(gif_path, exist_ok=True)
 
-    model = RelationalSAC.init_from_save(model_path)
+    model, _ = RelationalSAC.init_from_save(model_path)
     print(config.benchmark)
     if 'boxworld' in config.env_id:
         from environments.box import BoxWorldEnv
@@ -47,7 +47,7 @@ def run(config):
             num_colours=config.num_colours,
             goal_length=config.goal_length,
             sight=config.field,
-            max_episode_steps=config.test_episode_length,
+            max_episode_steps=config.episode_length,
             grid_observation=config.grid_observation,
             simple=config.simple,
             single=config.single,
@@ -59,13 +59,13 @@ def run(config):
             # max_player_level=config.max_player_level,
             # max_player_level=2,
             field_size=(config.field, config.field),
-            max_food=config.max_food,
+            max_food=config.lbf['max_food'],
             grid_observation=config.grid_observation,
             sight=config.field,
-            max_episode_steps=config.test_episode_length,
-            force_coop=config.force_coop,
-            keep_food = config.keep_food,
-            simple=config.simple,
+            max_episode_steps=config.episode_length,
+            force_coop=config.lbf['force_coop'],
+            keep_food = config.lbf['keep_food'],
+            # simple=config.simple,
         )
     elif 'bpush' in  config.env_id:
         from bpush.environment import BoulderPush
@@ -73,7 +73,7 @@ def run(config):
             height=config.field,
             width=config.field,
             n_agents=config.player,
-            sensor_range=3,
+            sensor_range=config.bpush['sensory_range'],
         )
     elif 'wolf' in config.env_id:
         from Wolfpack_gym.envs.wolfpack import Wolfpack
@@ -81,7 +81,7 @@ def run(config):
             grid_height=config.field,
             grid_width=config.field,
             num_players=config.player,
-            max_food_num=config.max_food,
+            max_food_num=config.wolfpack['max_food_num'],
             obs_type='grid',
         )
     else:
@@ -104,13 +104,18 @@ def run(config):
         ep_rew = 0
 
         from utils.rel_wrapper2 import AbsoluteVKBWrapper
-        env = AbsoluteVKBWrapper(env, config.dense)
+        env = AbsoluteVKBWrapper(env,
+                                 attr_mapping=config.wolfpack['attr_mapping'],
+                                 dense=config.dense,
+                                 background_id=config.background_id,
+                                 abs_id=config.abs_id
+                                 )
 
         obs = env.reset()
         if render:
             env.render()
 
-        for t_i in range(config.test_episode_length):
+        for t_i in range(config.episode_length):
             calc_start = time.time()
 
             # rearrange observations to be per agent, and convert to torch Variable
@@ -125,6 +130,8 @@ def run(config):
             actions = [np.argmax(ac.data.numpy().flatten()) for ac in torch_actions]
             # print('actions', actions)
             obs, rewards, dones, infos = env.step(actions)
+            if any(rewards)!=0:
+                print(rewards)
             if render:
                 env.render()
                 time.sleep(0.5)
@@ -162,7 +169,7 @@ if __name__ == '__main__':
                         help="Load incremental policy from given episode " +
                              "rather than final policy")
     parser.add_argument("--test_n_episodes", default=10, type=int)
-    parser.add_argument("--test_episode_length", default=25, type=int)
+    # parser.add_argument("--test_episode_length", default=25, type=int)
     parser.add_argument("--fps", default=30, type=int)
     parser.add_argument("--no_render", default=True, action="store_false",
                         help="render")
