@@ -45,8 +45,9 @@ class AttentionAgent(object):
     def load_params(self, params):
 
         self.policy.load_state_dict(params['policy'])
-        self.policy = self.policy.to('cuda')
         self.target_policy.load_state_dict(params['target_policy'])
-        self.target_policy = self.target_policy.to('cuda')
         self.policy_optimizer = Adam(self.policy.parameters(), lr=0.01)
         self.policy_optimizer.load_state_dict(params['policy_optimizer'])
+        if torch.cuda.is_available():
+            self.policy = self.policy.to('cuda')
+            self.target_policy = self.target_policy.to('cuda')

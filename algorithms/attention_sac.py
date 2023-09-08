@@ -311,7 +311,10 @@ class RelationalSAC(object):
         """
         Instantiate instance of this class from file created by 'save' method
         """
-        save_dict = torch.load(filename, map_location="cuda")
+        if torch.cuda.is_available():
+            save_dict = torch.load(filename, map_location="cuda")
+        else:
+            save_dict = torch.load(filename, map_location="cpu")
         # episode = save_dict['episode']
         episode = 29001 +8200
         instance = cls(**save_dict['init_dict'])
