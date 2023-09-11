@@ -38,7 +38,6 @@ def run(config):
     os.makedirs(gif_path, exist_ok=True)
 
     model, _ = RelationalSAC.init_from_save(model_path)
-    print(config.benchmark)
     if 'boxworld' in config.env_id:
         from environments.box import BoxWorldEnv
         env = BoxWorldEnv(
@@ -88,33 +87,35 @@ def run(config):
         )
     else:
         raise ValueError(f'Cannot cater for the environment {config.env_id}')
+
+    from utils.rel_wrapper2 import AbsoluteVKBWrapper
+    env = AbsoluteVKBWrapper(env,
+                             attr_mapping=config.wolfpack['attr_mapping'],
+                             dense=config.marc['dense'],
+                             background_id=config.marc['background_id'],
+                             abs_id=config.marc['abs_id']
+                             )
     model.prep_rollouts(device='cpu')
     ifi = 1 / config.fps  # inter-frame interval
     collect_data = {}
     l_ep_rew = []
+
     for ep_i in range(config.test_n_episodes):
+    # for ep_i in range(20):
         print("Episode %i of %i" % (ep_i + 1, config.test_n_episodes))
 
-        frames = []
         collect_item = {
             'ep': ep_i,
             'final_reward': 0,
             'l_infos': [],
             'l_rewards': []
         }
-        l_rewards = []
+        # l_rewards = []
         ep_rew = 0
 
-        from utils.rel_wrapper2 import AbsoluteVKBWrapper
-        env = AbsoluteVKBWrapper(env,
-                                 attr_mapping=config.wolfpack['attr_mapping'],
-                                 dense=config.dense,
-                                 background_id=config.background_id,
-                                 abs_id=config.abs_id
-                                 )
 
         obs = env.reset()
-        if render:
+        if config.render:
             env.render()
 
         for t_i in range(config.episode_length):
@@ -132,16 +133,14 @@ def run(config):
             actions = [np.argmax(ac.data.numpy().flatten()) for ac in torch_actions]
             # print('actions', actions)
             obs, rewards, dones, infos = env.step(actions)
-            if any(rewards)!=0:
-                print(rewards)
-            if render:
+            if config.render:
                 env.render()
                 time.sleep(0.5)
             collect_item['l_infos'].append(infos)
 
             calc_end = time.time()
             elapsed = calc_end - calc_start
-            if render and (elapsed < ifi):
+            if config.render and (elapsed < ifi):
                 time.sleep(ifi - elapsed)
             ep_rew += sum(rewards)
 
@@ -161,7 +160,6 @@ def run(config):
     print("Average reward: {}".format(sum(l_ep_rew)/config.test_n_episodes))
     env.close()
 
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("model_path", help="model_path")
@@ -173,12 +171,11 @@ if __name__ == '__main__':
     parser.add_argument("--test_n_episodes", default=10, type=int)
     # parser.add_argument("--test_episode_length", default=25, type=int)
     parser.add_argument("--fps", default=30, type=int)
-    parser.add_argument("--no_render", default=True, action="store_false",
+    parser.add_argument("--render", default=False, action="store_true",
                         help="render")
     parser.add_argument("--benchmark", action="store_false",
                         help="benchmark mode")
     config = parser.parse_args()
-    render = True
     args = vars(config)
     eval_path = Path(config.model_path)
     dir_exp = Path(*eval_path.parts[:-2])
