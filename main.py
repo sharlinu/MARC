@@ -19,11 +19,12 @@ from lbforaging.foraging import ForagingEnv
 import wandb
 def run(config):
     torch.set_num_threads(1)
-    wandb.init(
-        project='MARC',
-        name=f'{config.alg}-{config.env_id}',
-        config=vars(config),
-    )
+    if config.exp_id =='std':
+        wandb.init(
+            project='MARC',
+            name=f'{config.alg}-{config.env_id}',
+            config=vars(config),
+        )
     env_name = config.env_name
 
     if config.resume != '':
@@ -178,8 +179,10 @@ def run(config):
                 print('done with time step', et_i)
                 break
         steps += et_i
-        wandb.log({"rew": episode_reward_total, "steps": et_i})
-
+        try:
+            wandb.log({"rew": episode_reward_total, "steps": et_i})
+        except:
+            pass
         print("%s - %s - Episodes %i of %i - Reward %.2f" % (config.env_id, config.random_seed, ep_i + 1,
                                         config.n_episodes,  episode_reward_total))
         l_rewards.append(episode_reward_total)
@@ -199,10 +202,13 @@ def run(config):
             os.makedirs('{}/summary/'.format(run_dir), exist_ok=True)
 
             if steps % config.step_interval_log == 0:
-                wandb.log({
-                            # 'return_mean_100': avg_reward,
-                           'epymarl_return_mean': np.mean(epymarl_rewards),
-                           'steps': steps})
+                try:
+                    wandb.log({
+                                # 'return_mean_100': avg_reward,
+                               'epymarl_return_mean': np.mean(epymarl_rewards),
+                               'steps': steps})
+                except:
+                    pass
                 with open("{}/summary/reward_step.txt".format(run_dir), "a") as f:
                     f.write("{},{} \n".format(steps, avg_reward))
                 with open("{}/summary/reward_epymarl.txt".format(run_dir), "a") as f:
@@ -227,9 +233,8 @@ def run(config):
                 model.prep_rollouts(device='cpu')
                 l_ep_rew = []
                 for eval_ep_i in range(config.test_n_episodes):
-                    print("Episode %i of %i" % (eval_ep_i + 1, config.test_n_episodes))
-
                     ep_rew = 0
+
                     obs = env.reset()
                     for t_i in range(config.episode_length):
 
@@ -266,21 +271,17 @@ def run(config):
                             break
 
                     l_ep_rew.append(ep_rew)
+                    print("Episode %i of %i - %i" % (eval_ep_i + 1, config.test_n_episodes, ep_rew))
 
-
+                print('test: ',np.mean(l_ep_rew),'train: ', np.mean(l_rewards[-10:]))
                 avg_eval_rew = sum(l_ep_rew) / config.test_n_episodes
                 print("Average eval reward: {}".format(avg_eval_rew))
                 with open('{}/summary/eval_reward.txt'.format(run_dir), 'a') as file:
                     file.write("{}\n".format(round(avg_eval_rew, 2)))
-                wandb.log({'avg_eval_return': avg_eval_rew, 'eval_at_step': ep_i})
-                if ep_i % 10000:
-                    # 🐝 Send the wandb Alert
-                    wandb.alert(
-                        title=f'Temporary {config.env_id} results',
-                        text=f'{config.env_id} reached {avg_reward_best:.2f} at {ep_i} episodes',
-                    )
-                    print(f'Alert triggered - best avg is {avg_reward_best}')
-
+                try:
+                    wandb.log({'avg_eval_return': avg_eval_rew, 'eval_at_step': ep_i})
+                except:
+                    pass
 
     plot_fig(l_rewards, 'reward_total', config.dir_summary, show=True)
     path_ckpt_final = os.path.join(config.dir_saved_models,
@@ -374,7 +375,7 @@ if __name__ == '__main__':
                         default=128, type=int,
                         help="Batch size for training")
     parser.add_argument("--save_interval", default=1000, type=int)
-    parser.add_argument("--test_interval", default=100, type=int)
+    parser.add_argument("--test_interval", default=1000, type=int)
     parser.add_argument("--save_interval_log", default=100, type=int)
     parser.add_argument('--step_interval_log', default=10000, type=int)
 
@@ -410,10 +411,11 @@ if __name__ == '__main__':
         args[k] = v
 
     if params['exp_id'] == 'try':
-        args['n_episodes']= 1000
+        args['n_episodes']= 10000
         args['episode_length']= 25
         args['test_n_episodes']= 10
         args['buffer_length'] = 1000
+        args['test_interval'] = 100
 
     if 'lbf' in args['env_name']:
         args['env_id'] = f"{args['env_name']}_{args['field']}x{args['field']}_{args['player']}p_{args['lbf']['max_food']}f{'_coop' if args['lbf']['force_coop'] else ''}{args['other']}"
