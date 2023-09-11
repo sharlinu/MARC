@@ -1,5 +1,6 @@
 import torch.cuda
 from torch import Tensor
+import torch.cuda
 from torch.autograd import Variable
 from torch.optim import Adam
 from utils.misc import hard_update, gumbel_softmax, onehot_from_logits
