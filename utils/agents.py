@@ -1,3 +1,4 @@
+import torch.cuda
 from torch import Tensor
 import torch.cuda
 from torch.autograd import Variable
