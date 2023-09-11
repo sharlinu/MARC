@@ -1,3 +1,4 @@
+import torch.cuda
 from torch import Tensor
 from torch.autograd import Variable
 from torch.optim import Adam
