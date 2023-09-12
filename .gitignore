@@ -8,6 +8,7 @@ node_modules/
 dist/
 config.yaml
 wandb/
+model.pt
 # Compiled Java class files
 *.class
 
@@ -16,8 +17,14 @@ wandb/
 
 # Log files
 *.log
-experiments/
-config.yaml
+saved_models/
+monitor/
+evaluate/
+summary/agent*/
+events.out*
+arguments.txt
+summary.json
+*multipleseeds*/
 # Package files
 *.jar
 
@@ -49,4 +56,5 @@ Thumbs.db
 *.flv
 *.mov
 *.wmv
+
 
