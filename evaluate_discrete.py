@@ -55,7 +55,7 @@ def run(config):
     elif 'lbf' in  config.env_id:
         env = ForagingEnv(
             players=config.player,
-            # max_player_level=config.max_player_level,
+            max_player_level=config.lbf['max_player_level'],
             # max_player_level=2,
             field_size=(config.field, config.field),
             max_food=config.lbf['max_food'],
@@ -66,6 +66,7 @@ def run(config):
             keep_food = config.lbf['keep_food'],
             # simple=config.simple,
         )
+        attr_mapping = config.lbf['attr_mapping']
     elif 'bpush' in  config.env_id:
         from bpush.environment import BoulderPush
         env = BoulderPush(
@@ -74,6 +75,7 @@ def run(config):
             n_agents=config.player,
             sensor_range=config.bpush['sensory_range'],
         )
+        attr_mapping = config.bpush['attr_mapping']
     elif 'wolf' in config.env_id:
         from Wolfpack_gym.envs.wolfpack import Wolfpack
         env = Wolfpack(
@@ -85,12 +87,14 @@ def run(config):
             close_penalty=config.wolfpack['close_penalty'],
             sparse=config.wolfpack['sparse'],
         )
+        attr_mapping = config.wolfpack['attr_mapping']
     else:
         raise ValueError(f'Cannot cater for the environment {config.env_id}')
 
     from utils.rel_wrapper2 import AbsoluteVKBWrapper
+
     env = AbsoluteVKBWrapper(env,
-                             attr_mapping=config.wolfpack['attr_mapping'],
+                             attr_mapping=attr_mapping,
                              dense=config.marc['dense'],
                              background_id=config.marc['background_id'],
                              abs_id=config.marc['abs_id']
