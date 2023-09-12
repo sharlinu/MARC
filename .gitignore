@@ -24,6 +24,7 @@ summary/agent*/
 events.out*
 arguments.txt
 summary.json
+*multipleseeds*/
 # Package files
 *.jar
 
