@@ -71,11 +71,10 @@ def run(config):
             num_players=config.player,
             max_food_num=config.wolfpack['max_food_num'],
             obs_type='grid',
-            sparse=True,
             sparse = config.wolfpack['sparse'],
             close_penalty = config.wolfpack['close_penalty'],
             # close_penalty = 0,
-        )
+            )
 
     else:
         raise ValueError(f'Cannot cater for the environment {config.env_id}')
@@ -103,11 +102,6 @@ def run(config):
         if display:
             time.sleep(0.5)
             env.render()
-        if config.save_gifs:
-            # frames = []
-            img = env.render(mode='rgb_array')
-            img = ax.imshow(img)
-            frames.append([img])
         # for t_i in range(config.test_episode_length):
         for t_i in range(10):
             calc_start = time.time()
@@ -131,11 +125,6 @@ def run(config):
             if display:
                 env.render()
                 time.sleep(1)
-            if config.save_gifs:
-                # frames = []
-                img = env.render(mode='rgb_array')
-                img = ax.imshow(img)
-                frames.append([img])
             collect_item['l_infos'].append(infos)
 
             calc_end = time.time()
