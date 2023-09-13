@@ -11,7 +11,7 @@ filterwarnings(action='ignore',
 from utils.buffer import ReplayBufferMARC, ReplayBufferMAAC
 from algorithms.attention_sac import AttentionSAC, RelationalSAC
 from utils.rel_wrapper2 import AbsoluteVKBWrapper
-from utils.env_wrappers import SubprocVecEnv, DummyVecEnv
+from utils.env_wrappers import DummyVecEnv
 import yaml
 from utils.misc import Agent
 from utils.plotting import plot_fig
@@ -83,7 +83,7 @@ def run(config):
                                            gamma=config.gamma,
                                            pol_hidden_dim=config.pol_hidden_dim,
                                            critic_hidden_dim=config.critic_hidden_dim,
-                                           attend_heads=config.attend_heads,
+                                           attend_heads=config.maac['attend_heads'],
                                            reward_scale=config.reward_scale)
         replay_buffer = ReplayBufferMAAC(config.buffer_length, model.nagents,
                                      [np.prod(obsp['image'].shape) if env.grid_observation else obsp.shape[0]
@@ -110,7 +110,7 @@ def run(config):
     avg_reward = float("-inf")
     avg_reward_best = float("-inf")
     path_ckpt_best_avg = ''
-    for ep_i in range(start_episode, config.n_episodes, config.n_rollout_threads):
+    for ep_i in range(start_episode, config.n_episodes):
         obs = env.reset()
         if env.grid_observation and config.alg =='MAAC':
             obs = tuple([obs[:, i][0]['image'].flatten() for i in range(model.nagents)])
@@ -146,7 +146,7 @@ def run(config):
             if config.alg == 'MARC':
                 actions = [np.argmax(ac) for ac in agent_actions]
             else:
-                actions = [[np.argmax(ac[i]) for ac in agent_actions] for i in range(config.n_rollout_threads)]
+                actions = [[np.argmax(ac[0]) for ac in agent_actions]]
             next_obs, rewards, dones, infos = env.step(actions)
             rewards, dones = np.array(rewards), np.array(dones) # TODO needed?
 
@@ -160,9 +160,9 @@ def run(config):
 
             episode_reward_total += rewards.sum()
             obs = next_obs
-            t += config.n_rollout_threads
+            t += 1
             if (len(replay_buffer) >= config.batch_size and
-                    (t % config.steps_per_update) < config.n_rollout_threads):
+                    (t % config.steps_per_update) ==0):
 
                 if config.use_gpu:
                     model.prep_training(device='gpu')
@@ -261,7 +261,7 @@ def run(config):
                             # convert actions to numpy arrays
                             agent_actions = [ac.data.numpy() for ac in torch_agent_actions]
                             # rearrange actions to be per environment
-                            actions = [[np.argmax(ac[i]) for ac in agent_actions] for i in range(config.n_rollout_threads)]
+                            actions = [[np.argmax(ac[0]) for ac in agent_actions]]
 
                         obs, rewards, dones, infos = env.step(actions)
                         rewards, dones = np.array(rewards), np.array(dones)
@@ -302,10 +302,10 @@ def make_parallel_MAAC_env(args, seed):
             np.random.seed(args.random_seed + rank * 1000)
             return env
         return init_env
-    if config.n_rollout_threads == 1:
-        return DummyVecEnv([get_env_fn(0)])
-    else:
-        return SubprocVecEnv([get_env_fn(i) for i in range(config.n_rollout_threads)])
+    # if config.n_rollout_threads == 1:
+    return DummyVecEnv([get_env_fn(0)])
+    # else:
+    #     return SubprocVecEnv([get_env_fn(i) for i in range(config.n_rollout_threads)])
 
 def make_env(config):
     if config.env_name == 'lbf':
@@ -334,7 +334,7 @@ def make_env(config):
             from utils.rel_wrapper2 import BPushWrapper
             env = BPushWrapper(env)
     elif config.env_name == 'wolfpack':
-        from Wolfpack_gym.envs.wolfpack import Wolfpack
+        from wolfpack.Wolfpack_gym.envs.wolfpack import Wolfpack
         env = Wolfpack(
             grid_width=config.field,
             grid_height=config.field,
@@ -362,8 +362,8 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--resume", default='', type=str)
-    parser.add_argument("--random_seed", default=1, type=int)
-    parser.add_argument("--n_rollout_threads", default=1, type=int)
+    # parser.add_argument("--random_seed", default=1, type=int)
+    # parser.add_argument("--n_rollout_threads", default=1, type=int)
     parser.add_argument("--buffer_length", default=int(1e6), type=int)
     parser.add_argument("--n_episodes", default=20000, type=int)
     parser.add_argument("--episode_length", default=25, type=int)
@@ -380,7 +380,7 @@ if __name__ == '__main__':
 
     parser.add_argument("--pol_hidden_dim", default=128, type=int)
     parser.add_argument("--critic_hidden_dim", default=128, type=int)
-    parser.add_argument("--attend_heads", default=4, type=int)
+
     parser.add_argument("--pi_lr", default=0.001, type=float)
     parser.add_argument("--q_lr", default=0.001, type=float)
     parser.add_argument("--tau", default=0.001, type=float)
