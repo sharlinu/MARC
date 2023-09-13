@@ -373,7 +373,6 @@ if __name__ == '__main__':
     parser.add_argument("--batch_size",
                         default=128, type=int,
                         help="Batch size for training")
-    parser.add_argument("--save_interval", default=1000, type=int)
     parser.add_argument("--test_interval", default=1000, type=int)
     parser.add_argument("--save_interval_log", default=100, type=int)
     parser.add_argument('--step_interval_log', default=10000, type=int)
@@ -404,22 +403,26 @@ if __name__ == '__main__':
             params = yaml.load(file, Loader=yaml.FullLoader)
             params['resume'] = args['resume']
 
-
-
     for k, v in params.items():
         args[k] = v
 
-    if params['exp_id'] == 'try':
-        args['n_episodes']= 10000
-        args['episode_length']= 25
-        args['test_n_episodes']= 10
-        args['buffer_length'] = 1000
-        args['test_interval'] = 100
-
+    # deletes arguments that are not used in this experiment
+    if args['alg'] == 'MARC':
+        del args['maac']
+    elif args['alg'] == 'MAAC':
+        del args['marc']
     if 'lbf' in args['env_name']:
-        args['env_id'] = f"{args['env_name']}_{args['field']}x{args['field']}_{args['player']}p_{args['lbf']['max_food']}f{'_coop' if args['lbf']['force_coop'] else ''}{args['other']}"
+        args['env_id'] = f"{args['env_name']}" \
+                         f"_{args['field']}x{args['field']}_" \
+                         f"{args['player']}p" \
+                         f"_{args['lbf']['max_food']}f" \
+                         f"{'_coop' if args['lbf']['force_coop'] else ''}{args['other']}"
+        del args['bpush'], args['wolfpack']
     elif 'bpush' in args['env_name']:
-        args['env_id'] = f"{args['env_name']}_{args['field']}x{args['field']}_{args['player']}p"
+        args['env_id'] = f"{args['env_name']}" \
+                         f"_{args['field']}x{args['field']}" \
+                         f"_{args['player']}p"
+        del args['wolfpack'], args['lbf']
     elif 'wolf' in args['env_name']:
         args[
             'env_id'] = f"{args['env_name']}" \
@@ -427,12 +430,20 @@ if __name__ == '__main__':
                         f"_{args['player']}w" \
                         f"_{args['wolfpack']['max_food_num']}s" \
                         f"{args['other']}"
+        del args['bpush'], args['lbf']
+
+    if params['exp_id'] == 'try':
+        args['env_id'] = 'TEST'
+        args['n_episodes']= 2000
+        args['episode_length']= 25
+        args['test_n_episodes']= 10
+        args['buffer_length'] = 1100
+        args['test_interval'] = 100
+
     dir_collected_data = './experiments/multipleseeds_data_{}_{}_{}'.format(args['alg'], args['env_id'],
                                                                                  args['exp_id'])
 
     if os.path.exists(dir_collected_data):
-        #toDelete = input("{} already exists, delete it if do you want to continue. Delete it? (yes/no) ". \
-        #                 format(dir_collected_data))
         toDelete = 'yes'
         if toDelete.lower() == 'yes':
             shutil.rmtree(dir_collected_data)
@@ -476,8 +487,8 @@ if __name__ == '__main__':
                 os.makedirs(args['dir_summary'])
                 os.makedirs(args['dir_saved_models'])
                 os.makedirs(args['dir_monitor'])
-                with open(os.path.expanduser('{}/arguments.txt'.format(args['dir_exp'])), 'w+') as file:
-                    file.write(json.dumps(args, indent=4, sort_keys=True))
+                # with open(os.path.expanduser('{}/arguments.txt'.format(args['dir_exp'])), 'w+') as file:
+                #     file.write(json.dumps(args, indent=4, sort_keys=True))
                 with open(os.path.expanduser('{}/config.yaml'.format(args['dir_exp'])), 'w+') as file:
                     documents = yaml.dump(args, file)
 
