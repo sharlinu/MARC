@@ -1,13 +1,13 @@
 env_name: 'wolfpack'
-exp_id : 'try'
+exp_id : 'std'
 other: ''
 
 
 player: 3
 field: 10
-grid_observation: True
+grid_observation: False
 
-alg: 'MARC'
+alg: 'MAAC'
 n_episodes: 50000
 episode_length: 200
 test_n_episodes: 100
@@ -27,8 +27,8 @@ bpush:
 
 wolfpack:
   max_food_num: 2
-  obs_type: 'grid'
-  sparse: False
+  obs_type: 'vector'
+  sparse: True
   close_penalty : 0.0
   attr_mapping: {'wolf': 0, 'sheep': 1, 'id': 2}
 
