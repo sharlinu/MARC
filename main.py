@@ -5,9 +5,9 @@ import numpy as np
 from gym.spaces import Box
 from torch.autograd import Variable
 from warnings import filterwarnings  # noqa
-filterwarnings(action='ignore',
-                        category=DeprecationWarning,
-                        module='gym') # TODO update
+# filterwarnings(action='ignore',
+#                         category=DeprecationWarning,
+#                         module='gym') # TODO update
 from utils.buffer import ReplayBufferMARC, ReplayBufferMAAC
 from algorithms.attention_sac import AttentionSAC, RelationalSAC
 from utils.rel_wrapper2 import AbsoluteVKBWrapper
@@ -15,7 +15,6 @@ from utils.env_wrappers import DummyVecEnv
 import yaml
 from utils.misc import Agent
 from utils.plotting import plot_fig
-from lbforaging.foraging import ForagingEnv
 import wandb
 def run(config):
     torch.set_num_threads(1)
@@ -62,7 +61,7 @@ def run(config):
                                            pol_hidden_dim=config.pol_hidden_dim,
                                            critic_hidden_dim=config.critic_hidden_dim,
                                            reward_scale=config.reward_scale)
-        replay_buffer = ReplayBufferMARC(max_steps=config.buffer_length,
+        replay_buffer = ReplayBufferMARC(max_steps=config.marc['buffer_length'],
                                          num_agents=model.n_agents,
                                          obs_dims=[np.prod(obsp['image'].shape) for obsp in env.observation_space],
                                          # nullary_dims=[nullary_dim for _ in range(model.nagents)],
@@ -85,7 +84,7 @@ def run(config):
                                            critic_hidden_dim=config.critic_hidden_dim,
                                            attend_heads=config.maac['attend_heads'],
                                            reward_scale=config.reward_scale)
-        replay_buffer = ReplayBufferMAAC(config.buffer_length, model.nagents,
+        replay_buffer = ReplayBufferMAAC(config.maac['buffer_length'], model.nagents,
                                      [np.prod(obsp['image'].shape) if env.grid_observation else obsp.shape[0]
                                       for obsp in env.observation_space],
                                      [acsp.shape[0] if isinstance(acsp, Box) else acsp.n
@@ -118,7 +117,6 @@ def run(config):
             obs = np.expand_dims(obs, axis=0)
 
         model.prep_rollouts(device='cpu')
-
         episode_reward_total = 0
         is_best_avg = False
 
@@ -158,6 +156,10 @@ def run(config):
             if (config.alg == 'MARC' and all([ob['unary_tensor'].any() for ob in obs + next_obs])):
                 replay_buffer.push(obs, agent_actions, rewards, next_obs, dones)
 
+            elif config.alg == 'MAAC':
+                replay_buffer.push(obs, agent_actions, rewards, next_obs, dones)
+
+
             episode_reward_total += rewards.sum()
             obs = next_obs
             t += 1
@@ -183,7 +185,7 @@ def run(config):
             wandb.log({"rew": episode_reward_total, "steps": et_i})
         except:
             pass
-        print("%s - %s - Episodes %i of %i - Reward %.2f" % (config.env_id, config.random_seed, ep_i + 1,
+        print("%s - %s - Episodes %i (%is) of %i - Reward %.2f" % (config.env_id, config.random_seed, ep_i + 1, steps,
                                         config.n_episodes,  episode_reward_total))
         l_rewards.append(episode_reward_total)
         epymarl_rewards.append(episode_reward_total)
@@ -204,7 +206,6 @@ def run(config):
             if steps % config.step_interval_log == 0:
                 try:
                     wandb.log({
-                                # 'return_mean_100': avg_reward,
                                'epymarl_return_mean': np.mean(epymarl_rewards),
                                'steps': steps})
                 except:
@@ -264,7 +265,7 @@ def run(config):
                             actions = [[np.argmax(ac[0]) for ac in agent_actions]]
 
                         obs, rewards, dones, infos = env.step(actions)
-                        rewards, dones = np.array(rewards), np.array(dones)
+                        # rewards, dones = np.array(rewards), np.array(dones)
                         ep_rew += rewards.sum()
                         if dones.all():
                             break
@@ -309,6 +310,7 @@ def make_parallel_MAAC_env(args, seed):
 
 def make_env(config):
     if config.env_name == 'lbf':
+        from lbforaging.foraging import ForagingEnv
         env = ForagingEnv(
             players=config.player,
             max_player_level=config.lbf['max_player_level'],
@@ -380,11 +382,11 @@ if __name__ == '__main__':
     parser.add_argument("--pol_hidden_dim", default=128, type=int)
     parser.add_argument("--critic_hidden_dim", default=128, type=int)
 
-    parser.add_argument("--pi_lr", default=0.001, type=float)
-    parser.add_argument("--q_lr", default=0.001, type=float)
-    parser.add_argument("--tau", default=0.001, type=float)
+    parser.add_argument("--pi_lr", default=0.001, type=float) # learning rate policy
+    parser.add_argument("--q_lr", default=0.001, type=float) # leanring rate critic
+    parser.add_argument("--tau", default=0.001, type=float) # soft update rate
     parser.add_argument("--gamma", default=0.99, type=float)
-    parser.add_argument("--reward_scale", default=100., type=float)
+    parser.add_argument("--reward_scale", default=100., type=float) # temperature parameter alpha = 1/reward_scale = 0.01 in this case
     parser.add_argument("--use_gpu", action='store_true')
     parser.add_argument('--dir_base', default='./experiments',
                         help='path of the experiment directory')
@@ -407,10 +409,7 @@ if __name__ == '__main__':
         args[k] = v
 
     # deletes arguments that are not used in this experiment
-    if args['alg'] == 'MARC':
-        del args['maac']
-    elif args['alg'] == 'MAAC':
-        del args['marc']
+
     if 'lbf' in args['env_name']:
         args['env_id'] = f"{args['env_name']}" \
                          f"_{args['field']}x{args['field']}_" \
@@ -437,8 +436,14 @@ if __name__ == '__main__':
         args['n_episodes']= 2000
         args['episode_length']= 25
         args['test_n_episodes']= 10
-        args['buffer_length'] = 1100
+        args['maac']['buffer_length'] = 1100
+        args['marc']['buffer_length'] = 1100
         args['test_interval'] = 100
+
+    if args['alg'] == 'MARC':
+        del args['maac']
+    elif args['alg'] == 'MAAC':
+        del args['marc']
 
     dir_collected_data = './experiments/multipleseeds_data_{}_{}_{}'.format(args['alg'], args['env_id'],
                                                                                  args['exp_id'])
@@ -506,7 +511,7 @@ if __name__ == '__main__':
                 t_min = (time.time() - st)/60
                 print(f'{args["n_episodes"]} episode on gpu:{args["use_gpu"]} with max {args["episode_length"]} steps ran in {t_min:.2f} minutes - {t_min*60/args["n_episodes"]:.2f} sec/episode')
 
-                cmd_test = 'python evaluate_discrete.py {} --no_render'.format(model_path)
+                cmd_test = 'python evaluate_discrete.py {}'.format(model_path)
                 print(cmd_test)
 
                 os.system(cmd_test)
@@ -526,7 +531,10 @@ if __name__ == '__main__':
             print(
                 f'{args["n_episodes"]} episode on gpu:{args["use_gpu"]} with max {args["episode_length"]} steps ran in {t_min:.2f} minutes - {t_min * 60 / args["n_episodes"]:.2f} sec/episode')
 
-            cmd_test = 'python evaluate_discrete.py {} --no_render'.format(model_path)
+            if config.use_gpu:
+                cmd_test = 'python evaluate_discrete.py {} '.format(model_path)
+            else:
+                cmd_test = 'python evaluate_discrete.py {} --render'.format(model_path)
             print(cmd_test)
 
             os.system(cmd_test)
