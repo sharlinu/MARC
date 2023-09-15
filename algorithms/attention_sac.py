@@ -154,12 +154,11 @@ class RelationalSAC(object):
             curr_ac, probs, log_pi, pol_regs, ent = pi(
                 ob, return_all_probs=True, return_log_pi=True,
                 regularize=True, return_entropy=True)
-            # logger.add_scalar('agent%i/policy_entropy' % a_i, ent,
-            #                   self.niter)
+
             samp_acs.append(curr_ac)
             all_probs.append(probs)
             all_log_pis.append(log_pi)
-            all_pol_regs.append(pol_regs)
+            all_pol_regs.append(pol_regs) # TODO reg unknown?
 
         critic_rets = self.critic(obs=obs, unary_tensors=unary, binary_tensors=binary, actions=samp_acs,
                                   logger=logger, return_all_q=True)
@@ -434,7 +433,7 @@ class AttentionSAC(object):
                         self.gamma * nq *
                         (1 - dones[a_i].view(-1, 1)))
             if soft:
-                target_q -= log_pi / self.reward_scale
+                target_q -= log_pi / self.reward_scale # reward scale is the alpha!
             q_loss += MSELoss(pq, target_q.detach())
             # print(q_loss.grad_fb)
             for reg in regs:
