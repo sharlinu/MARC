@@ -7,7 +7,7 @@ player: 3
 field: 10
 grid_observation: True
 
-alg: 'MARC'
+alg: 'MAAC'
 n_episodes: 50000
 episode_length: 200
 test_n_episodes: 100
@@ -38,7 +38,11 @@ marc:
   background_id : 'b0'
   abs_id: 'None'
 
+maac:
+  attend_heads : 4
+
 norm_rews : True
 batch_size : 1024
 seeds: [4001]
 buffer_length: 100000
+
