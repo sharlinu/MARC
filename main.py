@@ -242,7 +242,7 @@ def run(config):
 
                         if config.alg == 'MARC':
                             obs = [np.expand_dims(ob['image'].flatten(), axis=0) for ob in obs]
-                            torch_obs = [Variable(torch.Tensor(agent_obs[i]),
+                            torch_obs = [Variable(torch.Tensor(obs[i]),
                                                   requires_grad=False)
                                          for i in range(model.n_agents)]
                             # get actions as torch Variables
