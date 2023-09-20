@@ -146,7 +146,7 @@ def run(config):
             else:
                 actions = [[np.argmax(ac[0]) for ac in agent_actions]]
             next_obs, rewards, dones, infos = env.step(actions)
-            rewards, dones = np.array(rewards), np.array(dones) # TODO needed?
+            rewards, dones = np.array(rewards), np.array(dones)
 
             if config.alg == 'MAAC' and env.grid_observation:
                 next_obs = tuple([next_obs[:,i][0]['image'].flatten() for i in range(model.nagents)])
@@ -265,7 +265,7 @@ def run(config):
                             actions = [[np.argmax(ac[0]) for ac in agent_actions]]
 
                         obs, rewards, dones, infos = env.step(actions)
-                        # rewards, dones = np.array(rewards), np.array(dones)
+                        rewards, dones = np.array(rewards), np.array(dones)
                         ep_rew += rewards.sum()
                         if dones.all():
                             break
@@ -336,7 +336,7 @@ def make_env(config):
             from utils.rel_wrapper2 import BPushWrapper
             env = BPushWrapper(env)
     elif config.env_name == 'wolfpack':
-        from wolfpack.Wolfpack_gym.envs.wolfpack import Wolfpack
+        from Wolfpack_gym.envs.wolfpack import Wolfpack
         env = Wolfpack(
             grid_width=config.field,
             grid_height=config.field,
@@ -420,7 +420,8 @@ if __name__ == '__main__':
     elif 'bpush' in args['env_name']:
         args['env_id'] = f"{args['env_name']}" \
                          f"_{args['field']}x{args['field']}" \
-                         f"_{args['player']}p"
+                         f"_{args['player']}p" \
+                         f"{args['other']}"
         del args['wolfpack'], args['lbf']
     elif 'wolf' in args['env_name']:
         args[
