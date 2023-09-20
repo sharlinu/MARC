@@ -21,7 +21,7 @@ def run(config):
     if config.exp_id =='std':
         wandb.init(
             project='MARC',
-            name=f'{config.alg}-{config.env_id}',
+            name=f'{datetime.date.today().day}-{datetime.date.today().month}-{config.alg}-{config.env_id}',
             config=vars(config),
         )
     env_name = config.env_name
