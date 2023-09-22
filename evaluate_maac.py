@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 def run(config):
-    display = True
+    display = False
     model_path = config.model_path
 
     # create folder for evaluating
@@ -70,7 +70,7 @@ def run(config):
             grid_width=config.field,
             num_players=config.player,
             max_food_num=config.wolfpack['max_food_num'],
-            obs_type='grid',
+            obs_type=config.wolfpack['obs_type'],
             sparse = config.wolfpack['sparse'],
             close_penalty = config.wolfpack['close_penalty'],
             # close_penalty = 0,
@@ -102,8 +102,8 @@ def run(config):
         if display:
             time.sleep(0.5)
             env.render()
-        # for t_i in range(config.test_episode_length):
-        for t_i in range(10):
+        for t_i in range(config.episode_length):
+        # for t_i in range(10):
             calc_start = time.time()
 
             # if config.no_render != False:
@@ -124,7 +124,6 @@ def run(config):
             # print('obs', obs)
             if display:
                 env.render()
-                time.sleep(1)
             collect_item['l_infos'].append(infos)
 
             calc_end = time.time()
