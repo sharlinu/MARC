@@ -51,7 +51,6 @@ class RelationalSAC(object):
                                       num_out_pol=params['num_out_pol'])
                          for params in agent_init_params] # are input and output dims for agent
         self.critic = RelationalCritic(n_agents=self.n_agents,
-                                       # obs = obs,
                                        spatial_tensors=spatial_tensors,
                                        batch_size = batch_size,
                                        n_actions=n_actions,
@@ -271,16 +270,11 @@ class RelationalSAC(object):
         lr: learning rate for networks
         hidden_dim: number of hidden dimensions for networks
         """
-        agent_init_params = []
-        # sa_size = []
-        s_size = []
         a_size = []
         for acsp, obsp in zip(env.action_space,
                               env.observation_space):
             agent_init_params.append({'num_in_pol': np.ones(shape=obsp['image'].shape).flatten().shape[0],
                                       'num_out_pol': acsp.n})
-            # sa_size.append((obsp['image'].shape, acsp.n))
-            # s_size.append(obsp['image'].shape)
             a_size.append(acsp.n)
 
         init_dict = {'gamma': gamma,
@@ -292,15 +286,13 @@ class RelationalSAC(object):
                      'critic_hidden_dim': critic_hidden_dim,
                      'agent_init_params': agent_init_params,
                      'n_agents': env.n_agents,
-                     # 'sa_size': sa_size,
                      'spatial_tensors':spatial_tensors,
                      'batch_size': batch_size,
                      'n_actions': a_size,
-                     # 's_size': s_size,
                      'input_dims': [env.obs_shape['unary'][-1], env.obs_shape['binary'][-1] ],
-                     # 3 attributes and 14 relations
-
+                     # the number of attributes and the number of relations
                      }
+
         instance = cls(**init_dict)
         instance.init_dict = init_dict
         return instance
@@ -315,7 +307,7 @@ class RelationalSAC(object):
         else:
             save_dict = torch.load(filename, map_location="cpu")
         # episode = save_dict['episode']
-        episode = 29001 +8200
+        episode = 0
         instance = cls(**save_dict['init_dict'])
         instance.init_dict = save_dict['init_dict']
         for a, params in zip(instance.agents, save_dict['agent_params']):
