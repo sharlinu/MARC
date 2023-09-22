@@ -265,7 +265,7 @@ def run(config):
                             actions = [[np.argmax(ac[0]) for ac in agent_actions]]
 
                         obs, rewards, dones, infos = env.step(actions)
-                        # rewards, dones = np.array(rewards), np.array(dones)
+                        rewards, dones = np.array(rewards), np.array(dones)
                         ep_rew += rewards.sum()
                         if dones.all():
                             break
@@ -336,7 +336,7 @@ def make_env(config):
             from utils.rel_wrapper2 import BPushWrapper
             env = BPushWrapper(env)
     elif config.env_name == 'wolfpack':
-        from wolfpack.Wolfpack_gym.envs.wolfpack import Wolfpack
+        from Wolfpack_gym.envs.wolfpack import Wolfpack
         env = Wolfpack(
             grid_width=config.field,
             grid_height=config.field,
