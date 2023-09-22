@@ -24,7 +24,7 @@ def run():
     parser.add_argument("--buffer_length", default=int(1e6), type=int)
     parser.add_argument("--n_episodes", default=20000, type=int)
     parser.add_argument("--test_n_episodes", default=100, type=int)
-    parser.add_argument("--episode_length", default=25, type=int)
+    # parser.add_argument("--episode_length", default=25, type=int)
     parser.add_argument("--steps_per_update", default=100, type=int)
     parser.add_argument("--num_updates", default=4, type=int,
                         help="Number of updates per update cycle")
@@ -52,7 +52,8 @@ def run():
     args['alg'] = 'MAAC'
     args['env_id'] = "lbf_15x15_3_5f_keep_food"
     args['random_seed'] = 4001
-    args['n_episodes'] = 20000
+    args['n_episodes'] = 100000
+    args['episode_length'] = 50
     args['player'] = 3
     args['max_food'] = 5
 
@@ -287,7 +288,7 @@ def make_env(default_config):
         max_food= default_config.max_food,
         grid_observation=False,
         sight=15,
-        max_episode_steps=50,
+        max_episode_steps=default_config.episode_length,
         force_coop=False,
         keep_food=True,
     )
@@ -308,7 +309,7 @@ if __name__ == '__main__':
             'attend_heads': {'values':[2, 4, 6]},
             'norm_rews': {'value': True},
             'force_coop': {'value' : False},
-            'max_episode_steps': {'value': 50},
+            'episode_length': {'value': 50},
             'keep_food': {'value' : True},
             'grid_observation': {'value': False},
             # "reward_standardization": [True, False],
@@ -317,6 +318,6 @@ if __name__ == '__main__':
 
     sweep_id = wandb.sweep(sweep_config, project="MARC")
     wandb.agent(sweep_id, function=run, count=1)
-    # id : ya1t0y7c
+    # id : 3pg1uu5u
 
 
