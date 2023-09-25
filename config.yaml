@@ -1,7 +1,6 @@
 env_name: 'wolfpack'
-exp_id : 'try'
-other: ''
-
+exp_id : 'std'
+other: '_sparse+pen_grid'
 
 player: 3
 field: 10
@@ -28,21 +27,23 @@ bpush:
 wolfpack:
   max_food_num: 2
   obs_type: 'grid'
-  sparse: False
-  close_penalty : 0.0
+  sparse: True
+  close_penalty : 0.5
   attr_mapping: {'wolf': 0, 'sheep': 1, 'id': 2}
 
 marc:
-  dense: False
+  dense: True
   relational_embedding : False
   background_id : 'b0'
   abs_id: 'None'
+  buffer_length: 100000
 
 maac:
   attend_heads : 4
+  buffer_length : 1000000
 
 norm_rews : True
 batch_size : 1024
-seeds: [4001]
-buffer_length: 100000
+seeds: [2001]
+
 
