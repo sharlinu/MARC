@@ -270,6 +270,7 @@ class RelationalSAC(object):
         lr: learning rate for networks
         hidden_dim: number of hidden dimensions for networks
         """
+        agent_init_params = []
         a_size = []
         for acsp, obsp in zip(env.action_space,
                               env.observation_space):
@@ -357,7 +358,7 @@ class AttentionSAC(object):
                                   policy entropy)
             hidden_dim (int): Number of hidden dimensions for networks
         """
-        self.nagents = len(sa_size)
+        self.n_agents = len(sa_size)
         self.nobjects = None
         self.agents = [AttentionAgent(lr=pi_lr,
                                       hidden_dim=pol_hidden_dim,
@@ -419,7 +420,7 @@ class AttentionSAC(object):
         critic_rets = self.critic(critic_in, regularize=True,
                                   niter=self.niter)
         q_loss = 0
-        for a_i, nq, log_pi, (pq, regs) in zip(range(self.nagents), next_qs,
+        for a_i, nq, log_pi, (pq, regs) in zip(range(self.n_agents), next_qs,
                                                next_log_pis, critic_rets):
             target_q = (rews[a_i].view(-1, 1) +
                         self.gamma * nq *
@@ -434,7 +435,7 @@ class AttentionSAC(object):
         self.critic.scale_shared_grads()
 
         grad_norm = torch.nn.utils.clip_grad_norm_(
-            self.critic.parameters(), 10 * self.nagents)
+            self.critic.parameters(), 10 * self.n_agents)
         self.critic_optimizer.step()
         self.critic_optimizer.zero_grad()
 
@@ -450,7 +451,7 @@ class AttentionSAC(object):
         all_log_pis = []
         all_pol_regs = []
 
-        for a_i, pi, ob in zip(range(self.nagents), self.policies, obs):
+        for a_i, pi, ob in zip(range(self.n_agents), self.policies, obs):
             curr_ac, probs, log_pi, pol_regs, ent = pi(
                 ob, return_all_probs=True, return_log_pi=True,
                 regularize=True, return_entropy=True)
@@ -463,7 +464,7 @@ class AttentionSAC(object):
 
         critic_in = list(zip(obs, samp_acs))
         critic_rets = self.critic(critic_in, return_all_q=True)
-        for a_i, probs, log_pi, pol_regs, (q, all_q) in zip(range(self.nagents), all_probs,
+        for a_i, probs, log_pi, pol_regs, (q, all_q) in zip(range(self.n_agents), all_probs,
                                                             all_log_pis, all_pol_regs,
                                                             critic_rets):
             curr_agent = self.agents[a_i]

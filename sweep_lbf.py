@@ -52,7 +52,7 @@ def run():
     args['alg'] = 'MAAC'
     args['env_id'] = "lbf_15x15_3_5f_keep_food"
     args['random_seed'] = 4001
-    args['n_episodes'] = 100000
+    args['n_episodes'] = 150001
     args['episode_length'] = 50
     args['player'] = 3
     args['max_food'] = 5
@@ -316,8 +316,9 @@ if __name__ == '__main__':
         },
     }
 
-    sweep_id = wandb.sweep(sweep_config, project="MARC")
-    wandb.agent(sweep_id, function=run, count=1)
+    # sweep_id = wandb.sweep(sweep_config, project="MARC")
+
+    wandb.agent('3pg1uu5u', function=run, count=5, project='MARC')
     # id : 3pg1uu5u
 
 

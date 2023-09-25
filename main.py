@@ -64,9 +64,9 @@ def run(config):
         replay_buffer = ReplayBufferMARC(max_steps=config.marc['buffer_length'],
                                          num_agents=model.n_agents,
                                          obs_dims=[np.prod(obsp['image'].shape) for obsp in env.observation_space],
-                                         # nullary_dims=[nullary_dim for _ in range(model.nagents)],
+                                         # nullary_dims=[nullary_dim for _ in range(model.n_agents)],
                                          unary_dims=[unary_dim for _ in range(model.n_agents)],
-                                         # binary_dims=[binary_dim for _ in range(model.nagents)],
+                                         # binary_dims=[binary_dim for _ in range(model.n_agents)],
                                          ac_dims=[acsp.shape[0] if isinstance(acsp, Box) else acsp.n
                                                   for acsp in env.action_space],
                                          dense=config.marc['dense'])
@@ -84,7 +84,7 @@ def run(config):
                                            critic_hidden_dim=config.critic_hidden_dim,
                                            attend_heads=config.maac['attend_heads'],
                                            reward_scale=config.reward_scale)
-        replay_buffer = ReplayBufferMAAC(config.maac['buffer_length'], model.nagents,
+        replay_buffer = ReplayBufferMAAC(config.maac['buffer_length'], model.n_agents,
                                      [np.prod(obsp['image'].shape) if env.grid_observation else obsp.shape[0]
                                       for obsp in env.observation_space],
                                      [acsp.shape[0] if isinstance(acsp, Box) else acsp.n
@@ -112,7 +112,7 @@ def run(config):
     for ep_i in range(start_episode, config.n_episodes):
         obs = env.reset()
         if env.grid_observation and config.alg =='MAAC':
-            obs = tuple([obs[:, i][0]['image'].flatten() for i in range(model.nagents)])
+            obs = tuple([obs[:, i][0]['image'].flatten() for i in range(model.n_agents)])
             obs = np.vstack(obs)
             obs = np.expand_dims(obs, axis=0)
 
@@ -130,7 +130,7 @@ def run(config):
             else:
                 torch_obs = [Variable(torch.Tensor(np.vstack(obs[:, i])),
                                       requires_grad=False)
-                             for i in range(model.nagents)]
+                             for i in range(model.n_agents)]
 
             # get actions as torch Variables
             try:
@@ -146,10 +146,10 @@ def run(config):
             else:
                 actions = [[np.argmax(ac[0]) for ac in agent_actions]]
             next_obs, rewards, dones, infos = env.step(actions)
-            rewards, dones = np.array(rewards), np.array(dones) # TODO needed?
+            rewards, dones = np.array(rewards), np.array(dones)
 
             if config.alg == 'MAAC' and env.grid_observation:
-                next_obs = tuple([next_obs[:,i][0]['image'].flatten() for i in range(model.nagents)])
+                next_obs = tuple([next_obs[:,i][0]['image'].flatten() for i in range(model.n_agents)])
                 next_obs = np.vstack(next_obs)
                 next_obs = np.expand_dims(next_obs, axis=0)
 
@@ -158,6 +158,8 @@ def run(config):
 
             elif config.alg == 'MAAC':
                 replay_buffer.push(obs, agent_actions, rewards, next_obs, dones)
+            else:
+                print('did not consider transition')
 
 
             episode_reward_total += rewards.sum()
@@ -165,7 +167,6 @@ def run(config):
             t += 1
             if (len(replay_buffer) >= config.batch_size and
                     (t % config.steps_per_update) ==0):
-
                 if config.use_gpu:
                     model.prep_training(device='gpu')
                 else:
@@ -177,6 +178,7 @@ def run(config):
                     model.update_policies(sample)
                     model.update_all_targets()
                 model.prep_rollouts(device='cpu')
+
             if dones.all() == True:
                 print('done with time step', et_i)
                 break
@@ -252,12 +254,12 @@ def run(config):
                             actions = [np.argmax(ac.data.numpy().flatten()) for ac in torch_actions]
                         else:
                             if env.grid_observation:
-                                obs = tuple([obs[:, i][0]['image'].flatten() for i in range(model.nagents)])
+                                obs = tuple([obs[:, i][0]['image'].flatten() for i in range(model.n_agents)])
                                 obs = np.vstack(obs)
                                 obs = np.expand_dims(obs, axis=0)
                             torch_obs = [Variable(torch.Tensor(np.vstack(obs[:, i])),
                                                   requires_grad=False)
-                                         for i in range(model.nagents)]
+                                         for i in range(model.n_agents)]
                             torch_agent_actions = model.step(torch_obs, explore=False)
                             # convert actions to numpy arrays
                             agent_actions = [ac.data.numpy() for ac in torch_agent_actions]
