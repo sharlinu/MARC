@@ -105,6 +105,7 @@ def run(config):
     l_rewards = []
     epymarl_rewards = []
     steps = 0
+    next_step_log = config.step_interval_log
     reward_best = float("-inf")
     avg_reward = float("-inf")
     avg_reward_best = float("-inf")
@@ -205,7 +206,7 @@ def run(config):
 
             os.makedirs('{}/summary/'.format(run_dir), exist_ok=True)
 
-            if steps % config.step_interval_log == 0:
+            if steps >= next_step_log:
                 try:
                     wandb.log({
                                'epymarl_return_mean': np.mean(epymarl_rewards),
@@ -217,6 +218,8 @@ def run(config):
                 with open("{}/summary/reward_epymarl.txt".format(run_dir), "a") as f:
                     f.write("{},{} \n".format(steps, np.mean(epymarl_rewards)))
                 epymarl_rewards.clear()
+                next_step_log += config.step_interval_log
+                print('steplog in', next_step_log, config.step_interval_log)
 
             if ep_i % config.save_interval_log == 0:
                 with open('{}/summary/reward_total.txt'.format(run_dir), 'w') as fp:
@@ -441,6 +444,7 @@ if __name__ == '__main__':
         args['maac']['buffer_length'] = 1100
         args['marc']['buffer_length'] = 1100
         args['test_interval'] = 100
+        args['step_interval_log'] = 200
 
     if args['alg'] == 'MARC':
         del args['maac']

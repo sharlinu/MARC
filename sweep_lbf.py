@@ -50,7 +50,7 @@ def run():
     #     args[k] = v
 
     args['alg'] = 'MAAC'
-    args['env_id'] = "lbf_15x15_3_5f_keep_food"
+    args['env_id'] = "lbf_15x15_3p_5f_keep_food"
     args['random_seed'] = 4001
     args['n_episodes'] = 150001
     args['episode_length'] = 50
