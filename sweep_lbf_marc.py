@@ -21,7 +21,8 @@ import wandb
 
 def run():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--buffer_length", default=int(1e5), type=int)
+    parser.add_argument("--buffer_length", default=int(1e6), type=int)
+
     parser.add_argument("--n_episodes", default=20000, type=int)
     parser.add_argument("--test_n_episodes", default=100, type=int)
     # parser.add_argument("--episode_length", default=25, type=int)
@@ -48,6 +49,7 @@ def run():
     #     params = yaml.load(file, Loader=yaml.FullLoader)
     # for k, v in params.items():
     #     args[k] = v
+
 
     args['alg'] = 'MARC'
     args['env_id'] = "lbf_15x15_3p_5f_keep_food"
@@ -102,6 +104,24 @@ def run():
                                                   for acsp in env.action_space],
                                          dense=True)
 
+    elif default_config.alg == 'MAAC':
+        env = make_parallel_MAAC_env(default_config)
+        env.grid_observation = False
+        env.reset()
+        model = AttentionSAC.init_from_env(env,
+                                           tau=hyper_config.tau,
+                                           pi_lr=hyper_config.pi_lr,
+                                           q_lr=hyper_config.q_lr,
+                                           gamma=default_config.gamma,
+                                           pol_hidden_dim=hyper_config.pol_hidden_dim,
+                                           critic_hidden_dim=hyper_config.critic_hidden_dim,
+                                           attend_heads=hyper_config.attend_heads,
+                                           reward_scale=default_config.reward_scale)
+        replay_buffer = ReplayBufferMAAC(default_config.buffer_length, model.nagents,
+                                     [np.prod(obsp['image'].shape) if env.grid_observation else obsp.shape[0]
+                                      for obsp in env.observation_space],
+                                     [acsp.shape[0] if isinstance(acsp, Box) else acsp.n
+                                      for acsp in env.action_space])
     else:
         raise ValueError(f'Cannot identify algorithm {default_config.alg}')
 
@@ -140,7 +160,6 @@ def run():
             agent_actions = [ac.data.numpy() for ac in torch_agent_actions]
             # rearrange actions to be per environmentsweep.py
             actions = [np.argmax(ac) for ac in agent_actions]
-
             next_obs, rewards, dones, infos = env.step(actions)
             rewards, dones = np.array(rewards), np.array(dones)
 
@@ -185,6 +204,7 @@ def run():
             epymarl_rewards.clear()
             next_step_log += default_config.step_interval_log
 
+
         if ep_i % default_config.test_interval ==0:
             print('ep_i', ep_i)
             print('This should be 0:', ep_i % default_config.test_interval )
@@ -223,7 +243,6 @@ def run():
 
     env.close()
     wandb.finish()
-
 def make_env(default_config):
     from lbforaging.foraging import ForagingEnv
     env = ForagingEnv(
@@ -265,6 +284,7 @@ if __name__ == '__main__':
     sweep_id = wandb.sweep(sweep_config, project="MARC")
 
     wandb.agent(sweep_id, function=run, count=1, project='MARC')
+    # sweep_id = wandb.sweep(sweep_config, project="MARC")
     # id : 3pg1uu5u
 
 

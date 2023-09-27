@@ -231,7 +231,6 @@ def run(config):
                     f.write("{},{} \n".format(steps, np.mean(epymarl_rewards)))
                 epymarl_rewards.clear()
                 next_step_log += config.step_interval_log
-                print('steplog in', next_step_log, config.step_interval_log)
 
             if ep_i % config.save_interval_log == 0:
                 with open('{}/summary/reward_total.txt'.format(run_dir), 'w') as fp:
