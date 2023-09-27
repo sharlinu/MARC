@@ -1,20 +1,23 @@
 env_name: 'lbf'
-exp_id : 'std'
-other: '_b0'
+exp_id : 'try'
+other: '_b3_tau0.01'
 
-player: 4
-field: 10
+player: 3
+field: 15
 grid_observation: True
 
 alg: 'MARC'
 n_episodes: 550000
 episode_length: 50
 test_n_episodes: 100
+tau: 0.01
+#pol_hidden_dim: 64
+device: 'cuda:2'
 
 
 lbf:
-  max_food: 4
-  force_coop: True
+  max_food: 5
+  force_coop: False
   max_player_level: 2
   keep_food: True
   attr_mapping: {'agent': 0, 'id': 1, 'food': 2}
@@ -39,9 +42,9 @@ marc:
   buffer_length: 100000
 
 maac:
-  attend_heads : 4
-  buffer_length : 1000000
+  attend_heads: 4
+  buffer_length: 1000000
 
 norm_rews : True
 batch_size : 1024
-seeds: [4001]
+seeds: [6001]

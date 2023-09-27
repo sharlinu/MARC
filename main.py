@@ -66,6 +66,7 @@ def run(config):
                                                gamma=config.gamma,
                                                pol_hidden_dim=config.pol_hidden_dim,
                                                critic_hidden_dim=config.critic_hidden_dim,
+                                               device=config.device,
                                                reward_scale=config.reward_scale)
 
         if config.exp_id == 'std':
@@ -180,13 +181,10 @@ def run(config):
             t += 1
             if (len(replay_buffer) >= config.batch_size and
                     (t % config.steps_per_update) ==0):
-                if config.use_gpu:
-                    model.prep_training(device='gpu')
-                else:
-                    model.prep_training(device='cpu')
+                model.prep_training(device=config.device)
                 for u_i in range(config.num_updates):
                     sample = replay_buffer.sample(config.batch_size,
-                                                  to_gpu=config.use_gpu, norm_rews=config.norm_rews)
+                                                  device=config.device, norm_rews=config.norm_rews)
                     model.update_critic(sample)
                     model.update_policies(sample)
                     model.update_all_targets()
@@ -404,7 +402,7 @@ if __name__ == '__main__':
     parser.add_argument("--tau", default=0.001, type=float) # soft update rate
     parser.add_argument("--gamma", default=0.99, type=float)
     parser.add_argument("--reward_scale", default=100., type=float) # temperature parameter alpha = 1/reward_scale = 0.01 in this case
-    parser.add_argument("--use_gpu", action='store_true')
+    parser.add_argument("--device",default='cuda:0', type=str)
     parser.add_argument('--dir_base', default='./experiments',
                         help='path of the experiment directory')
     config = parser.parse_args()
