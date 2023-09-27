@@ -287,7 +287,7 @@ class RelationalSAC(object):
                      'critic_hidden_dim': critic_hidden_dim,
                      'agent_init_params': agent_init_params,
                      'n_agents': env.n_agents,
-                     'spatial_tensors':spatial_tensors,
+                     'spatial_tensors': spatial_tensors,
                      'batch_size': batch_size,
                      'n_actions': a_size,
                      'input_dims': [env.obs_shape['unary'][-1], env.obs_shape['binary'][-1] ],
@@ -303,21 +303,24 @@ class RelationalSAC(object):
         """
         Instantiate instance of this class from file created by 'save' method
         """
-        if torch.cuda.is_available():
-            save_dict = torch.load(filename, map_location="cuda")
-        else:
-            save_dict = torch.load(filename, map_location="cpu")
-        # episode = save_dict['episode']
-        episode = 0
+        # if torch.cuda.is_available():
+        #     save_dict = torch.load(filename, map_location="cuda")
+        # else:
+        save_dict = torch.load(filename, map_location="cpu")
+        try:
+            episode = save_dict['episode']
+        except Exception as e:
+            print(e)
+            episode = 0
         instance = cls(**save_dict['init_dict'])
         instance.init_dict = save_dict['init_dict']
         for a, params in zip(instance.agents, save_dict['agent_params']):
             a.load_params(params)
+            # a.policy_optimizer = Adam(a.policy.parameters(), lr=lr)
         instance.pol_dev = 'gpu'
         instance.trgt_pol_dev = 'gpu'
         if load_critic:
             critic_params = save_dict['critic_params']
-
             instance.critic.load_state_dict(critic_params['critic'])
             instance.critic = instance.critic.to('cuda')
 

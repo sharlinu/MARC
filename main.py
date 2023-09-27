@@ -18,23 +18,13 @@ from utils.plotting import plot_fig
 import wandb
 def run(config):
     torch.set_num_threads(1)
-    if config.exp_id =='std':
-        wandb.init(
-            project='MARC',
-            name=f'{datetime.date.today().day}-{datetime.date.today().month}-{config.alg}-{config.env_id}',
-            config=vars(config),
-        )
     env_name = config.env_name
 
-    if config.resume != '':
-        resume_path = config.resume
-        n_episodes = config.n_episodes
 
     # run_num = 1
     run_dir = config.dir_exp
     log_dir = config.dir_summary
 
-    start_episode = 0
 
     torch.manual_seed(config.random_seed)
     np.random.seed(config.random_seed)
@@ -51,16 +41,38 @@ def run(config):
         env.agents = [None] * len(env.action_space)
         unary_dim = env.obs_shape['unary']
         env.reset()
-        model = RelationalSAC.init_from_env(env,
-                                            spatial_tensors=env.spatial_tensors,
-                                            batch_size = config.batch_size,
-                                           tau=config.tau,
-                                           pi_lr=config.pi_lr,
-                                           q_lr=config.q_lr,
-                                           gamma=config.gamma,
-                                           pol_hidden_dim=config.pol_hidden_dim,
-                                           critic_hidden_dim=config.critic_hidden_dim,
-                                           reward_scale=config.reward_scale)
+        if config.resume != '':
+            # resume_path = config.resume
+            model_path = glob.glob('{}/saved_models/ckpt_final*'.format(config.resume))[0]
+            config.n_episodes = config.n_episodes + config.resume_episodes
+            print(f'Training for an additional {config.resume_episodes}')
+            model, start_episode = RelationalSAC.init_from_save(model_path, load_critic=True)
+            toResume = input(f'Do you want to resume training {model_path} for {config.resume_episodes} starting at {start_episode}? (yes/no)')
+            if toResume.lower()=='yes':
+                print('resuming training')
+            else:
+                print('Closing connection')
+                import sys
+                sys.exit()
+            # wandb.init(project="MARC", resume=True)
+        else:
+            start_episode = 0
+            model = RelationalSAC.init_from_env(env,
+                                                spatial_tensors=env.spatial_tensors,
+                                                batch_size = config.batch_size,
+                                               tau=config.tau,
+                                               pi_lr=config.pi_lr,
+                                               q_lr=config.q_lr,
+                                               gamma=config.gamma,
+                                               pol_hidden_dim=config.pol_hidden_dim,
+                                               critic_hidden_dim=config.critic_hidden_dim,
+                                               reward_scale=config.reward_scale)
+
+        if config.exp_id == 'std':
+            wandb.init(
+                project='MARC',
+                name=f'{datetime.date.today().day}-{datetime.date.today().month}-{config.alg}-{config.env_id}',
+                config=vars(config),)
         replay_buffer = ReplayBufferMARC(max_steps=config.marc['buffer_length'],
                                          num_agents=model.n_agents,
                                          obs_dims=[np.prod(obsp['image'].shape) for obsp in env.observation_space],
@@ -98,18 +110,18 @@ def run(config):
     #     model_path = glob.glob('{}/saved_models/ckpt_best_avg*'.format(config.resume))[0]
     #     print(f'Using model: {model_path}')
     #     model, start_episode = RelationalSAC.init_from_save(model_path, load_critic=True)
-    #     print(f'starting from episode {start_episode}')
-    # else:
 
     t = 0
     l_rewards = []
     epymarl_rewards = []
-    steps = 0
-    next_step_log = config.step_interval_log
-    reward_best = float("-inf")
-    avg_reward = float("-inf")
+    if config.resume!='':
+        steps = 10000000
+        next_step_log = steps + config.step_interval_log
+    else:
+        steps = 0
+        next_step_log = config.step_interval_log
     avg_reward_best = float("-inf")
-    path_ckpt_best_avg = ''
+    path_ckpt_best_avg = '' # TODO could be altered with resume
     for ep_i in range(start_episode, config.n_episodes):
         obs = env.reset()
         if env.grid_observation and config.alg =='MAAC':
@@ -369,6 +381,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--resume", default='', type=str)
+    parser.add_argument("--resume_episodes", default=0, type=int)
     # parser.add_argument("--random_seed", default=1, type=int)
     # parser.add_argument("--n_rollout_threads", default=1, type=int)
     parser.add_argument("--buffer_length", default=int(1e6), type=int)
@@ -414,42 +427,42 @@ if __name__ == '__main__':
         args[k] = v
 
     # deletes arguments that are not used in this experiment
+    if args['resume']=='':
+        if 'lbf' in args['env_name']:
+            args['env_id'] = f"{args['env_name']}" \
+                             f"_{args['field']}x{args['field']}_" \
+                             f"{args['player']}p" \
+                             f"_{args['lbf']['max_food']}f" \
+                             f"{'_coop' if args['lbf']['force_coop'] else ''}{args['other']}"
+            del args['bpush'], args['wolfpack']
+        elif 'bpush' in args['env_name']:
+            args['env_id'] = f"{args['env_name']}" \
+                             f"_{args['field']}x{args['field']}" \
+                             f"_{args['player']}p"
+            del args['wolfpack'], args['lbf']
+        elif 'wolf' in args['env_name']:
+            args[
+                'env_id'] = f"{args['env_name']}" \
+                            f"_{args['field']}x{args['field']}" \
+                            f"_{args['player']}w" \
+                            f"_{args['wolfpack']['max_food_num']}s" \
+                            f"{args['other']}"
+            del args['bpush'], args['lbf']
 
-    if 'lbf' in args['env_name']:
-        args['env_id'] = f"{args['env_name']}" \
-                         f"_{args['field']}x{args['field']}_" \
-                         f"{args['player']}p" \
-                         f"_{args['lbf']['max_food']}f" \
-                         f"{'_coop' if args['lbf']['force_coop'] else ''}{args['other']}"
-        del args['bpush'], args['wolfpack']
-    elif 'bpush' in args['env_name']:
-        args['env_id'] = f"{args['env_name']}" \
-                         f"_{args['field']}x{args['field']}" \
-                         f"_{args['player']}p"
-        del args['wolfpack'], args['lbf']
-    elif 'wolf' in args['env_name']:
-        args[
-            'env_id'] = f"{args['env_name']}" \
-                        f"_{args['field']}x{args['field']}" \
-                        f"_{args['player']}w" \
-                        f"_{args['wolfpack']['max_food_num']}s" \
-                        f"{args['other']}"
-        del args['bpush'], args['lbf']
+        if params['exp_id'] == 'try':
+            args['env_id'] = 'TEST'
+            args['n_episodes']= 2000
+            args['episode_length']= 25
+            args['test_n_episodes']= 10
+            args['maac']['buffer_length'] = 1100
+            args['marc']['buffer_length'] = 1100
+            args['test_interval'] = 100
+            args['step_interval_log'] = 200
 
-    if params['exp_id'] == 'try':
-        args['env_id'] = 'TEST'
-        args['n_episodes']= 2000
-        args['episode_length']= 25
-        args['test_n_episodes']= 10
-        args['maac']['buffer_length'] = 1100
-        args['marc']['buffer_length'] = 1100
-        args['test_interval'] = 100
-        args['step_interval_log'] = 200
-
-    if args['alg'] == 'MARC':
-        del args['maac']
-    elif args['alg'] == 'MAAC':
-        del args['marc']
+        if args['alg'] == 'MARC':
+            del args['maac']
+        elif args['alg'] == 'MAAC':
+            del args['marc']
 
     dir_collected_data = './experiments/multipleseeds_data_{}_{}_{}'.format(args['alg'], args['env_id'],
                                                                                  args['exp_id'])
@@ -522,7 +535,7 @@ if __name__ == '__main__':
 
                 os.system(cmd_test)
 
-                shutil.copyfile('{}/summary/reward_total.txt'.format(args['dir_exp']), # TODO check if this works - changed  list_exp_dir[-1]
+                shutil.copyfile('{}/summary/reward_total_a.txt'.format(args['dir_exp']), # TODO check if this works - changed  list_exp_dir[-1]
                                 '{}/reward_training_seed{}.txt'.format(dir_collected_data, seed)
                                 )
     else:
