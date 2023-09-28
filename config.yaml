@@ -8,13 +8,15 @@ field: 10
 grid_observation: False
 
 alg: 'MAAC'
-n_episodes: 50000
+n_episodes: 125000
 episode_length: 200
 test_n_episodes: 100
+tau: 0.01
+device: 'cpu'
 
 
 lbf:
-  max_food: 3
+  max_food: 5
   force_coop: False
   max_player_level: 2
   keep_food: True
@@ -27,22 +29,22 @@ bpush:
 
 wolfpack:
   max_food_num: 2
-  obs_type: 'vector'
+  obs_type: 'dense_vector'
   sparse: True
   close_penalty : 0.0
   attr_mapping: {'wolf': 0, 'sheep': 1, 'id': 2}
 
 marc:
-  dense: False
+  dense: True
   relational_embedding : False
   background_id : 'b0'
   abs_id: 'None'
+  buffer_length: 100000
 
 maac:
-  attend_heads : 4
+  attend_heads: 4
+  buffer_length: 1000000
 
 norm_rews : True
 batch_size : 1024
-seeds: [4001]
-buffer_length: 100000
-
+#seeds: [6001]

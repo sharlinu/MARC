@@ -23,6 +23,7 @@ class RelationalCritic(nn.Module):
                  hidden_dim: int = 32,
                  norm_in: object = True,
                  net_code: object = "1g0f",
+                 device: str = 'cuda:0',
                  mp_rounds: object = 1) -> object:
         """
         Inputs:
@@ -36,7 +37,7 @@ class RelationalCritic(nn.Module):
         self.n_agents = n_agents
         self.num_actions = n_actions[0]
         self.critics_head = nn.ModuleList()
-        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        self.device = device
         self.batch_size = batch_size
         self.max_reduce = True # TODO hardcoded
         # self.dense = True
@@ -103,15 +104,6 @@ class RelationalCritic(nn.Module):
         """
         if agents is None:
             agents = range(self.n_agents)
-        # state = None
-        # inputs = [[],
-        #           torch.flatten(unary_tensor, 0, 1).float(), #flattens obs["unary_tensor"] only in 0th and 1st dim
-        #           #torch.flatten(binary_tensor, 0, 1).permute(0,3,1,2).float()]
-        #           binary_tensor.permute(0, 3, 1, 2).float()
-        #           ]
-        # for i in [1,2]:
-        #     inputs[i] = inputs[i].to(device=device)
-        # adj_matrices = inputs[2]
 
         all_rets = []
 
@@ -144,10 +136,9 @@ class RelationalCritic(nn.Module):
             x = torch.cat(chunks, dim=0)
             if self.max_reduce:
                 # max-pooling layer
-                x, _ = torch.max(x, dim=1) # TODO check what dimension comes out of here
+                x, _ = torch.max(x, dim=1)
             else:
-                # I think this would be for the CNN which is flattened
-                x = torch.flatten(x, start_dim=1, end_dim=2) # TODO what does that do?
+                x = torch.flatten(x, start_dim=1, end_dim=2)
 
             # extract state encoding for each agent that we're returning Q for
             other_actions = actions.copy()

@@ -322,7 +322,7 @@ def make_env(default_config):
             from utils.rel_wrapper2 import BPushWrapper
             env = BPushWrapper(env)
     elif default_config.env_name == 'wolfpack':
-        from wolfpack.Wolfpack_gym.envs.wolfpack import Wolfpack
+        from Wolfpack_gym.envs.wolfpack import Wolfpack
         env = Wolfpack(
             grid_width=default_config.field,
             grid_height=default_config.field,
@@ -357,9 +357,9 @@ if __name__ == '__main__':
         },
     }
 
-    sweep_id = wandb.sweep(sweep_config, project="MARC")
-    print(sweep_id)
-    wandb.agent(sweep_id, function=run, count=5)
+    # sweep_id = wandb.sweep(sweep_config, project="MARC")
+    # print(sweep_id)
+    wandb.agent(sweep_id='nzlwvavn', function=run, project='MARC', count=5)
     # run(default_config=default_config, hyper_config=sweep_config)
     # id : 2v4znthf
 

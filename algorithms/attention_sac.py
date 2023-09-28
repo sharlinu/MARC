@@ -27,6 +27,7 @@ class RelationalSAC(object):
                  reward_scale=10.,
                  pol_hidden_dim=128,
                  critic_hidden_dim=128,
+                 device='cuda:0',
                  **kwargs):
         """
         Inputs:
@@ -51,12 +52,12 @@ class RelationalSAC(object):
                                       num_out_pol=params['num_out_pol'])
                          for params in agent_init_params] # are input and output dims for agent
         self.critic = RelationalCritic(n_agents=self.n_agents,
-                                       # obs = obs,
                                        spatial_tensors=spatial_tensors,
                                        batch_size = batch_size,
                                        n_actions=n_actions,
                                        input_dims=input_dims,
-                                       hidden_dim=critic_hidden_dim)
+                                       hidden_dim=critic_hidden_dim,
+                                       device = device)
         self.target_critic = RelationalCritic(
                                         n_agents = self.n_agents,
                                         # obs = obs,
@@ -64,7 +65,8 @@ class RelationalSAC(object):
                                         batch_size = batch_size,
                                         n_actions=n_actions,
                                         input_dims=input_dims,
-                                        hidden_dim=critic_hidden_dim)
+                                        hidden_dim=critic_hidden_dim,
+                                        device=device)
         hard_update(self.target_critic, self.critic) # hard update only at the beginning to initialise
         self.critic_optimizer = Adam(self.critic.parameters(), lr=q_lr,
                                      weight_decay=1e-3)
@@ -74,6 +76,7 @@ class RelationalSAC(object):
         self.pi_lr = pi_lr
         self.q_lr = q_lr
         self.reward_scale = reward_scale
+        self.device = device
         self.pol_dev = 'cpu'  # device for policies
         self.critic_dev = 'cpu'  # device for critics
         self.trgt_pol_dev = 'cpu'  # device for target policies
@@ -201,16 +204,13 @@ class RelationalSAC(object):
         for a in self.agents:
             soft_update(a.target_policy, a.policy, self.tau)
 
-    def prep_training(self, device='gpu'):
+    def prep_training(self, device='cuda:0'):
         self.critic.train()
         self.target_critic.train()
         for a in self.agents:
             a.policy.train()
             a.target_policy.train()
-        if device == 'gpu':
-            fn = lambda x: x.cuda()
-        else:
-            fn = lambda x: x.cpu()
+        fn = lambda x: x.to(device)
         if not self.pol_dev == device:
             for a in self.agents:
                 a.policy = fn(a.policy)
@@ -229,10 +229,7 @@ class RelationalSAC(object):
     def prep_rollouts(self, device='cpu'):
         for a in self.agents:
             a.policy.eval()
-        if device == 'gpu':
-            fn = lambda x: x.cuda()
-        else:
-            fn = lambda x: x.cpu()
+        fn = lambda x: x.to(device)
         # only need main policy for rollouts
         if not self.pol_dev == device:
             for a in self.agents:
@@ -260,8 +257,8 @@ class RelationalSAC(object):
                       pi_lr=0.01, q_lr=0.01,
                       reward_scale=10.,
                       pol_hidden_dim=64, critic_hidden_dim=64, attend_heads=4,
+                      device='cuda:0',
                       **kwargs):
-        # TODO changed the hidden dim from 128 to 64
         """
         Instantiate instance of this class from multi-agent environment
 
@@ -271,16 +268,13 @@ class RelationalSAC(object):
         lr: learning rate for networks
         hidden_dim: number of hidden dimensions for networks
         """
+        print(device, 'device for critic')
         agent_init_params = []
-        # sa_size = []
-        s_size = []
         a_size = []
         for acsp, obsp in zip(env.action_space,
                               env.observation_space):
             agent_init_params.append({'num_in_pol': np.ones(shape=obsp['image'].shape).flatten().shape[0],
                                       'num_out_pol': acsp.n})
-            # sa_size.append((obsp['image'].shape, acsp.n))
-            # s_size.append(obsp['image'].shape)
             a_size.append(acsp.n)
 
         init_dict = {'gamma': gamma,
@@ -292,15 +286,14 @@ class RelationalSAC(object):
                      'critic_hidden_dim': critic_hidden_dim,
                      'agent_init_params': agent_init_params,
                      'n_agents': env.n_agents,
-                     # 'sa_size': sa_size,
-                     'spatial_tensors':spatial_tensors,
+                     'spatial_tensors': spatial_tensors,
                      'batch_size': batch_size,
                      'n_actions': a_size,
-                     # 's_size': s_size,
                      'input_dims': [env.obs_shape['unary'][-1], env.obs_shape['binary'][-1] ],
-                     # 3 attributes and 14 relations
-
+                     'device':device,
+                     # the number of attributes and the number of relations
                      }
+
         instance = cls(**init_dict)
         instance.init_dict = init_dict
         return instance
@@ -310,30 +303,33 @@ class RelationalSAC(object):
         """
         Instantiate instance of this class from file created by 'save' method
         """
-        if torch.cuda.is_available():
-            save_dict = torch.load(filename, map_location="cuda")
-        else:
-            save_dict = torch.load(filename, map_location="cpu")
-        # episode = save_dict['episode']
-        episode = 29001 +8200
+        # if torch.cuda.is_available():
+        #     save_dict = torch.load(filename, map_location="cuda")
+        # else:
+        save_dict = torch.load(filename, map_location="cpu")
+        try:
+            episode = save_dict['episode']
+        except Exception as e:
+            print(e)
+            episode = 0
         instance = cls(**save_dict['init_dict'])
         instance.init_dict = save_dict['init_dict']
         for a, params in zip(instance.agents, save_dict['agent_params']):
             a.load_params(params)
-        instance.pol_dev = 'gpu'
-        instance.trgt_pol_dev = 'gpu'
+            # a.policy_optimizer = Adam(a.policy.parameters(), lr=lr)
+        instance.pol_dev = 'cuda:0'
+        instance.trgt_pol_dev = 'cuda:0'
         if load_critic:
             critic_params = save_dict['critic_params']
-
             instance.critic.load_state_dict(critic_params['critic'])
-            instance.critic = instance.critic.to('cuda')
+            instance.critic = instance.critic.to('cuda:0')
 
             instance.target_critic.load_state_dict(critic_params['target_critic'])
-            instance.target_critic = instance.target_critic.to('cuda')
+            instance.target_critic = instance.target_critic.to('cuda:0')
             instance.critic_optimizer = Adam(instance.critic.parameters(), lr=0.01, weight_decay=1e-3)
             instance.critic_optimizer.load_state_dict(critic_params['critic_optimizer'])
-            instance.critic_dev = 'gpu'
-            instance.trgt_critic_dev = 'gpu'
+            instance.critic_dev = 'cuda:0'
+            instance.trgt_critic_dev = 'cuda:0'
 
 
         return instance, episode
@@ -365,7 +361,7 @@ class AttentionSAC(object):
                                   policy entropy)
             hidden_dim (int): Number of hidden dimensions for networks
         """
-        self.nagents = len(sa_size)
+        self.n_agents = len(sa_size)
         self.nobjects = None
         self.agents = [AttentionAgent(lr=pi_lr,
                                       hidden_dim=pol_hidden_dim,
@@ -427,7 +423,7 @@ class AttentionSAC(object):
         critic_rets = self.critic(critic_in, regularize=True,
                                   niter=self.niter)
         q_loss = 0
-        for a_i, nq, log_pi, (pq, regs) in zip(range(self.nagents), next_qs,
+        for a_i, nq, log_pi, (pq, regs) in zip(range(self.n_agents), next_qs,
                                                next_log_pis, critic_rets):
             target_q = (rews[a_i].view(-1, 1) +
                         self.gamma * nq *
@@ -442,7 +438,7 @@ class AttentionSAC(object):
         self.critic.scale_shared_grads()
 
         grad_norm = torch.nn.utils.clip_grad_norm_(
-            self.critic.parameters(), 10 * self.nagents)
+            self.critic.parameters(), 10 * self.n_agents)
         self.critic_optimizer.step()
         self.critic_optimizer.zero_grad()
 
@@ -458,7 +454,7 @@ class AttentionSAC(object):
         all_log_pis = []
         all_pol_regs = []
 
-        for a_i, pi, ob in zip(range(self.nagents), self.policies, obs):
+        for a_i, pi, ob in zip(range(self.n_agents), self.policies, obs):
             curr_ac, probs, log_pi, pol_regs, ent = pi(
                 ob, return_all_probs=True, return_log_pi=True,
                 regularize=True, return_entropy=True)
@@ -471,7 +467,7 @@ class AttentionSAC(object):
 
         critic_in = list(zip(obs, samp_acs))
         critic_rets = self.critic(critic_in, return_all_q=True)
-        for a_i, probs, log_pi, pol_regs, (q, all_q) in zip(range(self.nagents), all_probs,
+        for a_i, probs, log_pi, pol_regs, (q, all_q) in zip(range(self.n_agents), all_probs,
                                                             all_log_pis, all_pol_regs,
                                                             critic_rets):
             curr_agent = self.agents[a_i]
@@ -509,16 +505,13 @@ class AttentionSAC(object):
         for a in self.agents:
             soft_update(a.target_policy, a.policy, self.tau)
 
-    def prep_training(self, device='gpu'):
+    def prep_training(self, device='cuda:0'):
         self.critic.train()
         self.target_critic.train()
         for a in self.agents:
             a.policy.train()
             a.target_policy.train()
-        if device == 'gpu':
-            fn = lambda x: x.cuda()
-        else:
-            fn = lambda x: x.cpu()
+        fn = lambda x: x.to(device)
         if not self.pol_dev == device:
             for a in self.agents:
                 a.policy = fn(a.policy)
@@ -537,10 +530,7 @@ class AttentionSAC(object):
     def prep_rollouts(self, device='cpu'):
         for a in self.agents:
             a.policy.eval()
-        if device == 'gpu':
-            fn = lambda x: x.cuda()
-        else:
-            fn = lambda x: x.cpu()
+        fn = lambda x: x.to(device)
         # only need main policy for rollouts
         if not self.pol_dev == device:
             for a in self.agents:
