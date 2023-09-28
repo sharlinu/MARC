@@ -1,19 +1,20 @@
 env_name: 'wolfpack'
 exp_id : 'std'
-other: '_sparse+pen_grid'
+other: '_dense_vector'
 
 player: 3
 field: 10
-grid_observation: True
+grid_observation: False
 
 alg: 'MAAC'
-n_episodes: 50000
+n_episodes: 125000
 episode_length: 200
 test_n_episodes: 100
+tau: 0.01
 
 
 lbf:
-  max_food: 3
+  max_food: 5
   force_coop: False
   max_player_level: 2
   keep_food: True
@@ -26,9 +27,9 @@ bpush:
 
 wolfpack:
   max_food_num: 2
-  obs_type: 'grid'
+  obs_type: 'dense_vector'
   sparse: True
-  close_penalty : 0.5
+  close_penalty : 0.0
   attr_mapping: {'wolf': 0, 'sheep': 1, 'id': 2}
 
 marc:
@@ -44,6 +45,6 @@ maac:
 
 norm_rews : True
 batch_size : 1024
-seeds: [2001]
+seeds: [6001]
 
 
