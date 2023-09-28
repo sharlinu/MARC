@@ -11,6 +11,7 @@ n_episodes: 125000
 episode_length: 200
 test_n_episodes: 100
 tau: 0.01
+device: 'cpu'
 
 
 lbf:
@@ -40,11 +41,9 @@ marc:
   buffer_length: 100000
 
 maac:
-  attend_heads : 4
-  buffer_length : 1000000
+  attend_heads: 4
+  buffer_length: 1000000
 
 norm_rews : True
 batch_size : 1024
-seeds: [6001]
-
-
+#seeds: [6001]

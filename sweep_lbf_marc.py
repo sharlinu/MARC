@@ -22,6 +22,7 @@ import wandb
 def run():
     parser = argparse.ArgumentParser()
     parser.add_argument("--buffer_length", default=int(1e6), type=int)
+
     parser.add_argument("--n_episodes", default=20000, type=int)
     parser.add_argument("--test_n_episodes", default=100, type=int)
     # parser.add_argument("--episode_length", default=25, type=int)
@@ -49,7 +50,8 @@ def run():
     # for k, v in params.items():
     #     args[k] = v
 
-    args['alg'] = 'MAAC'
+
+    args['alg'] = 'MARC'
     args['env_id'] = "lbf_15x15_3p_5f_keep_food"
     args['random_seed'] = 4001
     args['n_episodes'] = 150001
@@ -71,13 +73,13 @@ def run():
     np.random.seed(default_config.random_seed)
     if default_config.alg == 'MARC':
         env = make_env(default_config)
-        env.grid_observation = default_config.grid_observation
-        attr_mapping = getattr(default_config, env_name)['attr_mapping']
+        env.grid_observation = True
+        attr_mapping = {'agent': 0, 'id': 1, 'food': 2}
         env = AbsoluteVKBWrapper(env=env,
                                  attr_mapping=attr_mapping,
-                                 dense=default_config.marc['dense'],
-                                 background_id=default_config.marc['background_id'],
-                                 abs_id=default_config.marc['abs_id']
+                                 dense=True,
+                                 background_id='b0',
+                                 abs_id='None',
                                  )
         env.agents = [None] * len(env.action_space)
         unary_dim = env.obs_shape['unary']
@@ -92,7 +94,7 @@ def run():
                                            pol_hidden_dim=hyper_config.pol_hidden_dim,
                                            critic_hidden_dim=hyper_config.critic_hidden_dim,
                                            reward_scale=default_config.reward_scale)
-        replay_buffer = ReplayBufferMARC(max_steps=default_config.marc['buffer_length'],
+        replay_buffer = ReplayBufferMARC(max_steps=default_config.buffer_length,
                                          num_agents=model.n_agents,
                                          obs_dims=[np.prod(obsp['image'].shape) for obsp in env.observation_space],
                                          # nullary_dims=[nullary_dim for _ in range(model.nagents)],
@@ -100,7 +102,7 @@ def run():
                                          # binary_dims=[binary_dim for _ in range(model.nagents)],
                                          ac_dims=[acsp.shape[0] if isinstance(acsp, Box) else acsp.n
                                                   for acsp in env.action_space],
-                                         dense=default_config.marc['dense'])
+                                         dense=True)
 
     elif default_config.alg == 'MAAC':
         env = make_parallel_MAAC_env(default_config)
@@ -127,6 +129,7 @@ def run():
     l_rewards = []
     epymarl_rewards = []
     steps = 0
+    next_step_log = default_config.step_interval_log
     avg_reward_best = float("-inf")
     path_ckpt_best_avg = ''
     for ep_i in range(start_episode, default_config.n_episodes+1):
@@ -141,16 +144,12 @@ def run():
         is_best_avg = False
 
         for et_i in range(1, default_config.episode_length + 1):
-            if default_config.alg == 'MARC':
-                # rearrange observations to be per agent, and convert to torch Variable
-                agent_obs = [np.expand_dims(ob['image'].flatten(), axis=0) for ob in obs]
-                torch_obs = [Variable(torch.Tensor(agent_obs[i]),
-                                      requires_grad=False)
-                             for i in range(model.n_agents)]
-            else:
-                torch_obs = [Variable(torch.Tensor(np.vstack(obs[:, i])),
-                                      requires_grad=False)
-                             for i in range(model.nagents)]
+            # rearrange observations to be per agent, and convert to torch Variable
+            agent_obs = [np.expand_dims(ob['image'].flatten(), axis=0) for ob in obs]
+            torch_obs = [Variable(torch.Tensor(agent_obs[i]),
+                                  requires_grad=False)
+                         for i in range(model.n_agents)]
+
             # get actions as torch Variables
             try:
                 torch_agent_actions = model.step(torch_obs, explore=True)
@@ -160,10 +159,7 @@ def run():
             # convert actions to numpy arrays
             agent_actions = [ac.data.numpy() for ac in torch_agent_actions]
             # rearrange actions to be per environmentsweep.py
-            if default_config.alg == 'MARC':
-                actions = [np.argmax(ac) for ac in agent_actions]
-            else:
-                actions = [[np.argmax(ac[0]) for ac in agent_actions]]
+            actions = [np.argmax(ac) for ac in agent_actions]
             next_obs, rewards, dones, infos = env.step(actions)
             rewards, dones = np.array(rewards), np.array(dones)
 
@@ -174,10 +170,6 @@ def run():
 
             if (default_config.alg == 'MARC' and all([ob['unary_tensor'].any() for ob in obs + next_obs])):
                 replay_buffer.push(obs, agent_actions, rewards, next_obs, dones)
-
-            elif default_config.alg == 'MAAC':
-                replay_buffer.push(obs, agent_actions, rewards, next_obs, dones)
-
 
             episode_reward_total += rewards.sum()
             obs = next_obs
@@ -200,16 +192,17 @@ def run():
                 print('done with time step', et_i)
                 break
         steps += et_i
+        wandb.log({'episode_return': episode_reward_total})
         print("%s - %s - Episodes %i (%is) of %i - Reward %.2f" % (default_config.env_id, default_config.random_seed, ep_i + 1, steps,
                                         default_config.n_episodes,  episode_reward_total))
         l_rewards.append(episode_reward_total)
         epymarl_rewards.append(episode_reward_total)
         # check if it in average was the best model so far
 
-
-        if steps % default_config.step_interval_log == 0:
+        if steps >= next_step_log:
             wandb.log({'mean_return': np.mean(epymarl_rewards)})
             epymarl_rewards.clear()
+            next_step_log += default_config.step_interval_log
 
 
         if ep_i % default_config.test_interval ==0:
@@ -225,28 +218,15 @@ def run():
 
                     # rearrange observations to be per agent, and convert to torch Variable
 
-                    if default_config.alg == 'MARC':
-                        obs = [np.expand_dims(ob['image'].flatten(), axis=0) for ob in obs]
-                        torch_obs = [Variable(torch.Tensor(agent_obs[i]),
-                                              requires_grad=False)
-                                     for i in range(model.n_agents)]
-                        # get actions as torch Variables
-                        torch_actions = model.step(torch_obs, explore=False)
-                        # convert actions to numpy arrays
-                        actions = [np.argmax(ac.data.numpy().flatten()) for ac in torch_actions]
-                    else:
-                        if env.grid_observation:
-                            obs = tuple([obs[:, i][0]['image'].flatten() for i in range(model.nagents)])
-                            obs = np.vstack(obs)
-                            obs = np.expand_dims(obs, axis=0)
-                        torch_obs = [Variable(torch.Tensor(np.vstack(obs[:, i])),
-                                              requires_grad=False)
-                                     for i in range(model.nagents)]
-                        torch_agent_actions = model.step(torch_obs, explore=False)
-                        # convert actions to numpy arrays
-                        agent_actions = [ac.data.numpy() for ac in torch_agent_actions]
-                        # rearrange actions to be per environment
-                        actions = [[np.argmax(ac[0]) for ac in agent_actions]]
+
+                    obs = [np.expand_dims(ob['image'].flatten(), axis=0) for ob in obs]
+                    torch_obs = [Variable(torch.Tensor(agent_obs[i]),
+                                          requires_grad=False)
+                                 for i in range(model.n_agents)]
+                    # get actions as torch Variables
+                    torch_actions = model.step(torch_obs, explore=False)
+                    # convert actions to numpy arrays
+                    actions = [np.argmax(ac.data.numpy().flatten()) for ac in torch_actions]
 
                     obs, rewards, dones, infos = env.step(actions)
                     rewards, dones = np.array(rewards), np.array(dones)
@@ -263,22 +243,6 @@ def run():
 
     env.close()
     wandb.finish()
-
-def make_parallel_MAAC_env(args):
-    def get_env_fn(rank):
-        def init_env():
-            env = make_env(args)
-            env.agents = [Agent() for _ in range(args.player)]
-            # env.grid_observation = args.grid_observation
-            # env.seed(args.random_seed + rank * 1000)
-            np.random.seed(args.random_seed + rank * 1000)
-            return env
-        return init_env
-    # if default_config.n_rollout_threads == 1:
-    return DummyVecEnv([get_env_fn(0)])
-    # else:
-    #     return SubprocVecEnv([get_env_fn(i) for i in range(default_config.n_rollout_threads)])
-
 def make_env(default_config):
     from lbforaging.foraging import ForagingEnv
     env = ForagingEnv(
@@ -286,7 +250,7 @@ def make_env(default_config):
         max_player_level=2,
         field_size=(15,15),
         max_food= default_config.max_food,
-        grid_observation=False,
+        grid_observation=True,
         sight=15,
         max_episode_steps=default_config.episode_length,
         force_coop=False,
@@ -305,20 +269,22 @@ if __name__ == '__main__':
             "pi_lr": {'values':[0.0005, 0.001]},
             "q_lr": {'values':[0.0005, 0.001]},
             'tau': {'values':[0.001, 0.01]},
-            'batch_size':{'values': [512, 1024]},
-            'attend_heads': {'values':[2, 4, 6]},
+            # 'background_id': {'values':['b0', 'b3']},
+            'batch_size':{'value': 1024},
+            # 'attend_heads': {'values':[2, 4, 6]},
             'norm_rews': {'value': True},
             'force_coop': {'value' : False},
             'episode_length': {'value': 50},
             'keep_food': {'value' : True},
-            'grid_observation': {'value': False},
+            'grid_observation': {'value': True},
             # "reward_standardization": [True, False],
         },
     }
 
-    # sweep_id = wandb.sweep(sweep_config, project="MARC")
+    sweep_id = wandb.sweep(sweep_config, project="MARC")
 
-    wandb.agent('3pg1uu5u', function=run, count=5, project='MARC')
+    wandb.agent(sweep_id, function=run, count=1, project='MARC')
+    # sweep_id = wandb.sweep(sweep_config, project="MARC")
     # id : 3pg1uu5u
 
 

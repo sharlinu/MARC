@@ -23,6 +23,7 @@ class RelationalCritic(nn.Module):
                  hidden_dim: int = 32,
                  norm_in: object = True,
                  net_code: object = "1g0f",
+                 device: str = 'cuda:0',
                  mp_rounds: object = 1) -> object:
         """
         Inputs:
@@ -36,7 +37,7 @@ class RelationalCritic(nn.Module):
         self.n_agents = n_agents
         self.num_actions = n_actions[0]
         self.critics_head = nn.ModuleList()
-        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        self.device = device
         self.batch_size = batch_size
         self.max_reduce = True # TODO hardcoded
         # self.dense = True

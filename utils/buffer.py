@@ -70,14 +70,12 @@ class ReplayBufferMAAC(object):
         if self.curr_i == self.max_steps:
             self.curr_i = 0
 
-    def sample(self, N, to_gpu=False, norm_rews=True):
+    def sample(self, N, device='cpu', norm_rews=True):
         inds = np.random.choice(np.arange(self.filled_i), size=N,
                                 replace=True)
         # all this does is turn sample into a tensor
-        if to_gpu:
-            cast = lambda x: Variable(Tensor(x), requires_grad=False).cuda()
-        else:
-            cast = lambda x: Variable(Tensor(x), requires_grad=False)
+        
+        cast = lambda x: Variable(Tensor(x), requires_grad=False).to(device)
         if norm_rews and any([self.rew_buffs[i][:self.filled_i].mean() for i in range(self.num_agents)]) !=0 :
             ret_rews = [cast((self.rew_buffs[i][inds] -
                               self.rew_buffs[i][:self.filled_i].mean()) /
@@ -219,13 +217,10 @@ class ReplayBufferMARC(object):
         if self.curr_i == self.max_steps:
             self.curr_i = 0
 
-    def sample(self, N, to_gpu=False, norm_rews=True):
+    def sample(self, N, device='cpu', norm_rews=True):
         inds = np.random.choice(np.arange(self.filled_i), size=N,
                                 replace=True)
-        if to_gpu:
-            cast = lambda x: Variable(Tensor(x), requires_grad=False).cuda()
-        else:
-            cast = lambda x: Variable(Tensor(x), requires_grad=False)
+        cast = lambda x: Variable(Tensor(x), requires_grad=False).to(device)
         if norm_rews:
             ret_rews = [cast((self.rew_buffs[i][inds] -
                               self.rew_buffs[i][:self.filled_i].mean()) /
