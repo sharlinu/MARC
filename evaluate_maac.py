@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 def run(config):
-    display = False
+    display = True
     model_path = config.model_path
 
     # create folder for evaluating
@@ -45,15 +45,15 @@ def run(config):
         env = ForagingEnv(
             players=config.player,
             # max_player_level=args.max_player_level,
-            max_player_level=3,
+            max_player_level=2,
             field_size=(config.field, config.field),
-            max_food=config.max_food,
+            max_food=config.lbf['max_food'],
             grid_observation=False,
             sight=config.field,
-            max_episode_steps=25,
-            force_coop=config.force_coop,
-            keep_food=config.keep_food,
-            simple=config.simple,
+            max_episode_steps=50,
+            force_coop=config.lbf['force_coop'],
+            keep_food=config.lbf['keep_food'],
+            simple=False,
         )
     elif 'push' in config.env_id:
         from bpush.environment import BoulderPush
@@ -123,6 +123,7 @@ def run(config):
             obs, rewards, dones, infos = env.step(actions)
             # print('obs', obs)
             if display:
+                time.sleep(0.5)
                 env.render()
             collect_item['l_infos'].append(infos)
 
