@@ -88,6 +88,7 @@ def run(config):
         env = make_parallel_MAAC_env(config,seed=1)
         env.grid_observation = config.grid_observation
         env.reset()
+        start_episode = 0
         model = AttentionSAC.init_from_env(env,
                                            tau=config.tau,
                                            pi_lr=config.pi_lr,
@@ -104,19 +105,12 @@ def run(config):
                                       for acsp in env.action_space])
     else:
         raise ValueError(f'Cannot identify algorithm {config.alg}')
-    # env.seed(config.random_seed)
-    # np.random.seed(config.random_seed)
-
-    # if config.resume != '':
-    #     model_path = glob.glob('{}/saved_models/ckpt_best_avg*'.format(config.resume))[0]
-    #     print(f'Using model: {model_path}')
-    #     model, start_episode = RelationalSAC.init_from_save(model_path, load_critic=True)
 
     t = 0
     l_rewards = []
     epymarl_rewards = []
     if config.resume!='':
-        steps = 10000000
+        steps = 7980000 # TODO this needs to be stored somewhere or taken from reward_step.txt
         next_step_log = steps + config.step_interval_log
     else:
         steps = 0
@@ -358,11 +352,14 @@ def make_env(config):
             max_food_num=config.wolfpack['max_food_num'],
             obs_type=config.wolfpack['obs_type'],
             close_penalty = config.wolfpack['close_penalty'],
-            sparse = config.wolfpack['sparse'],
-        )
-
+            sparse = config.wolfpack['sparse'],)
         env.n_agents = env.num_players
         env.grid_observation = True
+    elif config.env_name == 'gridworld':
+        from Gridworld_Scripts.Connection import Connection as Conn
+        from Gridworld_Scripts.UnityGridEnv import UnityGridEnv as Env
+        conn = Conn(["server"])
+        env = Env(0, conn)
     else:
         raise ValueError(f'No known env {config.env_name} ')
     return env
@@ -423,7 +420,7 @@ if __name__ == '__main__':
     for k, v in params.items():
         args[k] = v
 
-   if args['resume']=='':
+    if args['resume']=='':
         if 'lbf' in args['env_name']:
             args['env_id'] = f"{args['env_name']}" \
                              f"_{args['field']}x{args['field']}_" \
@@ -444,6 +441,9 @@ if __name__ == '__main__':
                             f"_{args['wolfpack']['max_food_num']}s" \
                             f"{args['other']}"
             del args['bpush'], args['lbf']
+        elif 'grid' in args['env_name']:
+            args['env_id'] = f"{args['env_name']}"
+            del args['bpush'], args['lbf'], args['wolfpack']
 
         if params['exp_id'] == 'try':
             args['env_id'] = 'TEST'
@@ -457,7 +457,7 @@ if __name__ == '__main__':
 
         if args['alg'] == 'MARC':
             del args['maac']
-        elif args['alg'] == 'MAAC':
+        else:
             del args['marc']
 
     dir_collected_data = './experiments/multipleseeds_data_{}_{}_{}'.format(args['alg'], args['env_id'],

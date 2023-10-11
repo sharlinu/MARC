@@ -1,4 +1,4 @@
-env_name: 'wolfpack'
+env_name: 'gridworld'
 exp_id : 'std'
 other: ''
 
@@ -8,12 +8,11 @@ field: 10
 grid_observation: False
 
 alg: 'MAAC'
-n_episodes: 125000
-episode_length: 200
+n_episodes: 100000
+episode_length: 50
 test_n_episodes: 100
 tau: 0.01
 device: 'cpu'
-
 
 lbf:
   max_food: 5
@@ -47,4 +46,4 @@ maac:
 
 norm_rews : True
 batch_size : 1024
-#seeds: [6001]
+seeds: [4001]
