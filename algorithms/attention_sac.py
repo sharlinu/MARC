@@ -246,7 +246,8 @@ class RelationalSAC(object):
                      'critic_params': {'critic': self.critic.state_dict(),
                                        'target_critic': self.target_critic.state_dict(),
                                        'critic_optimizer': self.critic_optimizer.state_dict()},
-                     'episode': episode}
+                     'episode': episode,
+                     'device':self.device}
         torch.save(save_dict, filename)
 
     @classmethod
@@ -299,7 +300,7 @@ class RelationalSAC(object):
         return instance
 
     @classmethod
-    def init_from_save(cls, filename, load_critic=False):
+    def init_from_save(cls, filename, load_critic=False, device='cuda:0'):
         """
         Instantiate instance of this class from file created by 'save' method
         """
@@ -311,25 +312,25 @@ class RelationalSAC(object):
             episode = save_dict['episode']
         except Exception as e:
             print(e)
-            episode = 199999
+            episode = 0
+        save_dict['device'] = device
         instance = cls(**save_dict['init_dict'])
         instance.init_dict = save_dict['init_dict']
         for a, params in zip(instance.agents, save_dict['agent_params']):
-            a.load_params(params)
+            a.load_params(params, device=device)
             # a.policy_optimizer = Adam(a.policy.parameters(), lr=lr)
-        instance.pol_dev = 'cuda:0'
-        instance.trgt_pol_dev = 'cuda:0'
+        instance.pol_dev =  device
+        instance.trgt_pol_dev = device
         if load_critic:
             critic_params = save_dict['critic_params']
             instance.critic.load_state_dict(critic_params['critic'])
-            instance.critic = instance.critic.to('cuda:0')
-
             instance.target_critic.load_state_dict(critic_params['target_critic'])
-            instance.target_critic = instance.target_critic.to('cuda:0')
+            instance.critic = instance.critic.to(device)
+            instance.target_critic = instance.target_critic.to(device)
             instance.critic_optimizer = Adam(instance.critic.parameters(), lr=0.01, weight_decay=1e-3)
             instance.critic_optimizer.load_state_dict(critic_params['critic_optimizer'])
-            instance.critic_dev = 'cuda:0'
-            instance.trgt_critic_dev = 'cuda:0'
+            instance.critic_dev = device
+            instance.trgt_critic_dev = device
 
 
         return instance, episode
@@ -596,19 +597,31 @@ class AttentionSAC(object):
         return instance
 
     @classmethod
-    def init_from_save(cls, filename, load_critic=False):
+    def init_from_save(cls, filename, load_critic=False, device='cuda:0'):
         """
         Instantiate instance of this class from file created by 'save' method
         """
         save_dict = torch.load(filename, map_location=torch.device('cpu'))
         instance = cls(**save_dict['init_dict'])
         instance.init_dict = save_dict['init_dict']
+        try:
+            episode = save_dict['episode']
+        except Exception as e:
+            print(e)
+            episode = 0
         for a, params in zip(instance.agents, save_dict['agent_params']):
-            a.load_params(params)
-
+            a.load_params(params, device=device)
+        instance.pol_dev = device
+        instance.trgt_pol_dev = device
         if load_critic:
             critic_params = save_dict['critic_params']
             instance.critic.load_state_dict(critic_params['critic'])
+            instance.critic = instance.critic.to(device)
+            instance.target_critic = instance.target_critic.to(device)
+
+
             instance.target_critic.load_state_dict(critic_params['target_critic'])
             instance.critic_optimizer.load_state_dict(critic_params['critic_optimizer'])
-        return instance
+            instance.critic_dev = device
+            instance.trgt_critic_dev = device
+        return instance, episode
