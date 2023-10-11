@@ -311,7 +311,7 @@ class RelationalSAC(object):
             episode = save_dict['episode']
         except Exception as e:
             print(e)
-            episode = 0
+            episode = 199999
         instance = cls(**save_dict['init_dict'])
         instance.init_dict = save_dict['init_dict']
         for a, params in zip(instance.agents, save_dict['agent_params']):
