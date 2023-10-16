@@ -48,7 +48,7 @@ class RelationalCritic(nn.Module):
         self.nb_edge_types = len(spatial_tensors)
 
 
-        self.embedder = nn.Linear(input_dims[0], hidden_dim) # TODO - hardcoding needed?
+        self.embedder = nn.Linear(input_dims[0], hidden_dim)
         self.gnn_layers = RGCNConv(hidden_dim, hidden_dim, self.nb_edge_types)
 
         # iterate over agents
