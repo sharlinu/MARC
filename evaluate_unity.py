@@ -4,10 +4,12 @@ import time
 import imageio
 from pathlib import Path
 from torch.autograd import Variable
-from algorithms.attention_sac import RelationalSAC
+from algorithms.attention_sac import RelationalSAC, AttentionSAC
 import os
 import json
 import sys
+from utils.misc import Agent
+
 from Gridworld_Scripts.Connection import Connection as Conn
 from Gridworld_Scripts.UnityGridEnv import UnityGridEnv as Env 
 
@@ -16,6 +18,7 @@ import numpy as np
 from enum import Enum
 import yaml
 from lbforaging.foraging import ForagingEnv
+from utils.env_wrappers import DummyVecEnv
 
 class Action(Enum):
     NONE = 0
@@ -23,6 +26,19 @@ class Action(Enum):
     SOUTH = 2
     WEST = 3
     EAST = 4
+
+def make_parallel_MAAC_env(env, config):
+    from utils.env_wrappers import DummyVecEnv
+    def get_env_fn():
+        def init_env():
+            env.agents = [Agent() for _ in range(config.player)]
+            # env.grid_observation = args.grid_observation
+            # env.seed(args.random_seed + rank * 1000)
+            np.random.seed(config.random_seed)
+            return env
+        return init_env
+    # if config.n_rollout_threads == 1:
+    return DummyVecEnv([get_env_fn()])
 
 def run(config):
     model_path = config.model_path
@@ -36,11 +52,15 @@ def run(config):
     gif_path = '{}/{}'.format(eval_path, 'gifs')
     os.makedirs(gif_path, exist_ok=True)
 
-    model, start_episode  = RelationalSAC.init_from_save(model_path)
+    if config.alg=='MARC':
+        model, _ = RelationalSAC.init_from_save(model_path)
+    else:
+        model, _ = AttentionSAC.init_from_save(model_path)
     print(config.benchmark)
-    conn = Conn([''])
+    conn = Conn(['server'])
     env = Env(0, conn)
-
+    # if config.alg == 'MAAC':
+    #     env = make_parallel_MAAC_env(env, config)
     model.prep_rollouts(device='cpu')
 
     ifi = 1 / config.fps  # inter-frame interval
@@ -59,8 +79,8 @@ def run(config):
         l_rewards = []
         ep_rew = 0
 
-        from utils.rel_wrapper2 import AbsoluteVKBWrapper
-       # env = AbsoluteVKBWrapper(env, config.dense, background_id=config.background_id)
+        # from utils.rel_wrapper2 import AbsoluteVKBWrapper
+        # env = AbsoluteVKBWrapper(env, config.dense, background_id=config.background_id)
 
         obs = env.reset()
         #if render:
@@ -82,6 +102,8 @@ def run(config):
             actions = [np.argmax(ac.data.numpy().flatten()) for ac in torch_actions]
             # print('actions', actions)
             obs, rewards, dones, infos = env.step(actions)
+            rewards, dones = np.array(rewards), np.array(dones)
+
             if render:
             #    env.render()
                 time.sleep(1)
@@ -127,7 +149,7 @@ if __name__ == '__main__':
     parser.add_argument("--benchmark", action="store_false",
                         help="benchmark mode")
     config = parser.parse_args()
-    render = True
+    render = False
     args = vars(config)
     eval_path = Path(config.model_path)
     dir_exp = Path(*eval_path.parts[:-2])
@@ -138,4 +160,5 @@ if __name__ == '__main__':
         args[k] = v
 
     run(config)
+
 

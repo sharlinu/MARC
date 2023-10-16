@@ -1,18 +1,19 @@
-env_name: 'wolfpack'
+<<<<<<< HEAD
+env_name: 'gridworld'
 exp_id : 'std'
-other: '_dense_vector'
+other: ''
 
-player: 3
-field: 10
+
+player: 8
+field: 15
 grid_observation: False
 
 alg: 'MAAC'
-n_episodes: 125000
-episode_length: 200
+n_episodes: 100000
+episode_length: 50
 test_n_episodes: 100
-tau: 0.01
-device: 'cpu'
-
+#tau: 0.01
+device: 'cuda:1'
 
 lbf:
   max_food: 5
@@ -28,15 +29,15 @@ bpush:
 
 wolfpack:
   max_food_num: 2
-  obs_type: 'dense_vector'
+  obs_type: 'grid'
   sparse: True
   close_penalty : 0.0
   attr_mapping: {'wolf': 0, 'sheep': 1, 'id': 2}
 
 marc:
-  dense: True
+  dense: False
   relational_embedding : False
-  background_id : 'b0'
+  background_id : 'b3'
   abs_id: 'None'
   buffer_length: 100000
 
@@ -46,4 +47,4 @@ maac:
 
 norm_rews : True
 batch_size : 1024
-#seeds: [6001]
+seeds: [4001]

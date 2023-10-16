@@ -28,6 +28,11 @@ def run(config):
 
     torch.manual_seed(config.random_seed)
     np.random.seed(config.random_seed)
+    if config.exp_id == 'std':
+        wandb.init(
+            project='MARC',
+            name=f'{datetime.date.today().day}-{datetime.date.today().month}-{config.alg}-{config.env_id}',
+            config=vars(config), )
     if config.alg == 'MARC':
         env = make_env(config)
         env.grid_observation = config.grid_observation
@@ -46,7 +51,7 @@ def run(config):
             model_path = glob.glob('{}/saved_models/ckpt_final*'.format(config.resume))[0]
             config.n_episodes = config.n_episodes + config.resume_episodes
             print(f'Training for an additional {config.resume_episodes}')
-            model, start_episode = RelationalSAC.init_from_save(model_path, load_critic=True)
+            model, start_episode = RelationalSAC.init_from_save(model_path, load_critic=True, device=config.device)
             toResume = input(f'Do you want to resume training {model_path} for {config.resume_episodes} starting at {start_episode}? (yes/no)')
             if toResume.lower()=='yes':
                 print('resuming training')
@@ -69,11 +74,6 @@ def run(config):
                                                device=config.device,
                                                reward_scale=config.reward_scale)
 
-        if config.exp_id == 'std':
-            wandb.init(
-                project='MARC',
-                name=f'{datetime.date.today().day}-{datetime.date.today().month}-{config.alg}-{config.env_id}',
-                config=vars(config),)
         replay_buffer = ReplayBufferMARC(max_steps=config.marc['buffer_length'],
                                          num_agents=model.n_agents,
                                          obs_dims=[np.prod(obsp['image'].shape) for obsp in env.observation_space],
@@ -88,15 +88,30 @@ def run(config):
         env = make_parallel_MAAC_env(config,seed=1)
         env.grid_observation = config.grid_observation
         env.reset()
-        model = AttentionSAC.init_from_env(env,
-                                           tau=config.tau,
-                                           pi_lr=config.pi_lr,
-                                           q_lr=config.q_lr,
-                                           gamma=config.gamma,
-                                           pol_hidden_dim=config.pol_hidden_dim,
-                                           critic_hidden_dim=config.critic_hidden_dim,
-                                           attend_heads=config.maac['attend_heads'],
-                                           reward_scale=config.reward_scale)
+        if config.resume != '':
+            # resume_path = config.resume
+            model_path = glob.glob('{}/saved_models/ckpt_final*'.format(config.resume))[0]
+            config.n_episodes = config.n_episodes + config.resume_episodes
+            print(f'Training for an additional {config.resume_episodes}')
+            model, start_episode = AttentionSAC.init_from_save(model_path, load_critic=True, device=config.device)
+            toResume = input(f'Do you want to resume training {model_path} for {config.resume_episodes} starting at {start_episode}? (yes/no)')
+            if toResume.lower()=='yes':
+                print('resuming training')
+            else:
+                print('Closing connection')
+                import sys
+                sys.exit()
+            # wandb.init(project="MARC", resume=True)
+        else:
+            model = AttentionSAC.init_from_env(env,
+                                               tau=config.tau,
+                                               pi_lr=config.pi_lr,
+                                               q_lr=config.q_lr,
+                                               gamma=config.gamma,
+                                               pol_hidden_dim=config.pol_hidden_dim,
+                                               critic_hidden_dim=config.critic_hidden_dim,
+                                               attend_heads=config.maac['attend_heads'],
+                                               reward_scale=config.reward_scale)
         replay_buffer = ReplayBufferMAAC(config.maac['buffer_length'], model.n_agents,
                                      [np.prod(obsp['image'].shape) if env.grid_observation else obsp.shape[0]
                                       for obsp in env.observation_space],
@@ -104,19 +119,12 @@ def run(config):
                                       for acsp in env.action_space])
     else:
         raise ValueError(f'Cannot identify algorithm {config.alg}')
-    # env.seed(config.random_seed)
-    # np.random.seed(config.random_seed)
-
-    # if config.resume != '':
-    #     model_path = glob.glob('{}/saved_models/ckpt_best_avg*'.format(config.resume))[0]
-    #     print(f'Using model: {model_path}')
-    #     model, start_episode = RelationalSAC.init_from_save(model_path, load_critic=True)
 
     t = 0
     l_rewards = []
     epymarl_rewards = []
     if config.resume!='':
-        steps = 10000000
+        steps =  3130000 # TODO update this!
         next_step_log = steps + config.step_interval_log
     else:
         steps = 0
@@ -358,11 +366,14 @@ def make_env(config):
             max_food_num=config.wolfpack['max_food_num'],
             obs_type=config.wolfpack['obs_type'],
             close_penalty = config.wolfpack['close_penalty'],
-            sparse = config.wolfpack['sparse'],
-        )
-
+            sparse = config.wolfpack['sparse'],)
         env.n_agents = env.num_players
         env.grid_observation = True
+    elif config.env_name == 'gridworld':
+        from Gridworld_Scripts.Connection import Connection as Conn
+        from Gridworld_Scripts.UnityGridEnv import UnityGridEnv as Env
+        conn = Conn(["server"])
+        env = Env(0, conn)
     else:
         raise ValueError(f'No known env {config.env_name} ')
     return env
@@ -377,9 +388,9 @@ if __name__ == '__main__':
     import glob as glob
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--resume", default='', type=str)
-    parser.add_argument("--resume_episodes", default=0, type=int)
-    # parser.add_argument("--random_seed", default=1, type=int)
+    parser.add_argument("--resume", type=str)
+    parser.add_argument("--resume_episodes", type=int)
+    parser.add_argument("--random_seed", default=4001, type=int)
     # parser.add_argument("--n_rollout_threads", default=1, type=int)
     parser.add_argument("--buffer_length", default=int(1e6), type=int)
     parser.add_argument("--n_episodes", default=20000, type=int)
@@ -402,7 +413,7 @@ if __name__ == '__main__':
     parser.add_argument("--tau", default=0.001, type=float) # soft update rate
     parser.add_argument("--gamma", default=0.99, type=float)
     parser.add_argument("--reward_scale", default=100., type=float) # temperature parameter alpha = 1/reward_scale = 0.01 in this case
-    parser.add_argument("--device",default='cuda:0', type=str)
+    # parser.add_argument("--device",default='cuda:0', type=str)
     parser.add_argument('--dir_base', default='./experiments',
                         help='path of the experiment directory')
     config = parser.parse_args()
@@ -422,7 +433,7 @@ if __name__ == '__main__':
 
     for k, v in params.items():
         args[k] = v
-
+    print(f'using {config.device}')
     # deletes arguments that are not used in this experiment
     if args['resume']=='':
         if 'lbf' in args['env_name']:
@@ -445,6 +456,9 @@ if __name__ == '__main__':
                             f"_{args['wolfpack']['max_food_num']}s" \
                             f"{args['other']}"
             del args['bpush'], args['lbf']
+        elif 'grid' in args['env_name']:
+            args['env_id'] = f"{args['env_name']}"
+            del args['bpush'], args['lbf'], args['wolfpack']
 
         if params['exp_id'] == 'try':
             args['env_id'] = 'TEST'
@@ -458,7 +472,7 @@ if __name__ == '__main__':
 
         if args['alg'] == 'MARC':
             del args['maac']
-        elif args['alg'] == 'MAAC':
+        else:
             del args['marc']
 
     dir_collected_data = './experiments/multipleseeds_data_{}_{}_{}'.format(args['alg'], args['env_id'],
@@ -475,66 +489,64 @@ if __name__ == '__main__':
 
     list_exp_dir = []
     if args['resume'] == '':
-        for seed in args['seeds']:
-            args['random_seed'] = seed
 
-            dir_exp_name = '{}_{}_{}_seed{}'.format(str([datetime.date.today()][0]),
-                                                    args['env_id'],
-                                                    args['exp_id'],
-                                                    args['random_seed'])
-            args['dir_exp'] = '{}/{}/{}/{}'.format(args['dir_base'], args['alg'],args['env_name'], dir_exp_name)
-            args['dir_summary'] = '{}/summary'.format(args['dir_exp'])
-            args['dir_saved_models'] = '{}/saved_models'.format(args['dir_exp'])
-            args['dir_monitor'] = '{}/monitor'.format(args['dir_exp'])
+        dir_exp_name = '{}_{}_{}_seed{}'.format(str([datetime.date.today()][0]),
+                                                args['env_id'],
+                                                args['exp_id'],
+                                                args['random_seed'])
+        args['dir_exp'] = '{}/{}/{}/{}'.format(args['dir_base'], args['alg'],args['env_name'], dir_exp_name)
+        args['dir_summary'] = '{}/summary'.format(args['dir_exp'])
+        args['dir_saved_models'] = '{}/saved_models'.format(args['dir_exp'])
+        args['dir_monitor'] = '{}/monitor'.format(args['dir_exp'])
 
-            # creating folders:
-            directory = args['dir_exp']
-            if os.path.exists(directory):
-                # toDelete= input("{} already exists, delete it if do you want to continue. Delete it? (yes/no) ".\
-                #     format(directory))
-                toDelete = 'yes'
-                if toDelete.lower() == 'yes':
-                    shutil.rmtree(directory)
-                    print("Directory removed")
-                if toDelete.lower() == 'no':
-                    print("It was not possible to continue, an experiment \
-                            folder is required.Terminiting here.")
-                    import sys
+        # creating folders:
+        directory = args['dir_exp']
+        if os.path.exists(directory):
+            # toDelete= input("{} already exists, delete it if do you want to continue. Delete it? (yes/no) ".\
+            #     format(directory))
+            toDelete = 'yes'
+            if toDelete.lower() == 'yes':
+                shutil.rmtree(directory)
+                print("Directory removed")
+            if toDelete.lower() == 'no':
+                print("It was not possible to continue, an experiment \
+                        folder is required.Terminiting here.")
+                import sys
 
-                    sys.exit()
+                sys.exit()
 
-            if os.path.exists(directory) == False:
-                os.makedirs(directory)
-                os.makedirs(args['dir_summary'])
-                os.makedirs(args['dir_saved_models'])
-                os.makedirs(args['dir_monitor'])
-                # with open(os.path.expanduser('{}/arguments.txt'.format(args['dir_exp'])), 'w+') as file:
-                #     file.write(json.dumps(args, indent=4, sort_keys=True))
-                with open(os.path.expanduser('{}/config.yaml'.format(args['dir_exp'])), 'w+') as file:
-                    documents = yaml.dump(args, file)
+        if os.path.exists(directory) == False:
+            os.makedirs(directory)
+            os.makedirs(args['dir_summary'])
+            os.makedirs(args['dir_saved_models'])
+            os.makedirs(args['dir_monitor'])
+            # with open(os.path.expanduser('{}/arguments.txt'.format(args['dir_exp'])), 'w+') as file:
+            #     file.write(json.dumps(args, indent=4, sort_keys=True))
+            with open(os.path.expanduser('{}/config.yaml'.format(args['dir_exp'])), 'w+') as file:
+                documents = yaml.dump(args, file)
 
 
-            # train
-            list_exp_dir.append(args['dir_exp'])
+        # train
+        list_exp_dir.append(args['dir_exp'])
 
-            if os.path.exists('{}/collected_data_seed_{}.json'.format(dir_collected_data, seed)) == False:
-                st = time.time()
-                run(config)
+        if os.path.exists('{}/collected_data_seed_{}.json'.format(dir_collected_data, args['random_seed'])) == False:
+            st = time.time()
+            run(config)
 
-                # test
-                # model_path = '{}/'.format(args['dir_exp'])
-                model_path = glob.glob('{}/saved_models/ckpt_best_*'.format(args['dir_exp']))[0]
-                t_min = (time.time() - st)/60
-                print(f'{args["n_episodes"]} episode on gpu:{args["use_gpu"]} with max {args["episode_length"]} steps ran in {t_min:.2f} minutes - {t_min*60/args["n_episodes"]:.2f} sec/episode')
+            # test
+            # model_path = '{}/'.format(args['dir_exp'])
+            model_path = glob.glob('{}/saved_models/ckpt_best_*'.format(args['dir_exp']))[0]
+            t_min = (time.time() - st)/60
+            print(f'{args["n_episodes"]} episode on gpu:{args["use_gpu"]} with max {args["episode_length"]} steps ran in {t_min:.2f} minutes - {t_min*60/args["n_episodes"]:.2f} sec/episode')
 
-                cmd_test = 'python evaluate_discrete.py {}'.format(model_path)
-                print(cmd_test)
+            cmd_test = 'python evaluate_discrete.py {}'.format(model_path)
+            print(cmd_test)
 
-                os.system(cmd_test)
+            os.system(cmd_test)
 
-                shutil.copyfile('{}/summary/reward_total_a.txt'.format(args['dir_exp']), # TODO check if this works - changed  list_exp_dir[-1]
-                                '{}/reward_training_seed{}.txt'.format(dir_collected_data, seed)
-                                )
+            shutil.copyfile('{}/summary/reward_total_a.txt'.format(args['dir_exp']), # TODO check if this works - changed  list_exp_dir[-1]
+                            '{}/reward_training_seed{}.txt'.format(dir_collected_data, args['random_seed'])
+                            )
     else:
         if os.path.exists('{}/collected_data_seed_{}.json'.format(dir_collected_data, args['random_seed'])) == False:
             st = time.time()
