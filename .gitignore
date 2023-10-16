@@ -18,6 +18,7 @@ model.pt
 # Log files
 *.log
 saved_models/
+!ckpt_final.pth.tar
 monitor/
 evaluate/
 summary/agent*/
