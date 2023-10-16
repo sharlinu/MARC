@@ -46,7 +46,7 @@ def run(config):
         env.agents = [None] * len(env.action_space)
         unary_dim = env.obs_shape['unary']
         env.reset()
-        if config.resume != '':
+        if config.resume:
             # resume_path = config.resume
             model_path = glob.glob('{}/saved_models/ckpt_final*'.format(config.resume))[0]
             config.n_episodes = config.n_episodes + config.resume_episodes
@@ -88,7 +88,7 @@ def run(config):
         env = make_parallel_MAAC_env(config,seed=1)
         env.grid_observation = config.grid_observation
         env.reset()
-        if config.resume != '':
+        if config.resume:
             # resume_path = config.resume
             model_path = glob.glob('{}/saved_models/ckpt_final*'.format(config.resume))[0]
             config.n_episodes = config.n_episodes + config.resume_episodes
@@ -103,6 +103,7 @@ def run(config):
                 sys.exit()
             # wandb.init(project="MARC", resume=True)
         else:
+            start_episode = 0
             model = AttentionSAC.init_from_env(env,
                                                tau=config.tau,
                                                pi_lr=config.pi_lr,
@@ -123,7 +124,7 @@ def run(config):
     t = 0
     l_rewards = []
     epymarl_rewards = []
-    if config.resume!='':
+    if config.resume:
         steps =  3130000 # TODO update this!
         next_step_log = steps + config.step_interval_log
     else:
@@ -423,7 +424,7 @@ if __name__ == '__main__':
     else:
         config.use_gpu = False
     args = vars(config)
-    if args['resume'] == '':
+    if not args['resume']:
         with open('config.yaml', "r") as file:
             params = yaml.load(file, Loader=yaml.FullLoader)
     else:
@@ -435,7 +436,7 @@ if __name__ == '__main__':
         args[k] = v
     print(f'using {config.device}')
     # deletes arguments that are not used in this experiment
-    if args['resume']=='':
+    if not args['resume']:
         if 'lbf' in args['env_name']:
             args['env_id'] = f"{args['env_name']}" \
                              f"_{args['field']}x{args['field']}_" \
@@ -488,7 +489,7 @@ if __name__ == '__main__':
         os.makedirs(dir_collected_data)
 
     list_exp_dir = []
-    if args['resume'] == '':
+    if not args['resume']:
 
         dir_exp_name = '{}_{}_{}_seed{}'.format(str([datetime.date.today()][0]),
                                                 args['env_id'],

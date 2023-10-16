@@ -43,18 +43,13 @@ def run(config):
     env = Env(0,conn)
     # env.seed(config.random_seed)
     np.random.seed(config.random_seed)
-    env = AbsoluteVKBWrapper(env, dense=False, background_id=config.background_id, abs_id='None')
+    if config.alg=='MARC':
+        env = AbsoluteVKBWrapper(env, dense=False, background_id=config.background_id, abs_id='None')
+        unary_dim = env.obs_shape['unary']
     env.agents = [None] * len(env.action_space)
-    # nullary_dim = env.obs_shape[0]
-    unary_dim = env.obs_shape['unary']
-    # binary_dim = env.obs_shape[2]
     env.reset()
-    spatial_tensors = env.spatial_tensors
-    if config.resume != '':
-        model_path = glob.glob('{}/saved_models/ckpt_best_avg*'.format(config.resume))[0]
-        print(f'Using model: {model_path}')
-        model, start_episode = RelationalSAC.init_from_save(model_path)
-    else:
+    if config.alg == 'MARC':
+        spatial_tensors = env.spatial_tensors
         start_episode = 0
         model = RelationalSAC.init_from_env(env,
                                             spatial_tensors=spatial_tensors,
@@ -66,16 +61,15 @@ def run(config):
                                            pol_hidden_dim=config.pol_hidden_dim,
                                            critic_hidden_dim=config.critic_hidden_dim,
                                            reward_scale=config.reward_scale)
-
-    replay_buffer = ReplayBuffer2(max_steps=config.buffer_length,
-                                 num_agents=model.n_agents,
-                                 obs_dims=[np.prod(obsp['image'].shape) for obsp in env.observation_space],
-                                 # nullary_dims=[nullary_dim for _ in range(model.nagents)],
-                                 unary_dims=[unary_dim for _ in range(model.n_agents)],
-                                 # binary_dims=[binary_dim for _ in range(model.nagents)],
-                                 ac_dims= [acsp.shape[0] if isinstance(acsp, Box) else acsp.n
-                                 for acsp in env.action_space],
-                                 dense = config.dense)
+        replay_buffer = ReplayBuffer2(max_steps=config.buffer_length,
+                                      num_agents=model.n_agents,
+                                     obs_dims=[np.prod(obsp['image'].shape) for obsp in env.observation_space],
+                                     # nullary_dims=[nullary_dim for _ in range(model.nagents)],
+                                     unary_dims=[unary_dim for _ in range(model.n_agents)],
+                                     # binary_dims=[binary_dim for _ in range(model.nagents)],
+                                     ac_dims= [acsp.shape[0] if isinstance(acsp, Box) else acsp.n
+                                     for acsp in env.action_space],
+                                     dense = config.dense)
     t = 0
     l_rewards = []
     epymarl_rewards = []
