@@ -1,0 +1,68 @@
+alg: MARC
+attend_heads: 4
+batch_size: 1024
+bpush:
+  attr_mapping:
+    agent: 0
+    boulder: 1
+    goal: 2
+    id: 3
+  penalty: 0.01
+  sensor_range: 4
+buffer_length: 1000
+critic_hidden_dim: 128
+dir_base: ./experiments
+dir_exp: ./experiments/MARC/wolfpack/2023-09-08_wolfpack_10x10_3w_2s_try_seed4001
+dir_monitor: ./experiments/MARC/wolfpack/2023-09-08_wolfpack_10x10_3w_2s_try_seed4001/monitor
+dir_saved_models: ./experiments/MARC/wolfpack/2023-09-08_wolfpack_10x10_3w_2s_try_seed4001/saved_models
+dir_summary: ./experiments/MARC/wolfpack/2023-09-08_wolfpack_10x10_3w_2s_try_seed4001/summary
+env_id: wolfpack_10x10_3w_2s
+env_name: wolfpack
+episode_length: 25
+exp_id: try
+field: 10
+gamma: 0.99
+grid_observation: false
+lbf:
+  attr_mapping:
+    agent: 0
+    food: 2
+    id: 1
+  force_coop: false
+  keep_food: true
+  max_food: 3
+  max_player_level: 2
+marc:
+  abs_id: None
+  background_id: b0
+  dense: false
+  relational_embedding: false
+n_episodes: 1000
+n_rollout_threads: 1
+norm_rews: true
+num_updates: 4
+other: ''
+pi_lr: 0.001
+player: 3
+pol_hidden_dim: 128
+q_lr: 0.001
+random_seed: 4001
+resume: ''
+reward_scale: 100.0
+save_interval: 1000
+save_interval_log: 100
+seeds:
+- 4001
+step_interval_log: 10000
+steps_per_update: 100
+tau: 0.001
+test_interval: 100
+test_n_episodes: 10
+use_gpu: true
+wolfpack:
+  attr_mapping:
+    id: 2
+    sheep: 1
+    wolf: 0
+  max_food_num: 2
+  obs_type: grid
