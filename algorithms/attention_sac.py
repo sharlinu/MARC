@@ -103,6 +103,19 @@ class RelationalSAC(object):
         return [a.step(obs, explore=explore) for a, obs in zip(self.agents,
                                                                observations)]
 
+    def target_step(self, observations, explore=False):
+        """
+        Take a step forward in environment with all agents
+        Inputs:
+            observations: List of observations for each agent
+        Outputs:
+            actions: List of actions for each agent
+        """
+        # observations = [observations['image']] * 2
+        return [a.step(obs, explore=explore) for a, obs in zip(self.agents,
+                                                               observations)]
+
+
     def update_critic(self, sample, soft=True, logger=None, **kwargs):
         """
         Update central critic for all agents

@@ -39,6 +39,17 @@ class AttentionAgent(object):
         """
         return self.policy(obs, sample=explore)
 
+    def target_step(self, obs, explore=False):
+        """
+        Take a step forward in environment for a minibatch of observations
+        Inputs:
+            obs (PyTorch Variable): Observations for this agent
+            explore (boolean): Whether or not to sample
+        Outputs:
+            action (PyTorch Variable): Actions for this agent
+        """
+        return self.target_policy(obs, sample=False)
+
     def get_params(self):
         return {'policy': self.policy.state_dict(),
                 'target_policy': self.target_policy.state_dict(),
