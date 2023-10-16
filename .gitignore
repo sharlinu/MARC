@@ -25,6 +25,7 @@ events.out*
 arguments.txt
 summary.json
 *multipleseeds*/
+reward_total.png
 # Package files
 *.jar
 
