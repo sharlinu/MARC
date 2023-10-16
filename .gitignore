@@ -17,8 +17,6 @@ model.pt
 
 # Log files
 *.log
-#saved_models/
-#!kpt_final.pth.tar
 ckpt_best_avg_r*
 monitor/
 evaluate/
