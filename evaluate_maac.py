@@ -24,7 +24,7 @@ def run(config):
     gif_path = '{}/{}'.format(eval_path, 'gifs')
     os.makedirs(gif_path, exist_ok=True)
 
-    maddpg = AttentionSAC.init_from_save(model_path)
+    maddpg, _ = AttentionSAC.init_from_save(model_path)
     print(config.env_id)
     if 'boxworld' in config.env_id:
         from environments.box import BoxWorldEnv
@@ -114,9 +114,9 @@ def run(config):
                 obs = [np.expand_dims(ob['image'].flatten(), axis=0) for ob in obs]
             torch_obs = [Variable(torch.Tensor(obs[i]).view(1, -1),
                                   requires_grad=False)
-                         for i in range(maddpg.nagents)]
+                         for i in range(maddpg.n_agents)]
             # get actions as torch Variables
-            torch_actions = maddpg.step(torch_obs, explore=False)
+            torch_actions = maddpg.target_step(torch_obs)
             # convert actions to numpy arrays
             actions = [np.argmax(ac.data.numpy().flatten()) for ac in torch_actions]
             # print('actions',actions)
@@ -156,7 +156,7 @@ if __name__ == '__main__':
                         help="Load incremental policy from given episode " +
                              "rather than final policy")
     parser.add_argument("--test_n_episodes", default=10, type=int)
-    parser.add_argument("--test_episode_length", default=25, type=int)
+    parser.add_argument("--test_episode_length", default=50, type=int)
     parser.add_argument("--fps", default=30, type=int)
     parser.add_argument("--no_render",   action="store_false",
                         help="render")

@@ -81,8 +81,8 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
             self.obj_n = np.prod((self.field_size, self.field_size)) #physical entities
         else:
             self.obj_n = env.n_agents + env.n_objects
-        self.obs_shape = {'unary': (self.obj_n, self.n_attr),
-                          'binary': (self.obj_n, self.obj_n, self.n_rel_rules+len(self.abs_rel_func))}
+        # self.obs_shape = {'unary': (self.obj_n, self.n_attr),
+        #                   'binary': (self.obj_n, self.obj_n, self.n_rel_rules+len(self.abs_rel_func))}
         self.spatial_tensors = None
         self.prev = None
 
@@ -91,8 +91,8 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
         attribute_sum = np.sum(data, axis=2)
 
         non_zero_count = np.count_nonzero(attribute_sum)
-        if non_zero_count != self.obj_n:
-            print( f'object mismatch: {non_zero_count} non_zerocount but {self.obj_n} objects')
+        # if non_zero_count != self.obj_n:
+        #     print( f'object mismatch: {non_zero_count} non_zerocount but {self.obj_n} objects')
         # Find the indices of non-zero attribute sums
         non_zero_indices = np.nonzero(attribute_sum)
 
@@ -163,11 +163,11 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
 
         all_binaries = self.spatial_tensors + self.abstract_tensors
         binary_tensors = torch.tensor(all_binaries)
-        if len(unary_tensors[0]) != self.obj_n:
-            unary_t =  np.array([])
-        else:
-            unary_t = np.stack(unary_tensors, axis=-1)
-        gd = to_gd(binary_tensors, nb_objects=self.obj_n)
+        # if len(unary_tensors[0]) != self.obj_n:
+        #     unary_t =  np.array([])
+        # else:
+        unary_t = torch.Tensor(np.stack(unary_tensors, axis=-1))
+        gd = to_gd(binary_tensors, unary_t, nb_objects=self.obj_n) # TODO
         return unary_t, gd
 
     def observation(self, obs):
@@ -245,7 +245,7 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
 
         return rel_func
 
-def to_gd(data: torch.Tensor, nb_objects) -> GeometricData:
+def to_gd(data: torch.Tensor, unary_t, nb_objects) -> GeometricData:
     """
     takes batch of adjacency geometric data and transforms it to a GeometricData object for torch.geometric
 
@@ -253,8 +253,8 @@ def to_gd(data: torch.Tensor, nb_objects) -> GeometricData:
     --------
     data : heterogeneous adjacency matrix (nb_relations, nb_objects, nb_objects)
     """
-    nb_objects = nb_objects
-    x = torch.arange(nb_objects).view(-1, 1) # TODO change to actual node features i.e. the unary tensors
+    # nb_objects = nb_objects
+    # x = torch.arange(nb_objects).view(-1, 1) # TODO change to actual node features i.e. the unary tensors
     nz = torch.nonzero(data)
 
     # list of all edges and what relationtype they have
@@ -262,7 +262,7 @@ def to_gd(data: torch.Tensor, nb_objects) -> GeometricData:
 
     # list of node to node indicating an edge
     edge_index = nz[:, 1:].T
-    return GeometricData(x=x, edge_index=edge_index, edge_attr=edge_attr)
+    return GeometricData(x=unary_t, edge_index=edge_index, edge_attr=edge_attr)
 
 
 

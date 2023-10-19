@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from itertools import chain
-from torch_geometric.nn import RGCNConv
+from torch_geometric.nn import RGCNConv, pool
 from torch_geometric.data import Data as GeometricData, Batch
 
 
@@ -48,8 +48,8 @@ class RelationalCritic(nn.Module):
         self.nb_edge_types = len(spatial_tensors)
 
 
-        self.embedder = nn.Linear(input_dims[0], hidden_dim)
-        self.gnn_layers = RGCNConv(hidden_dim, hidden_dim, self.nb_edge_types)
+        # self.embedder = nn.Linear(input_dims[0], hidden_dim)
+        self.gnn_layers = RGCNConv(3, hidden_dim, self.nb_edge_types)
 
         # iterate over agents
         for _ in range(self.n_agents):
@@ -61,8 +61,8 @@ class RelationalCritic(nn.Module):
             critic.add_module('critic_fc2', nn.Linear(hidden_dim, self.num_actions))
             self.critics_head.append(critic) # one critic for each agent
 
-        self.shared_modules = [self.embedder, self.gnn_layers]
-
+        # self.shared_modules = [self.embedder, self.gnn_layers]
+        self.shared_modules = [self.gnn_layers]
 
     def shared_parameters(self):
         """
@@ -109,36 +109,29 @@ class RelationalCritic(nn.Module):
 
         for a_i in agents:
             # feature embedding
-            #embedds = torch.flatten(inputs[1], 0, 1)
-            embedds = torch.flatten(unary_tensors[a_i], 0, 1).float().to(device=self.device)
-            #embedds = self.embedding_linear(embedds)
-            embedds = self.embedder(embedds) # seems right so far
-
+            # print(unary_tensors[a_i])
+            # embedds = torch.flatten(unary_tensors[a_i], 0, 1).float().to(device=self.device)
+            # embedds = self.embedder(embedds) # seems right so far
 
             # RGCN module
             if all(binary_tensors):
-
-                # single_gd, self.slices = to_gd(binary_t)  # makes adjs geometric data usable for torch geometric
-                # batch_data = [to_gd(instance) for instance in binary_tensors]
-
                 gd = Batch.from_data_list(binary_tensors[a_i])
                 gd = gd.to(device = self.device)
-                # max_node = max(i + 1 for b in batch_data for i in b.x[:, 0].cpu().numpy())
-                # slices = [max_node for _ in batch_data]
 
-                embedds = self.gnn_layers(embedds, gd.edge_index, gd.edge_attr)
+                embedds = self.gnn_layers(gd.x, gd.edge_index, gd.edge_attr)
             else:
                 embedds = self.gnn_layers(embedds, self.gd.edge_index, self.gd.edge_attr)
             embedds = torch.relu(embedds)
 
-            chunks = torch.split(embedds, self.slices, dim=0) # splits it in slices/entities
-            chunks = [p.unsqueeze(0) for p in chunks] # just adds back another dimension in the beginning
-            x = torch.cat(chunks, dim=0)
-            if self.max_reduce:
-                # max-pooling layer
-                x, _ = torch.max(x, dim=1)
-            else:
-                x = torch.flatten(x, start_dim=1, end_dim=2)
+            # chunks = torch.split(embedds, self.slices, dim=0) # splits it in slices/entities
+            # chunks = [p.unsqueeze(0) for p in chunks] # just adds back another dimension in the beginning
+            # x = torch.cat(chunks, dim=0)
+            # if self.max_reduce:
+            #     # max-pooling layer
+            #     x, _ = torch.max(x, dim=1)
+            # else:
+            #     x = torch.flatten(x, start_dim=1, end_dim=2)
+            x = pool.global_max_pool(embedds,gd.batch)
 
             # extract state encoding for each agent that we're returning Q for
             other_actions = actions.copy()
@@ -373,5 +366,6 @@ def batch_to_gd(batch: torch.Tensor, device: str):
     geometric_batch = Batch.from_data_list(batch_data)
     max_node = max(i + 1 for b in batch_data for i in b.x[:, 0].cpu().numpy())
     slices = [max_node for _ in batch_data]
+    # print(device)
     return geometric_batch.to(device=device), slices
 

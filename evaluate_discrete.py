@@ -36,8 +36,8 @@ def run(config):
 
     gif_path = '{}/{}'.format(eval_path, 'gifs')
     os.makedirs(gif_path, exist_ok=True)
-
-    model, _ = RelationalSAC.init_from_save(model_path)
+    config.device = 'cpu'
+    model, _ = RelationalSAC.init_from_save(model_path, device=config.device)
     if 'boxworld' in config.env_id:
         from environments.box import BoxWorldEnv
         env = BoxWorldEnv(
@@ -132,13 +132,13 @@ def run(config):
                                   requires_grad=False)
                          for i in range(model.n_agents)]
             # get actions as torch Variables
-            torch_actions = model.step(torch_obs, explore=False)
+            torch_actions = model.step(torch_obs,explore=False)
             # convert actions to numpy arrays
             actions = [np.argmax(ac.data.numpy().flatten()) for ac in torch_actions]
             # print('actions', actions)
             obs, rewards, dones, infos = env.step(actions)
             if config.render:
-                env.render()
+                env.render(actions=actions)
                 time.sleep(0.5)
             collect_item['l_infos'].append(infos)
 

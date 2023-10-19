@@ -45,12 +45,14 @@ class RelationalSAC(object):
                                   policy entropy)
             hidden_dim (int): Number of hidden dimensions for networks
         """
+        # print('initalised sac with ', device)
         self.n_agents = n_agents
         self.agents = [AttentionAgent(lr=pi_lr,
                                       hidden_dim=pol_hidden_dim,
                                       num_in_pol=params['num_in_pol'],
                                       num_out_pol=params['num_out_pol'])
                          for params in agent_init_params] # are input and output dims for agent
+        print('loading from', device)
         self.critic = RelationalCritic(n_agents=self.n_agents,
                                        spatial_tensors=spatial_tensors,
                                        batch_size = batch_size,
@@ -103,7 +105,7 @@ class RelationalSAC(object):
         return [a.step(obs, explore=explore) for a, obs in zip(self.agents,
                                                                observations)]
 
-    def target_step(self, observations, explore=False):
+    def target_step(self, observations):
         """
         Take a step forward in environment with all agents
         Inputs:
@@ -112,8 +114,7 @@ class RelationalSAC(object):
             actions: List of actions for each agent
         """
         # observations = [observations['image']] * 2
-        return [a.step(obs, explore=explore) for a, obs in zip(self.agents,
-                                                               observations)]
+        return [a.target_step(obs) for a, obs in zip(self.agents, observations)]
 
 
     def update_critic(self, sample, soft=True, logger=None, **kwargs):
@@ -242,6 +243,7 @@ class RelationalSAC(object):
     def prep_rollouts(self, device='cpu'):
         for a in self.agents:
             a.policy.eval()
+            a.target_policy.eval()
         fn = lambda x: x.to(device)
         # only need main policy for rollouts
         if not self.pol_dev == device:
@@ -303,7 +305,7 @@ class RelationalSAC(object):
                      'spatial_tensors': spatial_tensors,
                      'batch_size': batch_size,
                      'n_actions': a_size,
-                     'input_dims': [env.obs_shape['unary'][-1], env.obs_shape['binary'][-1] ],
+                     'input_dims': [env.n_attr, env.n_rel_rules],
                      'device':device,
                      # the number of attributes and the number of relations
                      }
@@ -326,7 +328,8 @@ class RelationalSAC(object):
         except Exception as e:
             print(e)
             episode = 0
-        save_dict['device'] = device
+        save_dict['init_dict']['device'] = device
+        print(save_dict['init_dict'])
         instance = cls(**save_dict['init_dict'])
         instance.init_dict = save_dict['init_dict']
         for a, params in zip(instance.agents, save_dict['agent_params']):
@@ -418,6 +421,16 @@ class AttentionSAC(object):
         """
         return [a.step(obs, explore=explore) for a, obs in zip(self.agents,
                                                                observations)]
+
+    def target_step(self, observations):
+        """
+        Take a step forward in environment with all agents
+        Inputs:
+            observations: List of observations for each agent
+        Outputs:
+            actions: List of actions for each agent
+        """
+        return [a.target_step(obs) for a, obs in zip(self.agents, observations)]
 
     def update_critic(self, sample, soft=True, logger=None, **kwargs):
         """
@@ -544,6 +557,7 @@ class AttentionSAC(object):
     def prep_rollouts(self, device='cpu'):
         for a in self.agents:
             a.policy.eval()
+            a.target_policy.eval()
         fn = lambda x: x.to(device)
         # only need main policy for rollouts
         if not self.pol_dev == device:

@@ -44,7 +44,7 @@ def run(config):
                                  abs_id=config.marc['abs_id']
                                  )
         env.agents = [None] * len(env.action_space)
-        unary_dim = env.obs_shape['unary']
+        # unary_dim = env.obs_shape['unary']
         env.reset()
         if config.resume:
             # resume_path = config.resume
@@ -77,9 +77,7 @@ def run(config):
         replay_buffer = ReplayBufferMARC(max_steps=config.marc['buffer_length'],
                                          num_agents=model.n_agents,
                                          obs_dims=[np.prod(obsp['image'].shape) for obsp in env.observation_space],
-                                         # nullary_dims=[nullary_dim for _ in range(model.n_agents)],
-                                         unary_dims=[unary_dim for _ in range(model.n_agents)],
-                                         # binary_dims=[binary_dim for _ in range(model.n_agents)],
+                                         # unary_dims=[unary_dim for _ in range(model.n_agents)],
                                          ac_dims=[acsp.shape[0] if isinstance(acsp, Box) else acsp.n
                                                   for acsp in env.action_space],
                                          dense=config.marc['dense'])
@@ -178,7 +176,6 @@ def run(config):
 
             if (config.alg == 'MARC' and all([ob['unary_tensor'].any() for ob in obs + next_obs])):
                 replay_buffer.push(obs, agent_actions, rewards, next_obs, dones)
-
             elif config.alg == 'MAAC':
                 replay_buffer.push(obs, agent_actions, rewards, next_obs, dones)
             else:
@@ -545,7 +542,7 @@ if __name__ == '__main__':
 
             os.system(cmd_test)
 
-            shutil.copyfile('{}/summary/reward_total_a.txt'.format(args['dir_exp']), # TODO check if this works - changed  list_exp_dir[-1]
+            shutil.copyfile('{}/summary/reward_total.txt'.format(args['dir_exp']), # TODO check if this works - changed  list_exp_dir[-1]
                             '{}/reward_training_seed{}.txt'.format(dir_collected_data, args['random_seed'])
                             )
     else:
