@@ -5,17 +5,19 @@ import numpy as np
 from gym.spaces import Box
 from torch.autograd import Variable
 from warnings import filterwarnings  # noqa
+import macpp
 # filterwarnings(action='ignore',
 #                         category=DeprecationWarning,
 #                         module='gym') # TODO update
 from utils.buffer import ReplayBufferMARC, ReplayBufferMAAC
 from algorithms.attention_sac import AttentionSAC, RelationalSAC
 from utils.rel_wrapper2 import AbsoluteVKBWrapper
-from utils.env_wrappers import DummyVecEnv
+from utils.env_wrappers import DummyVecEnv, FlatObs
 import yaml
 from utils.misc import Agent
 from utils.plotting import plot_fig
 import wandb
+
 def run(config):
     torch.set_num_threads(1)
     env_name = config.env_name
@@ -325,55 +327,11 @@ def make_parallel_MAAC_env(args, seed):
         return init_env
     # if config.n_rollout_threads == 1:
     return DummyVecEnv([get_env_fn(0)])
-    # else:
-    #     return SubprocVecEnv([get_env_fn(i) for i in range(config.n_rollout_threads)])
 
 def make_env(config):
-    if config.env_name == 'lbf':
-        from lbforaging.foraging import ForagingEnv
-        env = ForagingEnv(
-            players=config.player,
-            max_player_level=config.lbf['max_player_level'],
-            field_size=(config.field, config.field),
-            max_food=config.lbf['max_food'],
-            grid_observation=config.grid_observation,
-            sight=config.field,
-            max_episode_steps=config.episode_length,
-            force_coop=config.lbf['force_coop'],
-            keep_food=config.lbf['keep_food'],
-            # simple=config.simple,
-        )
-    elif config.env_name == 'bpush':
-        from bpush.environment import BoulderPush
-        env = BoulderPush(
-            width=config.field,
-            height=config.field,
-            n_agents=config.player,
-            penalty=config.bpush['penalty'],
-            sensor_range=config.bpush['sensor_range'],
-        )
-        if config.alg == 'MARC':
-            from utils.rel_wrapper2 import BPushWrapper
-            env = BPushWrapper(env)
-    elif config.env_name == 'wolfpack':
-        from Wolfpack_gym.envs.wolfpack import Wolfpack
-        env = Wolfpack(
-            grid_width=config.field,
-            grid_height=config.field,
-            num_players=config.player,
-            max_food_num=config.wolfpack['max_food_num'],
-            obs_type=config.wolfpack['obs_type'],
-            close_penalty = config.wolfpack['close_penalty'],
-            sparse = config.wolfpack['sparse'],)
-        env.n_agents = env.num_players
-        env.grid_observation = True
-    elif config.env_name == 'gridworld':
-        from Gridworld_Scripts.Connection import Connection as Conn
-        from Gridworld_Scripts.UnityGridEnv import UnityGridEnv as Env
-        conn = Conn(["server"])
-        env = Env(0, conn)
-    else:
-        raise ValueError(f'No known env {config.env_name} ')
+    import gym
+    env = gym.make(f"macpp-{config.field}x{config.field}-{config.player}a-{config.pp['n_picker']}p-{config.pp['n_objects']}o-v0", debug_mode=False)
+    env = FlatObs(env)
     return env
 
 
@@ -457,13 +415,19 @@ if __name__ == '__main__':
         elif 'grid' in args['env_name']:
             args['env_id'] = f"{args['env_name']}"
             del args['bpush'], args['lbf'], args['wolfpack']
-
+        elif 'pp' in args['env_name']:
+            args['env_id'] = f"{args['env_name']}" \
+                            f"_{args['field']}x{args['field']}" \
+                            f"_{args['player']}a" \
+                            f"_{args['pp']['n_picker']}p" \
+                            f"_{args['pp']['n_objects']}o"
+            del args['bpush'], args['lbf'], args['wolfpack']
         if params['exp_id'] == 'try':
             args['env_id'] = 'TEST'
-            args['n_episodes']= 2000
+            args['n_episodes']= 30000
             args['episode_length']= 25
             args['test_n_episodes']= 10
-            args['maac']['buffer_length'] = 1100
+            args['maac']['buffer_length'] = 10000
             args['marc']['buffer_length'] = 1100
             args['test_interval'] = 100
             args['step_interval_log'] = 200
