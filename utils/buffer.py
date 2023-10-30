@@ -76,7 +76,7 @@ class ReplayBufferMAAC(object):
         # all this does is turn sample into a tensor
         
         cast = lambda x: Variable(Tensor(x), requires_grad=False).to(device)
-        if norm_rews and any([self.rew_buffs[i][:self.filled_i].mean() for i in range(self.num_agents)]) !=0 :
+        if norm_rews and all([self.rew_buffs[i][:self.filled_i].mean()!= 0 for i in range(self.num_agents)]):
             ret_rews = [cast((self.rew_buffs[i][inds] -
                               self.rew_buffs[i][:self.filled_i].mean()) /
                              self.rew_buffs[i][:self.filled_i].std())
