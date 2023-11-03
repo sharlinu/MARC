@@ -81,7 +81,7 @@ def run(config):
         import macpp
         from utils.env_wrappers import FlatObs
         # env = gym.make(f"macpp-{config.field}x{config.field}-{config.player}a-{config.pp['n_picker']}p-{config.pp['n_objects']}o-v0",
-        env=gym.make(f"macpp-5x5-{config.player}a-{config.pp['n_picker']}p-{config.pp['n_objects']}o-v0",
+        env=gym.make(f"macpp-{config.field}x{config.field}-{config.player}a-{config.pp['n_picker']}p-{config.pp['n_objects']}o-v0",
                        debug_mode=False)
         env = FlatObs(env)
     else:
@@ -95,7 +95,7 @@ def run(config):
         print("Episode %i of %i" % (ep_i + 1, config.test_n_episodes))
 
         frames = []
-        fig, ax = plt.subplots()
+        # fig, ax = plt.subplots()
         collect_item = {
             'ep': ep_i,
             'final_reward': 0,
@@ -130,6 +130,8 @@ def run(config):
             # print('actions',actions)
             obs, rewards, dones, infos = env.step(actions)
             # print('obs', obs)
+            # print(obs[0])
+            # print(obs[1])
             if display and 'lbf' in config.env_id:
                 time.sleep(0.5)
                 env.render(actions=actions)
