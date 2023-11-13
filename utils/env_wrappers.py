@@ -60,6 +60,63 @@ class FlatObs(gym.ObservationWrapper):
 
         return flattened_obs_all
 
+class GridObs(gym.ObservationWrapper):
+    def __init__(self, env):
+        super().__init__(env)
+        # self.observation_space = None
+        single_observation_space = {}
+        single_observation_space['image'] = gym.spaces.Box(
+            low=-float("inf"),
+            high=float("inf"),
+            shape=(*env.grid_size, 6),
+            dtype=np.float32)
+        self.observation_space = [single_observation_space for _ in range(self.n_agents)]
+    def observation(self, obs):
+        '''
+        Converts the observation dictionary into a 3D grid representation.
+
+        The grid is represented as a 3D NumPy array with dimensions (grid_width, grid_length, 3),
+        where the last dimension corresponds to different channels for agents, objects, and goals.
+        Each cell in the grid can be either 0 or 1, indicating the absence or presence of an entity.
+
+        Args:
+        obs (dict): The observation dictionary containing information about agents, objects, and goals.
+        grid_size (tuple): A tuple representing the size of the grid as (grid_width, grid_length).
+
+        Returns:
+        np.ndarray: A 3D NumPy array representing the grid.
+        '''
+        obs_all = []
+
+        for _, agent_data in obs.items():
+            single_obs = {}
+
+            grid = np.zeros((*self.grid_size, 6))
+            x, y = agent_data['self']['position']
+            grid[x, y, 3] = 1  # ID layer
+            grid[x, y, 0] = 1
+            grid[x, y, 4] = 1 if agent_data['self']['carrying_object'] is not None else -1
+            grid[x, y, 5] = agent_data['self']['picker']
+
+            for other_agent in agent_data['agents']:
+                x, y = other_agent['position']
+                grid[x, y, 0] = 1
+                grid[x, y, 4] = 1 if other_agent['carrying_object'] is not None else -1
+                grid[x, y, 5] = other_agent['picker']
+
+            for obj in agent_data['objects']:
+                x, y = obj['position']
+                grid[x, y, 1] = 1
+
+            for goal in agent_data['goals']:
+                x, y = goal
+                grid[x, y, 2] = 1
+
+            single_obs['image'] = grid
+            obs_all.append(single_obs)
+
+        return (obs_all)
+
 
 def worker(remote, parent_remote, env_fn_wrapper):
     parent_remote.close()

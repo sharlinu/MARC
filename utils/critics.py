@@ -49,7 +49,7 @@ class RelationalCritic(nn.Module):
 
 
         # self.embedder = nn.Linear(input_dims[0], hidden_dim)
-        self.gnn_layers = RGCNConv(3, hidden_dim, self.nb_edge_types)
+        self.gnn_layers = RGCNConv(input_dims[0], hidden_dim, self.nb_edge_types)
 
         # iterate over agents
         for _ in range(self.n_agents):

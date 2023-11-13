@@ -7,6 +7,7 @@ from algorithms.attention_sac import RelationalSAC
 import os
 import json
 import sys
+import gym
 sys.path.insert(0, '/Users/sharlinu/Desktop/github/MABoxWorld/environments')
 sys.path.insert(0, '/Users/sharlinu/Desktop/github/MABoxWorld/Images')
 sys.path.insert(0, '/Users/sharlinu/Desktop/github/MABoxWorld/')
@@ -88,6 +89,14 @@ def run(config):
             sparse=config.wolfpack['sparse'],
         )
         attr_mapping = config.wolfpack['attr_mapping']
+    elif 'pp' in config.env_id:
+        import macpp
+        from utils.env_wrappers import GridObs
+        # env = gym.make(f"macpp-{config.field}x{config.field}-{config.player}a-{config.pp['n_picker']}p-{config.pp['n_objects']}o-v0",
+        env=gym.make(f"macpp-{config.field}x{config.field}-{config.player}a-{config.pp['n_picker']}p-{config.pp['n_objects']}o-v0",
+                       debug_mode=False)
+        env = GridObs(env)
+        attr_mapping = config.pp['attr_mapping']
     else:
         raise ValueError(f'Cannot cater for the environment {config.env_id}')
 
@@ -104,9 +113,9 @@ def run(config):
     collect_data = {}
     l_ep_rew = []
 
-    for ep_i in range(config.test_n_episodes):
+    for ep_i in range(config.eval_n_episodes):
     # for ep_i in range(20):
-        print("Episode %i of %i" % (ep_i + 1, config.test_n_episodes))
+        print("Episode %i of %i" % (ep_i + 1, config.eval_n_episodes))
 
         collect_item = {
             'ep': ep_i,
@@ -122,7 +131,7 @@ def run(config):
         if config.render:
             env.render()
 
-        for t_i in range(config.episode_length):
+        for t_i in range(config.eval_episode_length):
             calc_start = time.time()
 
             # rearrange observations to be per agent, and convert to torch Variable
@@ -132,13 +141,16 @@ def run(config):
                                   requires_grad=False)
                          for i in range(model.n_agents)]
             # get actions as torch Variables
-            torch_actions = model.step(torch_obs,explore=False)
+            torch_actions = model.target_step(torch_obs,explore=False)
             # convert actions to numpy arrays
             actions = [np.argmax(ac.data.numpy().flatten()) for ac in torch_actions]
             # print('actions', actions)
             obs, rewards, dones, infos = env.step(actions)
             if config.render:
-                env.render(actions=actions)
+                if 'lbf' in config.env_id:
+                    env.render(actions=actions)
+                else:
+                    env.render()
                 time.sleep(0.5)
             collect_item['l_infos'].append(infos)
 
@@ -161,7 +173,7 @@ def run(config):
         with open('{}/collected_data.json'.format(eval_path), 'w') as outfile:
             json.dump(collect_data, outfile,indent=4)
 
-    print("Average reward: {}".format(sum(l_ep_rew)/config.test_n_episodes))
+    print("Average reward: {}".format(sum(l_ep_rew)/config.eval_n_episodes))
     env.close()
 
 if __name__ == '__main__':
@@ -172,8 +184,8 @@ if __name__ == '__main__':
     parser.add_argument("--incremental", default=None, type=int,
                         help="Load incremental policy from given episode " +
                              "rather than final policy")
-    parser.add_argument("--test_n_episodes", default=10, type=int)
-    # parser.add_argument("--test_episode_length", default=25, type=int)
+    parser.add_argument("--eval_n_episodes", default=10, type=int)
+    parser.add_argument("--eval_episode_length", default=25, type=int)
     parser.add_argument("--fps", default=30, type=int)
     parser.add_argument("--render", default=False, action="store_true",
                         help="render")

@@ -60,7 +60,7 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
     Entities are objects in the gird-world, predicates represents the properties of them and relations between them.
     """
     def __init__(self, env, attr_mapping, dense=False, background_id="b3", abs_id='None'):
-        super().__init__(env, new_step_api=True)
+        super().__init__(env)
         # self.attribute_labels = ['agents', 'id', 'feature']
 
 
@@ -81,8 +81,6 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
             self.obj_n = np.prod((self.field_size, self.field_size)) #physical entities
         else:
             self.obj_n = env.n_agents + env.n_objects
-        # self.obs_shape = {'unary': (self.obj_n, self.n_attr),
-        #                   'binary': (self.obj_n, self.obj_n, self.n_rel_rules+len(self.abs_rel_func))}
         self.spatial_tensors = None
         self.prev = None
 
