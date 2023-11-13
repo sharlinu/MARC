@@ -17,10 +17,11 @@ model.pt
 
 # Log files
 *.log
-ckpt_best_avg_r*
+#ckpt_best_avg_r*
 monitor/
 evaluate/
 summary/agent*/
+Box/
 events.out*
 arguments.txt
 summary.json
