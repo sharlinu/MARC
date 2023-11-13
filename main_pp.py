@@ -12,7 +12,7 @@ import macpp
 from utils.buffer import ReplayBufferMARC, ReplayBufferMAAC
 from algorithms.attention_sac import AttentionSAC, RelationalSAC
 from utils.rel_wrapper2 import AbsoluteVKBWrapper
-from utils.env_wrappers import DummyVecEnv, FlatObs
+from utils.env_wrappers import DummyVecEnv, FlatObs, GridObs
 import yaml
 from utils.misc import Agent
 from utils.plotting import plot_fig
@@ -37,6 +37,7 @@ def run(config):
             config=vars(config), )
     if config.alg == 'MARC':
         env = make_env(config)
+        env = GridObs(env)
         env.grid_observation = config.grid_observation
         attr_mapping = getattr(config, env_name)['attr_mapping']
         env = AbsoluteVKBWrapper(env=env,
@@ -86,6 +87,7 @@ def run(config):
 
     elif config.alg == 'MAAC':
         env = make_parallel_MAAC_env(config,seed=1)
+        # env = FlatObs(env)
         env.grid_observation = config.grid_observation
         env.reset()
         if config.resume:
@@ -319,6 +321,7 @@ def make_parallel_MAAC_env(args, seed):
     def get_env_fn(rank):
         def init_env():
             env = make_env(args)
+            env = FlatObs(env)
             env.agents = [Agent() for _ in range(args.player)]
             # env.grid_observation = args.grid_observation
             # env.seed(args.random_seed + rank * 1000)
@@ -331,7 +334,7 @@ def make_parallel_MAAC_env(args, seed):
 def make_env(config):
     import gym
     env = gym.make(f"macpp-{config.field}x{config.field}-{config.player}a-{config.pp['n_picker']}p-{config.pp['n_objects']}o-v0", debug_mode=False)
-    env = FlatObs(env)
+    # env = FlatObs(env)
     return env
 
 
