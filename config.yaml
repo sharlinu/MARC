@@ -2,23 +2,26 @@ env_name: 'pp'
 exp_id : 'std'
 other: ''
 
-player: 4
+player: 2
 field: 10
 grid_observation: False
 
 alg: 'MAAC'
-n_episodes: 1000000
+n_episodes: 500000
 episode_length: 50
 test_n_episodes: 100
 #tau: 0.01
 device: 'cpu'
 
 pp:
-  n_picker: 2
+  n_picker: 1
   n_objects: 2
-  # attr_mapping: {'agent': 0, 'id': 1, 'food': 2}
-
-
+  attr_mapping: {'agent': 0,
+                 'objects': 1,
+                 'goals': 2,
+                 'id':3,
+                 'carrying':4,
+                 'picker':5,}
 lbf:
   max_food: 2
   force_coop: False
