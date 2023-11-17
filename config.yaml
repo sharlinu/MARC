@@ -1,4 +1,4 @@
-env_name: 'lbf'
+env_name: 'pp'
 exp_id : 'std'
 other: ''
 
@@ -7,11 +7,16 @@ field: 10
 grid_observation: False
 
 alg: 'MAAC'
-n_episodes: 500000
+n_episodes: 1000000
 episode_length: 50
 test_n_episodes: 100
 #tau: 0.01
 device: 'cpu'
+
+pp:
+  n_picker: 2
+  n_objects: 2
+  # attr_mapping: {'agent': 0, 'id': 1, 'food': 2}
 
 
 lbf:

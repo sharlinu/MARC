@@ -39,5 +39,11 @@ grid_observation: True # the format of the observation as grid or 1D array. Need
 # Usage
 To launch experiments (training + evaluation) over a number of seeds just set config.yaml and run:
 ```commandline
-$ python main_lbf.py
+$ python3 main_lbf.py
+```
+
+# Evaluation
+After a model has run, it can be found in the folder `experiments/{alg}/{env_name}/{experiment_id}/saved_models/`. For example, to evaluate MAAC we would run:
+```commandline
+$ python3 evaluate_maac.py experiments/MAAC/lbf/2023-09-27_lbf_15x15_8p_1f_coop_std_seed4001/saved_models/ckpt_final.pth.tar
 ```

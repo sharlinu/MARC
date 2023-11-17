@@ -1,4 +1,6 @@
 import argparse
+
+import gym
 import torch
 import time
 from pathlib import Path
@@ -75,7 +77,13 @@ def run(config):
             close_penalty = config.wolfpack['close_penalty'],
             # close_penalty = 0,
             )
-
+    elif 'pp' in config.env_id:
+        import macpp
+        from utils.env_wrappers import FlatObs
+        # env = gym.make(f"macpp-{config.field}x{config.field}-{config.player}a-{config.pp['n_picker']}p-{config.pp['n_objects']}o-v0",
+        env=gym.make(f"macpp-{config.field}x{config.field}-{config.player}a-{config.pp['n_picker']}p-{config.pp['n_objects']}o-v0",
+                       debug_mode=False)
+        env = FlatObs(env)
     else:
         raise ValueError(f'Cannot cater for the environment {config.env_id}')
 
@@ -87,7 +95,7 @@ def run(config):
         print("Episode %i of %i" % (ep_i + 1, config.test_n_episodes))
 
         frames = []
-        fig, ax = plt.subplots()
+        # fig, ax = plt.subplots()
         collect_item = {
             'ep': ep_i,
             'final_reward': 0,
@@ -122,7 +130,12 @@ def run(config):
             # print('actions',actions)
             obs, rewards, dones, infos = env.step(actions)
             # print('obs', obs)
-            if display:
+            # print(obs[0])
+            # print(obs[1])
+            if display and 'lbf' in config.env_id:
+                time.sleep(0.5)
+                env.render(actions=actions)
+            else:
                 time.sleep(0.5)
                 env.render()
             collect_item['l_infos'].append(infos)
