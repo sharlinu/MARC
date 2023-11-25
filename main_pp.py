@@ -208,14 +208,15 @@ def run(config):
             wandb.log({"rew": episode_reward_total, "steps": et_i})
         except:
             pass
-        print("%s - %s - Episodes %i (%is) of %i - Reward %.2f" % (config.env_id, config.random_seed, ep_i + 1, steps,
-                                        config.n_episodes,  episode_reward_total))
         l_rewards.append(episode_reward_total)
         epymarl_rewards.append(episode_reward_total)
         # check if it in average was the best model so far
         th_l_rewards = torch.FloatTensor(np.asarray(l_rewards))
 
-
+        if ep_i % 50 ==0:
+            print(
+                "%s - %s - Episodes %i (%is) of %i - Reward %.2f" % (config.env_id, config.random_seed, ep_i + 1, steps,
+                                                                     config.n_episodes, episode_reward_total))
         if len(th_l_rewards) >= 100:
             avg_rewards = th_l_rewards.unfold(0, 100, 1).mean(1).view(-1)
             avg_rewards = torch.cat((torch.zeros(99), avg_rewards))

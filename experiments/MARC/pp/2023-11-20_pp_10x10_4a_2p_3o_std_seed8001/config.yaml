@@ -1,0 +1,54 @@
+alg: MARC
+batch_size: 1024
+buffer_length: 1000000
+critic_hidden_dim: 128
+device: cuda:1
+dir_base: ./experiments
+dir_exp: ./experiments/MARC/pp/2023-11-20_pp_10x10_4a_2p_3o_std_seed8001
+dir_monitor: ./experiments/MARC/pp/2023-11-20_pp_10x10_4a_2p_3o_std_seed8001/monitor
+dir_saved_models: ./experiments/MARC/pp/2023-11-20_pp_10x10_4a_2p_3o_std_seed8001/saved_models
+dir_summary: ./experiments/MARC/pp/2023-11-20_pp_10x10_4a_2p_3o_std_seed8001/summary
+env_id: pp_10x10_4a_2p_3o
+env_name: pp
+episode_length: 50
+exp_id: std
+field: 10
+gamma: 0.99
+grid_observation: true
+marc:
+  abs_id: None
+  background_id: b0
+  buffer_length: 100000
+  dense: true
+  relational_embedding: false
+n_episodes: 2500000
+norm_rews: true
+num_updates: 4
+other: ''
+pi_lr: 0.001
+player: 4
+pol_hidden_dim: 128
+pp:
+  attr_mapping:
+    agent: 0
+    carrying: 4
+    goals: 2
+    id: 3
+    objects: 1
+    picker: 5
+  n_objects: 3
+  n_picker: 2
+q_lr: 0.001
+random_seed: 8001
+resume: null
+resume_episodes: null
+reward_scale: 100.0
+save_interval_log: 100
+seeds:
+- 4001
+step_interval_log: 10000
+steps_per_update: 100
+tau: 0.001
+test_interval: 1000
+test_n_episodes: 10
+use_gpu: true
