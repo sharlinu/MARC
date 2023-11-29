@@ -6,7 +6,7 @@
 # Node artifact files
 node_modules/
 dist/
-# config.yaml
+./config.yaml
 wandb/
 model.pt
 # Compiled Java class files
