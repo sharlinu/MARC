@@ -1,17 +1,17 @@
 env_name: 'pp'
 exp_id : 'std'
-other: ''
+other: '_sparse_rew'
 
 player: 2
 field: 10
-grid_observation: False
+grid_observation: True
 
-alg: 'MAAC'
-n_episodes: 500000
+alg: 'MARC'
+n_episodes: 2500000
 episode_length: 50
-test_n_episodes: 100
+test_n_episodes: 10
 #tau: 0.01
-device: 'cpu'
+device: 'cuda:0'
 
 pp:
   n_picker: 1
@@ -44,7 +44,7 @@ wolfpack:
 marc:
   dense: True
   relational_embedding : False
-  background_id : 'b3'
+  background_id : 'b0'
   abs_id: 'None'
   buffer_length: 100000
 
