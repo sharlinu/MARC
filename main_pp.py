@@ -424,7 +424,8 @@ if __name__ == '__main__':
                             f"_{args['field']}x{args['field']}" \
                             f"_{args['player']}a" \
                             f"_{args['pp']['n_picker']}p" \
-                            f"_{args['pp']['n_objects']}o-v3"
+                            f"_{args['pp']['n_objects']}o" \
+                            f"-{args['pp']['version']"
             del args['bpush'], args['lbf'], args['wolfpack']
         if params['exp_id'] == 'try':
             args['env_id'] = 'TEST'
