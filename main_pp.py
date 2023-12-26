@@ -72,6 +72,7 @@ def run(config):
                                                pi_lr=config.pi_lr,
                                                q_lr=config.q_lr,
                                                gamma=config.gamma,
+                                               graph_layer = config.marc['graph_layer'],
                                                pol_hidden_dim=config.pol_hidden_dim,
                                                critic_hidden_dim=config.critic_hidden_dim,
                                                device=config.device,

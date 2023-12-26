@@ -1,6 +1,6 @@
 env_name: 'pp'
-exp_id : 'std'
-other: '_sparse_rew'
+exp_id : 'try'
+other: ''
 
 player: 2
 field: 10
@@ -47,6 +47,7 @@ marc:
   background_id : 'b0'
   abs_id: 'None'
   buffer_length: 100000
+  graph_layer: 'RGAT'
 
 maac:
   attend_heads: 4

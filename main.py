@@ -71,6 +71,7 @@ def run(config):
                                                gamma=config.gamma,
                                                pol_hidden_dim=config.pol_hidden_dim,
                                                critic_hidden_dim=config.critic_hidden_dim,
+                                               graph_layer = config.marc['graph_layer'],
                                                device=config.device,
                                                reward_scale=config.reward_scale)
 

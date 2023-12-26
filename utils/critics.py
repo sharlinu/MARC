@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from itertools import chain
-from torch_geometric.nn import RGCNConv, pool
+from torch_geometric.nn import RGCNConv, pool, RGATConv
 from torch_geometric.data import Data as GeometricData, Batch
 
 
@@ -24,6 +24,7 @@ class RelationalCritic(nn.Module):
                  norm_in: object = True,
                  net_code: object = "1g0f",
                  device: str = 'cuda:0',
+                 graph_layer: str = 'RGCN', 
                  mp_rounds: object = 1) -> object:
         """
         Inputs:
@@ -41,7 +42,7 @@ class RelationalCritic(nn.Module):
         self.batch_size = batch_size
         self.max_reduce = True # TODO hardcoded
         # self.dense = True
-
+        self.graph_layer = graph_layer
         self.spatial_tensors = np.array(spatial_tensors)
         self.binary_batch = torch.tensor([self.spatial_tensors for _ in range(self.batch_size)])
         self.gd, self.slices = batch_to_gd(self.binary_batch, self.device)  # makes adjs geometric data usable for torch geometric
@@ -49,8 +50,13 @@ class RelationalCritic(nn.Module):
 
 
         # self.embedder = nn.Linear(input_dims[0], hidden_dim)
-        self.gnn_layers = RGCNConv(input_dims[0], hidden_dim, self.nb_edge_types)
-
+        if self.graph_layer == 'RGCN':
+            self.gnn_layers = RGCNConv(input_dims[0], hidden_dim, self.nb_edge_types)
+        elif self.graph_layer == 'RGAT':
+            self.gnn_layers = RGATConv(input_dims[0], hidden_dim, self.nb_edge_types)
+        else:
+            print('not a valid graph layer')
+        print(f'Using {self.graph_layer} as graph layer')
         # iterate over agents
         for _ in range(self.n_agents):
             critic = nn.Sequential()
@@ -76,7 +82,8 @@ class RelationalCritic(nn.Module):
         gradients from the critic loss function multiple times
         """
         for p in self.shared_parameters():
-            p.grad.data.mul_(1. / self.n_agents)
+            if p.grad is not None: 
+                p.grad.data.mul_(1. / self.n_agents)
 
     def forward(self,
                 obs,
