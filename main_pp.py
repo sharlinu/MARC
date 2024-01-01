@@ -425,7 +425,7 @@ if __name__ == '__main__':
                             f"_{args['player']}a" \
                             f"_{args['pp']['n_picker']}p" \
                             f"_{args['pp']['n_objects']}o" \
-                            f"-{args['pp']['version']"
+                            f"-{args['pp']['version']}"
             del args['bpush'], args['lbf'], args['wolfpack']
         if params['exp_id'] == 'try':
             args['env_id'] = 'TEST'
