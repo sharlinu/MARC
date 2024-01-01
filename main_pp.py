@@ -334,7 +334,7 @@ def make_parallel_MAAC_env(args, seed):
 
 def make_env(config):
     import gym
-    env = gym.make(f"macpp-{config.field}x{config.field}-{config.player}a-{config.pp['n_picker']}p-{config.pp['n_objects']}o-v3", debug_mode=False)
+    env = gym.make(f"macpp-{config.field}x{config.field}-{config.player}a-{config.pp['n_picker']}p-{config.pp['n_objects']}o-{config.pp['version']}", debug_mode=False)
     # env = FlatObs(env)
     return env
 
