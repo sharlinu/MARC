@@ -1,21 +1,22 @@
 env_name: 'pp'
 exp_id : 'std'
-other: '_sparse_rew'
+other: '_RGAT'
 
 player: 2
 field: 10
 grid_observation: True
 
 alg: 'MARC'
-n_episodes: 2500000
+n_episodes: 5500000
 episode_length: 50
 test_n_episodes: 10
 #tau: 0.01
-device: 'cuda:0'
+device: 'cuda:3'
 
 pp:
   n_picker: 1
   n_objects: 2
+  version: 'v2'
   attr_mapping: {'agent': 0,
                  'objects': 1,
                  'goals': 2,
@@ -23,10 +24,10 @@ pp:
                  'carrying':4,
                  'picker':5,}
 lbf:
-  max_food: 2
-  force_coop: False
+  max_food: 4
+  force_coop: True
   max_player_level: 2
-  keep_food: False
+  keep_food: True
   attr_mapping: {'agent': 0, 'id': 1, 'food': 2}
 
 bpush:
@@ -47,7 +48,8 @@ marc:
   background_id : 'b0'
   abs_id: 'None'
   buffer_length: 100000
-
+  graph_layer: 'RGAT'
+  
 maac:
   attend_heads: 4
   buffer_length: 1000000

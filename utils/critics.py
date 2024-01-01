@@ -48,7 +48,7 @@ class RelationalCritic(nn.Module):
         self.nb_edge_types = len(spatial_tensors)
 
 
-        # self.embedder = nn.Linear(input_dims[0], hidden_dim)
+        self.embedder = nn.Linear(input_dims[0], hidden_dim)
         self.gnn_layers = RGCNConv(input_dims[0], hidden_dim, self.nb_edge_types)
 
         # iterate over agents
@@ -110,19 +110,21 @@ class RelationalCritic(nn.Module):
         for a_i in agents:
             # feature embedding
             # print(unary_tensors[a_i])
-            # embedds = torch.flatten(unary_tensors[a_i], 0, 1).float().to(device=self.device)
             # embedds = self.embedder(embedds) # seems right so far
-
             # RGCN module
+
             if all(binary_tensors):
                 gd = Batch.from_data_list(binary_tensors[a_i])
                 gd = gd.to(device = self.device)
-
                 embedds = self.gnn_layers(gd.x, gd.edge_index, gd.edge_attr)
+                embedds = torch.relu(embedds)
+                x = pool.global_max_pool(embedds, gd.batch)
             else:
+                embedds = torch.flatten(unary_tensors[a_i], 0, 1).float().to(device=self.device)
+                # embedds = self.embedder(unary_tensors[a_i])
                 embedds = self.gnn_layers(embedds, self.gd.edge_index, self.gd.edge_attr)
-            embedds = torch.relu(embedds)
-
+                embedds = torch.relu(embedds)
+                x = pool.global_max_pool(embedds, self.gd.batch)
             # chunks = torch.split(embedds, self.slices, dim=0) # splits it in slices/entities
             # chunks = [p.unsqueeze(0) for p in chunks] # just adds back another dimension in the beginning
             # x = torch.cat(chunks, dim=0)
@@ -131,7 +133,7 @@ class RelationalCritic(nn.Module):
             #     x, _ = torch.max(x, dim=1)
             # else:
             #     x = torch.flatten(x, start_dim=1, end_dim=2)
-            x = pool.global_max_pool(embedds,gd.batch)
+
 
             # extract state encoding for each agent that we're returning Q for
             other_actions = actions.copy()

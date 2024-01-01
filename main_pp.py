@@ -334,7 +334,7 @@ def make_parallel_MAAC_env(args, seed):
 
 def make_env(config):
     import gym
-    env = gym.make(f"macpp-{config.field}x{config.field}-{config.player}a-{config.pp['n_picker']}p-{config.pp['n_objects']}o-v0", debug_mode=False)
+    env = gym.make(f"macpp-{config.field}x{config.field}-{config.player}a-{config.pp['n_picker']}p-{config.pp['n_objects']}o-v3", debug_mode=False)
     # env = FlatObs(env)
     return env
 
@@ -401,7 +401,7 @@ if __name__ == '__main__':
                              f"_{args['field']}x{args['field']}_" \
                              f"{args['player']}p" \
                              f"_{args['lbf']['max_food']}f" \
-                             f"{'_coop' if args['lbf']['force_coop'] else ''}{args['other']}"
+                             f"{'_coop' if args['lbf']['force_coop'] else ''}{args['other']}v"
             del args['bpush'], args['wolfpack']
         elif 'bpush' in args['env_name']:
             args['env_id'] = f"{args['env_name']}" \
@@ -424,7 +424,8 @@ if __name__ == '__main__':
                             f"_{args['field']}x{args['field']}" \
                             f"_{args['player']}a" \
                             f"_{args['pp']['n_picker']}p" \
-                            f"_{args['pp']['n_objects']}o"
+                            f"_{args['pp']['n_objects']}o" \
+                            f"-{args['pp']['version']"
             del args['bpush'], args['lbf'], args['wolfpack']
         if params['exp_id'] == 'try':
             args['env_id'] = 'TEST'

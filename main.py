@@ -293,7 +293,7 @@ def run(config):
                     l_ep_rew.append(ep_rew)
                     print("Episode %i of %i - %i" % (eval_ep_i + 1, config.test_n_episodes, ep_rew))
 
-                print('test: ',np.mean(l_ep_rew),'train: ', np.mean(l_rewards[-10:]))
+                print('test: ',np.mean(l_ep_rew), 'train: ', np.mean(l_rewards[-10:]))
                 avg_eval_rew = sum(l_ep_rew) / config.test_n_episodes
                 print("Average eval reward: {}".format(avg_eval_rew))
                 with open('{}/summary/eval_reward.txt'.format(run_dir), 'a') as file:
