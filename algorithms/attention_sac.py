@@ -27,6 +27,7 @@ class RelationalSAC(object):
                  reward_scale=10.,
                  pol_hidden_dim=128,
                  critic_hidden_dim=128,
+                 graph_layer='RCN', 
                  device='cuda:0',
                  **kwargs):
         """
@@ -59,6 +60,7 @@ class RelationalSAC(object):
                                        n_actions=n_actions,
                                        input_dims=input_dims,
                                        hidden_dim=critic_hidden_dim,
+                                       graph_layer = graph_layer,
                                        device = device)
         self.target_critic = RelationalCritic(
                                         n_agents = self.n_agents,
@@ -68,6 +70,7 @@ class RelationalSAC(object):
                                         n_actions=n_actions,
                                         input_dims=input_dims,
                                         hidden_dim=critic_hidden_dim,
+                                        graph_layer = graph_layer, 
                                         device=device)
         hard_update(self.target_critic, self.critic) # hard update only at the beginning to initialise
         self.critic_optimizer = Adam(self.critic.parameters(), lr=q_lr,
@@ -272,6 +275,7 @@ class RelationalSAC(object):
                       gamma=0.95, tau=0.01,
                       pi_lr=0.01, q_lr=0.01,
                       reward_scale=10.,
+                      graph_layer = 'RGCN',
                       pol_hidden_dim=64, critic_hidden_dim=64, attend_heads=4,
                       device='cuda:0',
                       **kwargs):
@@ -307,6 +311,7 @@ class RelationalSAC(object):
                      'n_actions': a_size,
                      'input_dims': [env.n_attr, env.n_rel_rules],
                      'device':device,
+                     'graph_layer':graph_layer,
                      # the number of attributes and the number of relations
                      }
 

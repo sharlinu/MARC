@@ -1,6 +1,11 @@
 env_name: 'pp'
+<<<<<<< HEAD
 exp_id : 'std'
 other: '_RGAT'
+=======
+exp_id : 'try'
+other: ''
+>>>>>>> rgat
 
 player: 2
 field: 10
@@ -49,7 +54,11 @@ marc:
   abs_id: 'None'
   buffer_length: 100000
   graph_layer: 'RGAT'
+<<<<<<< HEAD
   
+=======
+
+>>>>>>> rgat
 maac:
   attend_heads: 4
   buffer_length: 1000000
