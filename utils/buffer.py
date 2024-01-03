@@ -187,28 +187,32 @@ class ReplayBufferMARC(object):
         for agent_i in range(self.num_agents):
             self.obs_buffs[agent_i][self.curr_i:self.curr_i + nentries] = observation[agent_i]['image'].flatten()
             # self.obs_unary_buffs[agent_i][self.curr_i:self.curr_i + nentries] = observation[agent_i]['unary_tensor']
-            if self.dense:
 
+            if self.dense:
                 # print('obs g', observation[agent_i]['binary_tensor'])
                 # print('next_obs g', next_observation[agent_i]['binary_tensor'])
                 try:
                     self.obs_binary_buffs[agent_i].insert(self.curr_i, observation[agent_i]['binary_tensor'])
                     self.next_obs_binary_buffs[agent_i].insert(self.curr_i, next_observation[agent_i]['binary_tensor'])
-                    self.obs_unary_buffs[agent_i].insert(self.curr_i, observation[agent_i]['unary_tensor'])
-                    self.next_obs_unary_buffs[agent_i].insert(self.curr_i, next_observation[agent_i]['unary_tensor'])
+                    # self.obs_unary_buffs[agent_i].insert(self.curr_i, observation[agent_i]['unary_tensor'])
+                    # self.next_obs_unary_buffs[agent_i].insert(self.curr_i, next_observation[agent_i]['unary_tensor'])
                 except IndexError:
                     self.obs_binary_buffs[agent_i][self.curr_i] = observation[agent_i]['binary_tensor']
                     self.next_obs_binary_buffs[agent_i][self.curr_i] = next_observation[agent_i]['binary_tensor']
                 # print('binary buffer length:', len(self.obs_binary_buffs[0]), len(self.next_obs_binary_buffs[0]))
                 # print('general buffer length', self.curr_i, self.filled_i)
+            else:
+                try:
+                    self.next_obs_unary_buffs[agent_i].insert(self.curr_i, next_observation[agent_i]['unary_tensor'].numpy())
+                    self.obs_unary_buffs[agent_i].insert(self.curr_i, observation[agent_i]['unary_tensor'].numpy())
+                except IndexError:
+                    self.obs_unary_buffs[agent_i][self.curr_i] = observation[agent_i]['unary_tensor'].numpy()
+                    self.next_obs_unary_buffs[agent_i][self.curr_i] = next_observation[agent_i]['unary_tensor'].numpy()
+
             self.ac_buffs[agent_i][self.curr_i:self.curr_i + nentries] = actions[agent_i]
             self.rew_buffs[agent_i][self.curr_i:self.curr_i + nentries] = rewards[agent_i]
 
             self.next_obs_buffs[agent_i][self.curr_i:self.curr_i + nentries] = next_observation[agent_i]['image'].flatten()
-            # try:
-            #     self.next_obs_unary_buffs[agent_i][self.curr_i:self.curr_i + nentries] = next_observation[agent_i]['unary_tensor']
-            # except:
-            #     print('Something wrong with the storage of unary tensors')
 
 
             self.done_buffs[agent_i][self.curr_i:self.curr_i + nentries] = dones[agent_i]
@@ -231,8 +235,8 @@ class ReplayBufferMARC(object):
         else:
             ret_rews = [cast(self.rew_buffs[i][inds]) for i in range(self.num_agents)]
         if self.dense:
-            out =  ([cast(self.obs_buffs[i][inds]) for i in range(self.num_agents)],
-                    [None for i in range(self.num_agents)],
+            out = ([cast(self.obs_buffs[i][inds]) for i in range(self.num_agents)],
+                    [None for i in range(self.num_agents)], # seperate unary tensors
                     # [cast([self.obs_unary_buffs[i][ind] for ind in inds]) for i in range(self.num_agents)],
                     [[self.obs_binary_buffs[i][ind] for ind in inds] for i in range(self.num_agents)],
                     [cast(self.ac_buffs[i][inds]) for i in range(self.num_agents)],
@@ -244,12 +248,14 @@ class ReplayBufferMARC(object):
                     [cast(self.done_buffs[i][inds]) for i in range(self.num_agents)])
         else:
             out =  ([cast(self.obs_buffs[i][inds]) for i in range(self.num_agents)],
-                    [[cast(self.obs_unary_buffs[i][ind]) for ind in inds] for i in range(self.num_agents)],
-                    [None for i in range(self.num_agents)],
+                    [cast([self.obs_unary_buffs[i][ind] for ind in inds]) for i in range(self.num_agents)],
+                    # [[cast(self.obs_unary_buffs[i][ind]) for ind in inds] for i in range(self.num_agents)],
+                    [None for i in range(self.num_agents)], # graphs
                     [cast(self.ac_buffs[i][inds]) for i in range(self.num_agents)],
                     ret_rews,
                     [cast(self.next_obs_buffs[i][inds]) for i in range(self.num_agents)],
-                    [[cast(self.next_obs_unary_buffs[i][ind]) for ind in inds] for i in range(self.num_agents)],
+                    [cast([self.next_obs_unary_buffs[i][ind] for ind in inds]) for i in range(self.num_agents)],
+                    # [[cast(self.next_obs_unary_buffs[i][ind]) for ind in inds] for i in range(self.num_agents)],
                     [None for i in range(self.num_agents)],
                     [cast(self.done_buffs[i][inds]) for i in range(self.num_agents)])
         return out

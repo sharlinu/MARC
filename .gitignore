@@ -6,9 +6,10 @@
 # Node artifact files
 node_modules/
 dist/
-# config.yaml
+./config.yaml
 wandb/
 model.pt
+experiments/*/*/*TEST*
 # Compiled Java class files
 *.class
 
@@ -17,7 +18,7 @@ model.pt
 
 # Log files
 *.log
-#ckpt_best_avg_r*
+ckpt_best_avg_r*
 monitor/
 evaluate/
 summary/agent*/

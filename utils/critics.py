@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from itertools import chain
-from torch_geometric.nn import RGCNConv, pool
+from torch_geometric.nn import RGCNConv, pool, RGATConv
 from torch_geometric.data import Data as GeometricData, Batch
 
 
@@ -24,6 +24,7 @@ class RelationalCritic(nn.Module):
                  norm_in: object = True,
                  net_code: object = "1g0f",
                  device: str = 'cuda:0',
+                 graph_layer: str = 'RGCN', 
                  mp_rounds: object = 1) -> object:
         """
         Inputs:
@@ -41,7 +42,7 @@ class RelationalCritic(nn.Module):
         self.batch_size = batch_size
         self.max_reduce = True # TODO hardcoded
         # self.dense = True
-
+        self.graph_layer = graph_layer
         self.spatial_tensors = np.array(spatial_tensors)
         self.binary_batch = torch.tensor([self.spatial_tensors for _ in range(self.batch_size)])
         self.gd, self.slices = batch_to_gd(self.binary_batch, self.device)  # makes adjs geometric data usable for torch geometric
@@ -49,8 +50,15 @@ class RelationalCritic(nn.Module):
 
 
         # self.embedder = nn.Linear(input_dims[0], hidden_dim)
-        self.gnn_layers = RGCNConv(input_dims[0], hidden_dim, self.nb_edge_types)
+        if self.graph_layer == 'RGCN':
+            self.gnn_layers = RGCNConv(input_dims[0], hidden_dim, self.nb_edge_types)
+        elif self.graph_layer == 'RGAT':
+            self.gnn_layers = RGATConv(input_dims[0], hidden_dim, self.nb_edge_types)
+            print('This is using RGAT as graph layer')
 
+        else:
+            print('not a valid graph layer')
+        print(f'Using {self.graph_layer} as graph layer')
         # iterate over agents
         for _ in range(self.n_agents):
             critic = nn.Sequential()
@@ -76,7 +84,8 @@ class RelationalCritic(nn.Module):
         gradients from the critic loss function multiple times
         """
         for p in self.shared_parameters():
-            p.grad.data.mul_(1. / self.n_agents)
+            if p.grad is not None: 
+                p.grad.data.mul_(1. / self.n_agents)
 
     def forward(self,
                 obs,
@@ -110,19 +119,21 @@ class RelationalCritic(nn.Module):
         for a_i in agents:
             # feature embedding
             # print(unary_tensors[a_i])
-            # embedds = torch.flatten(unary_tensors[a_i], 0, 1).float().to(device=self.device)
             # embedds = self.embedder(embedds) # seems right so far
-
             # RGCN module
+
             if all(binary_tensors):
                 gd = Batch.from_data_list(binary_tensors[a_i])
                 gd = gd.to(device = self.device)
-
                 embedds = self.gnn_layers(gd.x, gd.edge_index, gd.edge_attr)
+                embedds = torch.relu(embedds)
+                x = pool.global_max_pool(embedds, gd.batch)
             else:
+                embedds = torch.flatten(unary_tensors[a_i], 0, 1).float().to(device=self.device)
+                # embedds = self.embedder(unary_tensors[a_i])
                 embedds = self.gnn_layers(embedds, self.gd.edge_index, self.gd.edge_attr)
-            embedds = torch.relu(embedds)
-
+                embedds = torch.relu(embedds)
+                x = pool.global_max_pool(embedds, self.gd.batch)
             # chunks = torch.split(embedds, self.slices, dim=0) # splits it in slices/entities
             # chunks = [p.unsqueeze(0) for p in chunks] # just adds back another dimension in the beginning
             # x = torch.cat(chunks, dim=0)
@@ -131,7 +142,7 @@ class RelationalCritic(nn.Module):
             #     x, _ = torch.max(x, dim=1)
             # else:
             #     x = torch.flatten(x, start_dim=1, end_dim=2)
-            x = pool.global_max_pool(embedds,gd.batch)
+
 
             # extract state encoding for each agent that we're returning Q for
             other_actions = actions.copy()
