@@ -1,5 +1,5 @@
 env_name: 'pp'
-exp_id : 'std'
+exp_id : 'try'
 other: '_RGAT'
 
 player: 2
@@ -11,7 +11,7 @@ n_episodes: 5500000
 episode_length: 50
 test_n_episodes: 10
 #tau: 0.01
-device: 'cuda:3'
+device: 'cuda:0'
 
 pp:
   n_picker: 1
