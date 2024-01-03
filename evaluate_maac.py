@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 def run(config):
-    display = True
+    display = False
     model_path = config.model_path
 
     # create folder for evaluating
@@ -80,8 +80,7 @@ def run(config):
     elif 'pp' in config.env_id:
         import macpp
         from utils.env_wrappers import FlatObs
-        # env = gym.make(f"macpp-{config.field}x{config.field}-{config.player}a-{config.pp['n_picker']}p-{config.pp['n_objects']}o-v0",
-        env=gym.make(f"macpp-{config.field}x{config.field}-{config.player}a-{config.pp['n_picker']}p-{config.pp['n_objects']}o-v0",
+        env=gym.make(f"macpp-{config.field}x{config.field}-{config.player}a-{config.pp['n_picker']}p-{config.pp['n_objects']}o-sparse-v0",
                        debug_mode=False)
         env = FlatObs(env)
     else:
