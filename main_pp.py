@@ -12,7 +12,7 @@ import macpp
 from utils.buffer import ReplayBufferMARC, ReplayBufferMAAC
 from algorithms.attention_sac import AttentionSAC, RelationalSAC
 from utils.rel_wrapper2 import AbsoluteVKBWrapper
-from utils.env_wrappers import DummyVecEnv, FlatObs, GridObs
+from utils.env_wrappers import DummyVecEnv, FlatObs, GridObs, PartialGridObs
 import yaml
 from utils.misc import Agent
 from utils.plotting import plot_fig
@@ -37,7 +37,10 @@ def run(config):
             config=vars(config), )
     if config.alg == 'MARC':
         env = make_env(config)
-        env = GridObs(env)
+        if config.env_name == 'pp':
+            env = GridObs(env)
+        elif config.env_name == 'rware':
+            env = PartialGridObs(env)
         env.grid_observation = config.grid_observation
         attr_mapping = getattr(config, env_name)['attr_mapping']
         env = AbsoluteVKBWrapper(env=env,
@@ -202,7 +205,7 @@ def run(config):
                 model.prep_rollouts(device='cpu')
 
             if dones.all() == True:
-                print('done with time step', et_i)
+                # print('done with time step', et_i)
                 break
         steps += et_i
         try:
@@ -323,7 +326,8 @@ def make_parallel_MAAC_env(args, seed):
     def get_env_fn(rank):
         def init_env():
             env = make_env(args)
-            env = FlatObs(env)
+            if args.env_name == 'pp':
+                env = FlatObs(env)
             env.agents = [Agent() for _ in range(args.player)]
             # env.grid_observation = args.grid_observation
             # env.seed(args.random_seed + rank * 1000)
@@ -335,7 +339,16 @@ def make_parallel_MAAC_env(args, seed):
 
 def make_env(config):
     import gym
-    env = gym.make(f"macpp-{config.field}x{config.field}-{config.player}a-{config.pp['n_picker']}p-{config.pp['n_objects']}o-{config.pp['version']}", debug_mode=False)
+    if config.env_name == 'rware':
+        import rware
+        if config.grid_observation:
+            env = gym.make(f"rware-img-{config.rware['size']}-{config.player}ag-{config.rware['difficulty']}v1")
+        else:
+            env = gym.make(f"rware-{config.rware['size']}-{config.player}ag-{config.rware['difficulty']}v1")
+    elif config.env_name == 'pp':
+        env = gym.make(f"macpp-{config.field}x{config.field}-{config.player}a-{config.pp['n_picker']}p-{config.pp['n_objects']}o-{config.pp['version']}", debug_mode=False)
+    else:
+        raise ValueError(f'Cannot identify environment {config.env_name}')
     # env = FlatObs(env)
     return env
 
@@ -403,12 +416,12 @@ if __name__ == '__main__':
                              f"{args['player']}p" \
                              f"_{args['lbf']['max_food']}f" \
                              f"{'_coop' if args['lbf']['force_coop'] else ''}{args['other']}v"
-            del args['bpush'], args['wolfpack']
+            del args['bpush'], args['wolfpack'], args['rware'], args['pp']
         elif 'bpush' in args['env_name']:
             args['env_id'] = f"{args['env_name']}" \
                              f"_{args['field']}x{args['field']}" \
                              f"_{args['player']}p"
-            del args['wolfpack'], args['lbf']
+            del args['wolfpack'], args['lbf'], args['rware'], args['pp']
         elif 'wolf' in args['env_name']:
             args[
                 'env_id'] = f"{args['env_name']}" \
@@ -416,7 +429,7 @@ if __name__ == '__main__':
                             f"_{args['player']}w" \
                             f"_{args['wolfpack']['max_food_num']}s" \
                             f"{args['other']}"
-            del args['bpush'], args['lbf']
+            del args['bpush'], args['lbf'], args['rware'], args['pp']
         elif 'grid' in args['env_name']:
             args['env_id'] = f"{args['env_name']}"
             del args['bpush'], args['lbf'], args['wolfpack']
@@ -427,7 +440,14 @@ if __name__ == '__main__':
                             f"_{args['pp']['n_picker']}p" \
                             f"_{args['pp']['n_objects']}o" \
                             f"-{args['pp']['version']}"
-            del args['bpush'], args['lbf'], args['wolfpack']
+            del args['bpush'], args['lbf'], args['wolfpack'], args['rware']
+        elif 'rware' in args['env_name']:
+            args['env_id'] = f"{args['env_name']}" \
+                            f"_{args['rware']['size']}" \
+                            f"_{args['player']}a" \
+                            f"-{args['rware']['difficulty']}"
+            del args['bpush'], args['lbf'], args['wolfpack'], args['pp']
+
         if params['exp_id'] == 'try':
             args['env_id'] = 'TEST'
             args['n_episodes']= 30000

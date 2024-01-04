@@ -1,17 +1,17 @@
-env_name: 'pp'
+env_name: 'rware'
 exp_id : 'try'
-other: '_RGAT'
+other: ''
 
 player: 2
 field: 10
 grid_observation: True
 
 alg: 'MARC'
-n_episodes: 5500000
-episode_length: 50
+n_episodes: 1000000
+episode_length: 500
 test_n_episodes: 10
 #tau: 0.01
-device: 'cuda:0'
+device: 'cpu'
 
 pp:
   n_picker: 1
@@ -23,6 +23,19 @@ pp:
                  'id':3,
                  'carrying':4,
                  'picker':5,}
+
+rware:
+  size: 'tiny'
+  difficulty: ''
+  attr_mapping: {
+    'shelves':0,
+    'requests':1,
+    'agents':2,
+    'goals':3,
+    'accessible':4,
+  }
+
+
 lbf:
   max_food: 4
   force_coop: True
@@ -43,12 +56,12 @@ wolfpack:
   attr_mapping: {'wolf': 0, 'sheep': 1, 'id': 2}
 
 marc:
-  dense: True
+  dense: False
   relational_embedding : False
   background_id : 'b0'
   abs_id: 'None'
   buffer_length: 100000
-  graph_layer: 'RGAT'
+  graph_layer: 'RGCN'
 
 maac:
   attend_heads: 4

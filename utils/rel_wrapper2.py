@@ -61,11 +61,12 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
     """
     def __init__(self, env, attr_mapping, dense=False, background_id="b3", abs_id='None'):
         super().__init__(env)
-        # self.attribute_labels = ['agents', 'id', 'feature']
-
-
-        self.field_size, _, self.n_attr = env.observation_space[0]['image'].shape
-        print(self.field_size, 'field_size')
+        a, b, c = env.observation_space[0]['image'].shape
+        if b==c:
+            self.n_attr, self.field_size = a,c
+        else:
+            self.field_size, self.n_attr = a,c
+        print(f'field_size:{self.field_size} and n_attributes:{self.n_attr}')
         self.attr_mapping = attr_mapping
         assert len(self.attr_mapping) == self.n_attr, f'Attribute mapping ({len(self.attr_mapping)}) needs to have a key for each attribute ({self.n_attr})'
 
