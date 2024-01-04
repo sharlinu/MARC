@@ -136,7 +136,7 @@ class PartialGridObs(gym.ObservationWrapper):
         obs_all = []
         for obs in observation:
             single_obs = {}
-            obs = np.moveaxis(obs, -1, 0)
+            obs = np.moveaxis(obs, 0, -1)
             single_obs['image'] = obs
             obs_all.append(single_obs)
         return (obs_all)

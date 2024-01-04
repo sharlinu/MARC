@@ -1,5 +1,5 @@
 env_name: 'rware'
-exp_id : 'try'
+exp_id : 'std'
 other: ''
 
 player: 2
@@ -7,7 +7,7 @@ field: 10
 grid_observation: True
 
 alg: 'MARC'
-n_episodes: 1000000
+n_episodes: 50000
 episode_length: 500
 test_n_episodes: 10
 #tau: 0.01
@@ -26,7 +26,7 @@ pp:
 
 rware:
   size: 'tiny'
-  difficulty: ''
+  difficulty: 'easy-'
   attr_mapping: {
     'shelves':0,
     'requests':1,
