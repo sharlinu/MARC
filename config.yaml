@@ -1,22 +1,22 @@
 env_name: 'pp'
-exp_id : 'try'
-other: '_RGAT'
+exp_id : 'std'
+other: ''
 
-player: 2
+player: 4
 field: 10
 grid_observation: True
 
 alg: 'MARC'
-n_episodes: 5500000
+n_episodes: 3000000
 episode_length: 50
 test_n_episodes: 10
 #tau: 0.01
 device: 'cuda:0'
 
 pp:
-  n_picker: 1
+  n_picker: 2
   n_objects: 2
-  version: 'v2'
+  version: 'v4'
   attr_mapping: {'agent': 0,
                  'objects': 1,
                  'goals': 2,
@@ -48,7 +48,7 @@ marc:
   background_id : 'b0'
   abs_id: 'None'
   buffer_length: 100000
-  graph_layer: 'RGAT'
+  graph_layer: 'RGCN'
 
 maac:
   attend_heads: 4
