@@ -336,8 +336,6 @@ def parse_code(net_code: str):
     is_max = True if net_code[2] == "m" else False
     return nb_gnn_layers, nb_dense_layers, is_max
 
-
-
 def batch_to_gd(batch: torch.Tensor, device: str):
     # [B x R x E x E]
     batch_size = batch.shape[0]
@@ -371,4 +369,3 @@ def batch_to_gd(batch: torch.Tensor, device: str):
     slices = [max_node for _ in batch_data]
     # print(device)
     return geometric_batch.to(device=device), slices
-

@@ -156,15 +156,16 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
                     for rel_idx, func in enumerate(self.rel_deter_func):
                         if func(obj1, obj2, direction_vec):
                             self.spatial_tensors[rel_idx][obj_idx1, obj_idx2] = 1.0
-                    for abs_rel_idx, abs_func in enumerate(self.abs_rel_func):
-                        if abs_func(obj1, obj2, self.attr_mapping):
-                            self.abstract_tensors[abs_rel_idx][obj_idx1, obj_idx2] = 1.0
+                    # for abs_rel_idx, abs_func in enumerate(self.abs_rel_func):
+                    #     if abs_func(obj1, obj2, self.attr_mapping):
+                    #         self.abstract_tensors[abs_rel_idx][obj_idx1, obj_idx2] = 1.0
 
         all_binaries = self.spatial_tensors + self.abstract_tensors
         binary_tensors = torch.tensor(all_binaries)
         # if len(unary_tensors[0]) != self.obj_n:
         #     unary_t =  np.array([])
         # else:
+        curr = binary_tensors
         unary_t = torch.Tensor(np.stack(unary_tensors, axis=-1))
         gd = to_gd(binary_tensors, unary_t, nb_objects=self.obj_n) # TODO
         return unary_t, gd
@@ -183,8 +184,7 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
         """
         #obs = obs.copy()
         for ob in obs:
-            spatial_VKB = self.img2vkb(ob['image'])
-            ob['unary_tensor'], ob['binary_tensor'] = spatial_VKB
+            ob['unary_tensor'], ob['binary_tensor'] = self.img2vkb(ob['image'])
         return obs
 
     def id_to_rule_list(self, background_id):

@@ -4,6 +4,7 @@
 #     https://www.atlassian.com/git/tutorials/saving-changes/gitignore
 
 # Node artifact files
+archive/
 node_modules/
 dist/
 ./config.yaml
@@ -12,6 +13,7 @@ model.pt
 experiments/*/*/*TEST*
 # Compiled Java class files
 *.class
+
 
 # Compiled Python bytecode
 *.py[cod]
@@ -28,6 +30,7 @@ arguments.txt
 summary.json
 *multipleseeds*/
 reward_total.png
+nohup.out
 # Package files
 *.jar
 

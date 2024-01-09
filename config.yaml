@@ -1,12 +1,12 @@
 env_name: 'rware'
-exp_id : 'std'
+exp_id : 'try'
 other: ''
 
 player: 2
 field: 10
 grid_observation: True
 
-alg: 'MAAC'
+alg: 'MARC'
 n_episodes: 50000
 episode_length: 500
 test_n_episodes: 10
