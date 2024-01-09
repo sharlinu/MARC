@@ -1,15 +1,14 @@
 # Summary
-This is an implementation of a R-GCN based MAAC architecture in Pytorch.
+This is the code for the paper 'Embracing Relational Reasoning in Multi-Agent Actor-Critic'.
 
 # Requirements used 
 - Python 3.9
 - Pytorch 1.13.1
 - Pytorch Geometric 2.2.0
-- Numpy 1.24.0
-- Baselines 0.1.5
+- Numpy 1.24.2
+- stable-baselines3==2.0.0
 - gym 0.25.1
 - my [fork](https://github.com/sharlinu/lb-foraging) of the Level-based Foraging environment
-
 
 # Experiment Settings
 The algorithm and environment can be configured in the `config.yaml`. 
