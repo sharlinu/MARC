@@ -328,6 +328,8 @@ def make_parallel_MAAC_env(args, seed):
             env = make_env(args)
             if args.env_name == 'pp':
                 env = FlatObs(env)
+            elif args.env_name == 'rware':
+                env = PartialGridObs(env)
             env.agents = [Agent() for _ in range(args.player)]
             # env.grid_observation = args.grid_observation
             # env.seed(args.random_seed + rank * 1000)

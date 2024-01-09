@@ -6,7 +6,7 @@ player: 2
 field: 10
 grid_observation: True
 
-alg: 'MARC'
+alg: 'MAAC'
 n_episodes: 50000
 episode_length: 500
 test_n_episodes: 10

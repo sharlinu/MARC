@@ -134,14 +134,6 @@ class RelationalCritic(nn.Module):
                 embedds = self.gnn_layers(embedds, self.gd.edge_index, self.gd.edge_attr)
                 embedds = torch.relu(embedds)
                 x = pool.global_max_pool(embedds, self.gd.batch)
-            # chunks = torch.split(embedds, self.slices, dim=0) # splits it in slices/entities
-            # chunks = [p.unsqueeze(0) for p in chunks] # just adds back another dimension in the beginning
-            # x = torch.cat(chunks, dim=0)
-            # if self.max_reduce:
-            #     # max-pooling layer
-            #     x, _ = torch.max(x, dim=1)
-            # else:
-            #     x = torch.flatten(x, start_dim=1, end_dim=2)
 
 
             # extract state encoding for each agent that we're returning Q for
