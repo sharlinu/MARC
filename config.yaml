@@ -16,7 +16,7 @@ device: 'cuda:0'
 pp:
   n_picker: 2
   n_objects: 2
-  version: 'v4'
+  version: 'v5'
   attr_mapping: {'agent': 0,
                  'objects': 1,
                  'goals': 2,
