@@ -92,8 +92,8 @@ def run(config):
     elif 'pp' in config.env_id:
         import macpp
         from utils.env_wrappers import GridObs
-        # env = gym.make(f"macpp-{config.field}x{config.field}-{config.player}a-{config.pp['n_picker']}p-{config.pp['n_objects']}o-v0",
-        env=gym.make(f"macpp-{config.field}x{config.field}-{config.player}a-{config.pp['n_picker']}p-{config.pp['n_objects']}o-v0",
+
+        env=gym.make(f"macpp-{config.field}x{config.field}-{config.player}a-{config.pp['n_picker']}p-{config.pp['n_objects']}o-sparse-v0",
                        debug_mode=False)
         env = GridObs(env)
         attr_mapping = config.pp['attr_mapping']

@@ -108,7 +108,7 @@ class RelationalSAC(object):
         return [a.step(obs, explore=explore) for a, obs in zip(self.agents,
                                                                observations)]
 
-    def target_step(self, observations):
+    def target_step(self, observations, explore=False):
         """
         Take a step forward in environment with all agents
         Inputs:

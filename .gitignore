@@ -5,10 +5,12 @@
 
 # Node artifact files
 node_modules/
+archive/
 dist/
 ./config.yaml
 wandb/
 model.pt
+nohup.out
 experiments/*/*/*TEST*
 nohup.out
 # Compiled Java class files
