@@ -1,12 +1,12 @@
 env_name: 'rware'
-exp_id : 'try'
-other: ''
+exp_id : 'std'
+other: '-Directional'
 
 player: 2
 field: 10
 grid_observation: True
 
-alg: 'MARC'
+alg: 'MAAC'
 n_episodes: 50000
 episode_length: 500
 test_n_episodes: 10
@@ -33,6 +33,8 @@ rware:
     'agents':2,
     'goals':3,
     'accessible':4,
+#    'agent_load':5,
+#    'agent_direction':6,
   }
 
 

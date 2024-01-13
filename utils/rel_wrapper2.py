@@ -78,10 +78,10 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
         self.n_rel_rules = len(self.rel_deter_func)
         print('Number of relational rules', self.n_rel_rules, "+", len(self.abs_rel_func))
         # number of objects/entities are the number of cells on the grid
-        if not self.dense:
-            self.obj_n = np.prod((self.field_size, self.field_size)) #physical entities
-        else:
-            self.obj_n = env.n_agents + env.n_objects
+        # if not self.dense:
+        #     self.obj_n = np.prod((self.field_size, self.field_size)) #physical entities
+        # else:
+        #     self.obj_n = env.n_agents + env.n_objects
         self.spatial_tensors = None
         self.prev = None
 
@@ -167,7 +167,7 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
         # else:
         curr = binary_tensors
         unary_t = torch.Tensor(np.stack(unary_tensors, axis=-1))
-        gd = to_gd(binary_tensors, unary_t, nb_objects=self.obj_n) # TODO
+        gd = to_gd(binary_tensors, unary_t)
         return unary_t, gd
 
     def observation(self, obs):
@@ -244,7 +244,7 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
 
         return rel_func
 
-def to_gd(data: torch.Tensor, unary_t, nb_objects) -> GeometricData:
+def to_gd(data: torch.Tensor, unary_t) -> GeometricData:
     """
     takes batch of adjacency geometric data and transforms it to a GeometricData object for torch.geometric
 

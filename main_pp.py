@@ -176,7 +176,10 @@ def run(config):
                 actions = [[np.argmax(ac[0]) for ac in agent_actions]]
             next_obs, rewards, dones, infos = env.step(actions)
             rewards, dones = np.array(rewards), np.array(dones)
-
+            if config.alg=='MAAC':
+                env.envs[0].render()
+            else:
+                env.render()
             if config.alg == 'MAAC' and env.grid_observation:
                 next_obs = tuple([next_obs[:,i][0]['image'].flatten() for i in range(model.n_agents)])
                 next_obs = np.vstack(next_obs)
@@ -344,7 +347,19 @@ def make_env(config):
     if config.env_name == 'rware':
         import rware
         if config.grid_observation:
-            env = gym.make(f"rware-img-{config.rware['size']}-{config.player}ag-{config.rware['difficulty']}v1")
+            # env = gym.make(f"rware-img-Nd-{config.rware['size']}-{config.player}ag-{config.rware['difficulty']}v1")
+            env = rware.warehouse.Warehouse(column_height=1,
+                            shelf_columns=3,
+                            shelf_rows=1,
+                            n_agents=2,
+                            msg_bits=0,
+                            sensor_range=5,
+                            request_queue_size=2,
+                            max_inactivity_steps= None,
+                            max_steps=500,
+                            observation_type=rware.warehouse.ObservationType.IMAGE,
+                            image_observation_directional=True,
+                            reward_type= rware.warehouse.RewardType.INDIVIDUAL)
         else:
             env = gym.make(f"rware-{config.rware['size']}-{config.player}ag-{config.rware['difficulty']}v1")
     elif config.env_name == 'pp':
