@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from itertools import chain
-from torch_geometric.nn import RGCNConv, pool, RGATConv
+from torch_geometric.nn import RGCNConv, pool, RGATConv, GATConv
 from torch_geometric.data import Data as GeometricData, Batch
 
 
@@ -20,11 +20,12 @@ class RelationalCritic(nn.Module):
                  batch_size: int,
                  n_actions: int,
                  input_dims: list,
+                 dense: bool,
                  hidden_dim: int = 32,
                  norm_in: object = True,
                  net_code: object = "1g0f",
                  device: str = 'cuda:0',
-                 graph_layer: str = 'RGCN', 
+                 graph_layer: str = 'RGCN',
                  mp_rounds: object = 1) -> object:
         """
         Inputs:
@@ -41,7 +42,7 @@ class RelationalCritic(nn.Module):
         self.device = device
         self.batch_size = batch_size
         self.max_reduce = True # TODO hardcoded
-        # self.dense = True
+        self.dense = dense
         self.graph_layer = graph_layer
         self.spatial_tensors = np.array(spatial_tensors)
         self.binary_batch = torch.tensor([self.spatial_tensors for _ in range(self.batch_size)])
@@ -51,11 +52,26 @@ class RelationalCritic(nn.Module):
 
         # self.embedder = nn.Linear(input_dims[0], hidden_dim)
         if self.graph_layer == 'RGCN':
-            self.gnn_layers = RGCNConv(input_dims[0], hidden_dim, self.nb_edge_types)
+            self.gnn_layers = RGCNConv(in_channels=input_dims[0],
+                                       out_channels = hidden_dim,
+                                       num_relations = self.nb_edge_types
+                                       )
         elif self.graph_layer == 'RGAT':
-            self.gnn_layers = RGATConv(input_dims[0], hidden_dim, self.nb_edge_types)
+            self.gnn_layers = RGATConv(in_channels=input_dims[0],
+                                       out_channels=hidden_dim,
+                                       num_relations = self.nb_edge_types
+                                       )
             print('This is using RGAT as graph layer')
+        elif self.graph_layer == 'GAT':
+            attend_heads = 4
+            assert (hidden_dim % attend_heads) == 0
+            attend_dim = hidden_dim // attend_heads
 
+            self.gnn_layers = GATConv(in_channels = input_dims[0],
+                                      out_channels=attend_dim,
+                                      heads=attend_heads,
+                                      )
+            print('Using GAT layer')
         else:
             print('not a valid graph layer')
         print(f'Using {self.graph_layer} as graph layer')
@@ -117,15 +133,14 @@ class RelationalCritic(nn.Module):
         all_rets = []
 
         for a_i in agents:
-            # feature embedding
-            # print(unary_tensors[a_i])
-            # embedds = self.embedder(embedds) # seems right so far
-            # RGCN module
 
-            if all(binary_tensors):
+            if self.dense:
                 gd = Batch.from_data_list(binary_tensors[a_i])
                 gd = gd.to(device = self.device)
-                embedds = self.gnn_layers(gd.x, gd.edge_index, gd.edge_attr)
+                if self.graph_layer=='GAT':
+                    embedds = self.gnn_layers(gd.x, gd.edge_index)
+                else:
+                    embedds = self.gnn_layers(gd.x, gd.edge_index, gd.edge_attr)
                 embedds = torch.relu(embedds)
                 x = pool.global_max_pool(embedds, gd.batch)
             else:
@@ -324,17 +339,6 @@ class AttentionCritic(nn.Module):
             return all_rets[0]
         else:
             return all_rets
-
-def parse_code(net_code: str):
-    """
-    :param net_code: format <a>g[m]<b>f
-    """
-    assert net_code[1]=="g"
-    assert net_code[-1]=="f"
-    nb_gnn_layers = int(net_code[0])
-    nb_dense_layers = int(net_code[-2])
-    is_max = True if net_code[2] == "m" else False
-    return nb_gnn_layers, nb_dense_layers, is_max
 
 def batch_to_gd(batch: torch.Tensor, device: str):
     # [B x R x E x E]

@@ -64,8 +64,10 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
         a, b, c = env.observation_space[0]['image'].shape
         if b==c:
             self.n_attr, self.field_size = a,c
+            print('Image dimensions are reversed')
         else:
             self.field_size, self.n_attr = a,c
+        print(f'Format {a}-{b}-{c}')
         print(f'field_size:{self.field_size} and n_attributes:{self.n_attr}')
         self.attr_mapping = attr_mapping
         assert len(self.attr_mapping) == self.n_attr, f'Attribute mapping ({len(self.attr_mapping)}) needs to have a key for each attribute ({self.n_attr})'
@@ -77,22 +79,13 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
         self.abs_rel_func = self.id_to_abstract_rule_list(self.abs_id)
         self.n_rel_rules = len(self.rel_deter_func)
         print('Number of relational rules', self.n_rel_rules, "+", len(self.abs_rel_func))
-        # number of objects/entities are the number of cells on the grid
-        # if not self.dense:
-        #     self.obj_n = np.prod((self.field_size, self.field_size)) #physical entities
-        # else:
-        #     self.obj_n = env.n_agents + env.n_objects
         self.spatial_tensors = None
-        self.prev = None
 
     def extract_dense_attributes(self, data):
         # Compute the sum of attributes along the last dimension
-        attribute_sum = np.sum(data, axis=2)
+        attribute_sum = np.sum(abs(data), axis=2)
 
         non_zero_count = np.count_nonzero(attribute_sum)
-        # if non_zero_count != self.obj_n:
-        #     print( f'object mismatch: {non_zero_count} non_zerocount but {self.obj_n} objects')
-        # Find the indices of non-zero attribute sums
         non_zero_indices = np.nonzero(attribute_sum)
 
         # Filter out elements whose attributes sum to zero
@@ -103,7 +96,6 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
         for i in range(self.n_attr):
             attribute_vectors.append(np.reshape(filtered_data[:,i], non_zero_count))
 
-        # assert len(attribute_vectors[0]) == self.obj_n, f'{len(attribute_vectors[0])} attribute vectors but {self.obj_n} objects'
         return attribute_vectors
 
     def extract_attributes(self, data):
@@ -141,7 +133,7 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
         for y, row in enumerate(img):
             for x, pixel in enumerate(row):
                 # print(pixel)
-                if self.dense and np.sum(pixel)==0:
+                if self.dense and np.sum(abs(pixel))==0:
                     continue
                 obj = GridObject(x,y, attr=pixel)
                 objs.append(obj)
@@ -149,7 +141,7 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
         if not self.spatial_tensors or self.dense:
             # create spatial tensors that gives for every rel. det rule a binary indicator between the entities
             self.spatial_tensors = [np.zeros([len(objs), len(objs)]) for _ in range(len(self.rel_deter_func))] # 14  81x81 vectors for each relation
-            self.abstract_tensors = [np.zeros([len(objs), len(objs)]) for _ in range(len(self.abs_rel_func))]
+            # self.abstract_tensors = [np.zeros([len(objs), len(objs)]) for _ in range(len(self.abs_rel_func))]
             for obj_idx1, obj1 in enumerate(objs):
                 for obj_idx2, obj2 in enumerate(objs):
                     direction_vec = DIR_TO_VEC[1]
@@ -160,12 +152,8 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
                     #     if abs_func(obj1, obj2, self.attr_mapping):
                     #         self.abstract_tensors[abs_rel_idx][obj_idx1, obj_idx2] = 1.0
 
-        all_binaries = self.spatial_tensors + self.abstract_tensors
+        all_binaries = self.spatial_tensors  # + self.abstract_tensors
         binary_tensors = torch.tensor(all_binaries)
-        # if len(unary_tensors[0]) != self.obj_n:
-        #     unary_t =  np.array([])
-        # else:
-        curr = binary_tensors
         unary_t = torch.Tensor(np.stack(unary_tensors, axis=-1))
         gd = to_gd(binary_tensors, unary_t)
         return unary_t, gd
@@ -244,7 +232,126 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
 
         return rel_func
 
-def to_gd(data: torch.Tensor, unary_t) -> GeometricData:
+class GATWrapper(gym.ObservationWrapper):
+    """
+    Add a key-value pair, which represents the state as a vectorised knowledge base.
+    Entities are objects in the gird-world, predicates represents the properties of them and relations between them.
+    """
+    def __init__(self, env, attr_mapping, dense=False):
+        super().__init__(env)
+        a, b, c = env.observation_space[0]['image'].shape
+        if b==c:
+            self.n_attr, self.field_size = a,c
+            print('Image dimensions are reversed')
+        else:
+            self.field_size, self.n_attr = a,c
+        print(f'Format {a}-{b}-{c}')
+        print(f'field_size:{self.field_size} and n_attributes:{self.n_attr}')
+        self.attr_mapping = attr_mapping
+        assert len(self.attr_mapping) == self.n_attr, f'Attribute mapping ({len(self.attr_mapping)}) needs to have a key for each attribute ({self.n_attr})'
+
+        # Add spatial coordinates to each object
+        self.n_attr += 2
+
+        self.dense = dense
+        self.n_rel_rules = 1
+        print('Number of relational rules', self.n_rel_rules)
+        self.spatial_tensors = None
+
+    def extract_dense_attributes(self, data):
+        # Compute the sum of attributes along the last dimension
+        attribute_sum = np.sum(abs(data), axis=2)
+
+        non_zero_count = np.count_nonzero(attribute_sum)
+        # if non_zero_count != self.obj_n:
+        #     print( f'object mismatch: {non_zero_count} non_zerocount but {self.obj_n} objects')
+        # Find the indices of non-zero attribute sums
+        non_zero_indices = np.nonzero(attribute_sum)
+
+        # Filter out elements whose attributes sum to zero
+        filtered_data = data[non_zero_indices]
+
+        attribute_vectors = []
+
+        for i in range(self.n_attr-2):
+            attribute_vectors.append(np.reshape(filtered_data[:,i], non_zero_count))
+
+        # assert len(attribute_vectors[0]) == self.obj_n, f'{len(attribute_vectors[0])} attribute vectors but {self.obj_n} objects'
+        return attribute_vectors
+
+    def extract_attributes(self, data):
+        # Get the size of the grid and number of attributes
+        n_rows, n_cols, n_attr = data.shape
+
+        # Initialize a list of attribute vectors, each with length n_rows * n_cols
+        attribute_vectors = []
+
+        for i in range(n_attr):
+            attribute_vectors.append(np.reshape(data[:, :, i], (n_rows * n_cols)))
+        return attribute_vectors
+
+    def img2vkb(self, img, direction=None):
+        """
+        Takes in an RGB img (n+2, n+2, n_) and returns vectorized attributes
+        Parameters
+        ----------
+        img : image of the environment
+        direction :
+
+        Returns
+        unary_t (attribute per entity), binary_t (relation between entities)
+        -------
+
+        """
+        img = img.astype(np.int32)
+        # data = filter_non_zero_elements(img) if self.dense else img
+
+        if self.dense:
+            unary_tensors = self.extract_dense_attributes(img)
+        else:
+            unary_tensors = self.extract_attributes(img)
+        objs = []
+        for y, row in enumerate(img):
+            for x, pixel in enumerate(row):
+                # print(pixel)
+                if self.dense and np.sum(abs(pixel))==0:
+                    continue
+                obj = GridObject(x,y, attr=pixel)
+                objs.append(obj)
+
+        # add spatial positions
+        unary_tensors.append(np.array([obj.x for obj in objs]))
+        unary_tensors.append(np.array([obj.y for obj in objs]))
+
+        self.spatial_tensors = [np.zeros([len(objs), len(objs)])]
+        for obj_idx1, obj1 in enumerate(objs):
+            for obj_idx2, obj2 in enumerate(objs):
+                self.spatial_tensors[0][obj_idx1, obj_idx2] = 1.0
+
+        binary_tensors = torch.tensor(self.spatial_tensors)
+        unary_t = torch.Tensor(np.stack(unary_tensors, axis=-1))
+        gd = to_gd(binary_tensors, unary_t)
+        return unary_t, gd
+
+    def observation(self, obs):
+        """
+        Wrapper that customizes the default observation space.
+        Is called also when environment is reset!
+        Parameters
+        ----------
+        obs : Observation from the default environment
+
+        Returns
+        -------
+
+        """
+        #obs = obs.copy()
+        for ob in obs:
+            ob['unary_tensor'], ob['binary_tensor'] = self.img2vkb(ob['image'])
+        return obs
+
+
+def to_gd(data: torch.Tensor, unary_t, GAT = False) -> GeometricData:
     """
     takes batch of adjacency geometric data and transforms it to a GeometricData object for torch.geometric
 
@@ -256,13 +363,17 @@ def to_gd(data: torch.Tensor, unary_t) -> GeometricData:
     # x = torch.arange(nb_objects).view(-1, 1) # TODO change to actual node features i.e. the unary tensors
     nz = torch.nonzero(data)
 
-    # list of all edges and what relationtype they have
-    edge_attr = nz[:, 0]
 
     # list of node to node indicating an edge
     edge_index = nz[:, 1:].T
-    return GeometricData(x=unary_t, edge_index=edge_index, edge_attr=edge_attr)
 
+
+    if GAT:
+        return GeometricData(x=unary_t, edge_index=edge_index)
+    else:
+        # list of all edges and what relationtype they have
+        edge_attr = nz[:, 0]
+        return GeometricData(x=unary_t, edge_index=edge_index, edge_attr=edge_attr)
 
 
 

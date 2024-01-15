@@ -29,6 +29,7 @@ class RelationalSAC(object):
                  critic_hidden_dim=128,
                  graph_layer='RCN', 
                  device='cuda:0',
+                 dense= True,
                  **kwargs):
         """
         Inputs:
@@ -61,7 +62,8 @@ class RelationalSAC(object):
                                        input_dims=input_dims,
                                        hidden_dim=critic_hidden_dim,
                                        graph_layer = graph_layer,
-                                       device = device)
+                                       device = device,
+                                       dense = dense)
         self.target_critic = RelationalCritic(
                                         n_agents = self.n_agents,
                                         # obs = obs,
@@ -71,7 +73,8 @@ class RelationalSAC(object):
                                         input_dims=input_dims,
                                         hidden_dim=critic_hidden_dim,
                                         graph_layer = graph_layer, 
-                                        device=device)
+                                        device=device,
+                                        dense = dense)
         hard_update(self.target_critic, self.critic) # hard update only at the beginning to initialise
         self.critic_optimizer = Adam(self.critic.parameters(), lr=q_lr,
                                      weight_decay=1e-3)
@@ -272,10 +275,11 @@ class RelationalSAC(object):
     def init_from_env(cls, env,
                       spatial_tensors,
                       batch_size,
+                      dense,
+                      graph_layer,
                       gamma=0.95, tau=0.01,
                       pi_lr=0.01, q_lr=0.01,
                       reward_scale=10.,
-                      graph_layer = 'RGCN',
                       pol_hidden_dim=64, critic_hidden_dim=64, attend_heads=4,
                       device='cuda:0',
                       **kwargs):
@@ -312,7 +316,7 @@ class RelationalSAC(object):
                      'input_dims': [env.n_attr, env.n_rel_rules],
                      'device':device,
                      'graph_layer':graph_layer,
-                     # the number of attributes and the number of relations
+                     'dense': dense,
                      }
 
         instance = cls(**init_dict)

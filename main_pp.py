@@ -11,7 +11,7 @@ import macpp
 #                         module='gym') # TODO update
 from utils.buffer import ReplayBufferMARC, ReplayBufferMAAC
 from algorithms.attention_sac import AttentionSAC, RelationalSAC
-from utils.rel_wrapper2 import AbsoluteVKBWrapper
+from utils.rel_wrapper2 import AbsoluteVKBWrapper, GATWrapper
 from utils.env_wrappers import DummyVecEnv, FlatObs, GridObs, PartialGridObs
 import yaml
 from utils.misc import Agent
@@ -43,11 +43,15 @@ def run(config):
             env = PartialGridObs(env)
         env.grid_observation = config.grid_observation
         attr_mapping = getattr(config, env_name)['attr_mapping']
-        env = AbsoluteVKBWrapper(env=env,
+        # env = AbsoluteVKBWrapper(env=env,
+        #                          attr_mapping=attr_mapping,
+        #                          dense=config.marc['dense'],
+        #                          background_id=config.marc['background_id'],
+        #                          abs_id=config.marc['abs_id']
+        #                          )
+        env = GATWrapper(env=env,
                                  attr_mapping=attr_mapping,
                                  dense=config.marc['dense'],
-                                 background_id=config.marc['background_id'],
-                                 abs_id=config.marc['abs_id']
                                  )
         env.agents = [None] * len(env.action_space)
         # unary_dim = env.obs_shape['unary']
@@ -79,7 +83,8 @@ def run(config):
                                                pol_hidden_dim=config.pol_hidden_dim,
                                                critic_hidden_dim=config.critic_hidden_dim,
                                                device=config.device,
-                                               reward_scale=config.reward_scale)
+                                               reward_scale=config.reward_scale,
+                                               dense=config.marc['dense'])
 
         replay_buffer = ReplayBufferMARC(max_steps=config.marc['buffer_length'],
                                          num_agents=model.n_agents,
