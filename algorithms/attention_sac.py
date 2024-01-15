@@ -604,6 +604,7 @@ class AttentionSAC(object):
         if env.grid_observation:
             for acsp, obsp in zip(env.action_space,
                                   env.observation_space):
+                # s_shape = np.prod(obsp['image'].shape)
                 s_shape = np.prod(obsp['image'].shape)
                 agent_init_params.append({'num_in_pol': s_shape,
                                           'num_out_pol': acsp.n})

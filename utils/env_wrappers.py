@@ -118,6 +118,31 @@ class GridObs(gym.ObservationWrapper):
         return (obs_all)
 
 
+class PartialGridObs(gym.ObservationWrapper):
+    def __init__(self, env):
+        super().__init__(env)
+        # self.observation_space = None
+        single_observation_space = {}
+        a, b, c = env.observation_space[0].shape
+        obs_shape = (b, c, a)
+        single_observation_space['image'] = gym.spaces.Box(
+            low=np.zeros(obs_shape),
+            high=np.ones(obs_shape),
+            shape=obs_shape,
+            dtype=np.float32)
+        self.observation_space = [single_observation_space for _ in range(self.n_agents)]
+
+    def observation(self, observation):
+        obs_all = []
+        for obs in observation:
+            single_obs = {}
+            obs = np.moveaxis(obs, 0, -1)
+            single_obs['image'] = obs
+            obs_all.append(single_obs)
+        return (obs_all)
+
+
+
 def worker(remote, parent_remote, env_fn_wrapper):
     parent_remote.close()
     env = env_fn_wrapper.x()
