@@ -1,12 +1,12 @@
 env_name: 'pp'
 exp_id : 'std'
-other: '_GAT'
+other: ''
 
 player: 2
 field: 5
-grid_observation: True
+grid_observation: False
 
-alg: 'MARC'
+alg: 'MAAC'
 n_episodes: 300000
 episode_length: 50
 test_n_episodes: 10
