@@ -10,7 +10,7 @@ from warnings import filterwarnings  # noqa
 #                         module='gym') # TODO update
 from utils.buffer import ReplayBufferMARC, ReplayBufferMAAC
 from algorithms.attention_sac import AttentionSAC, RelationalSAC
-from utils.rel_wrapper2 import AbsoluteVKBWrapper
+from utils.rel_wrapper2 import AbsoluteVKBWrapper, GATWrapper
 from utils.env_wrappers import DummyVecEnv
 import yaml
 from utils.misc import Agent
@@ -37,12 +37,18 @@ def run(config):
         env = make_env(config)
         env.grid_observation = config.grid_observation
         attr_mapping = getattr(config, env_name)['attr_mapping']
-        env = AbsoluteVKBWrapper(env=env,
+        if config.marc['graph_layer'] == 'GAT':
+            env = GATWrapper(env=env,
                                  attr_mapping=attr_mapping,
                                  dense=config.marc['dense'],
-                                 background_id=config.marc['background_id'],
-                                 abs_id=config.marc['abs_id']
                                  )
+        else:
+            env = AbsoluteVKBWrapper(env=env,
+                              attr_mapping=attr_mapping,
+                              dense=config.marc['dense'],
+                              background_id=config.marc['background_id'],
+                              abs_id=config.marc['abs_id']
+                              )
         env.agents = [None] * len(env.action_space)
         # unary_dim = env.obs_shape['unary']
         env.reset()
@@ -64,6 +70,7 @@ def run(config):
             start_episode = 0
             model = RelationalSAC.init_from_env(env,
                                                 spatial_tensors=env.spatial_tensors,
+                                                dense = config.marc['dense'],
                                                 batch_size = config.batch_size,
                                                tau=config.tau,
                                                pi_lr=config.pi_lr,

@@ -43,16 +43,18 @@ def run(config):
             env = PartialGridObs(env)
         env.grid_observation = config.grid_observation
         attr_mapping = getattr(config, env_name)['attr_mapping']
-        # env = AbsoluteVKBWrapper(env=env,
-        #                          attr_mapping=attr_mapping,
-        #                          dense=config.marc['dense'],
-        #                          background_id=config.marc['background_id'],
-        #                          abs_id=config.marc['abs_id']
-        #                          )
-        env = GATWrapper(env=env,
+        if config.marc['graph_layer'] == 'GAT':
+            env = GATWrapper(env=env,
                                  attr_mapping=attr_mapping,
                                  dense=config.marc['dense'],
                                  )
+        else:
+            env = AbsoluteVKBWrapper(env=env,
+                              attr_mapping=attr_mapping,
+                              dense=config.marc['dense'],
+                              background_id=config.marc['background_id'],
+                              abs_id=config.marc['abs_id']
+                              )
         env.agents = [None] * len(env.action_space)
         # unary_dim = env.obs_shape['unary']
         env.reset()
