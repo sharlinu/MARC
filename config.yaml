@@ -1,14 +1,14 @@
-env_name: 'lbf'
+env_name: 'pp'
 exp_id : 'std'
 other: ''
 
-player: 8
-field: 15
+player: 2
+field: 10
 grid_observation: True
 
 alg: 'MARC'
 n_episodes: 300000
-episode_length: 25
+episode_length: 50
 test_n_episodes: 10
 #tau: 0.01
 device: 'cuda:0'
@@ -63,7 +63,7 @@ marc:
   background_id : 'b0'
   abs_id: 'None'
   buffer_length: 100000
-  graph_layer: 'GAT'
+  graph_layer: 'GATv2'
 
 maac:
   attend_heads: 4

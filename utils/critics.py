@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from itertools import chain
-from torch_geometric.nn import RGCNConv, pool, RGATConv, GATConv
+from torch_geometric.nn import RGCNConv, pool, RGATConv, GATv2Conv, GATConv
 from torch_geometric.data import Data as GeometricData, Batch
 
 
@@ -72,6 +72,16 @@ class RelationalCritic(nn.Module):
                                       heads=attend_heads,
                                       )
             print('Using GAT layer')
+        elif self.graph_layer == 'GATv2':
+            attend_heads = 4
+            assert (hidden_dim % attend_heads) == 0
+            attend_dim = hidden_dim // attend_heads
+
+            self.gnn_layers = GATv2Conv(in_channels = input_dims[0],
+                                      out_channels=attend_dim,
+                                      heads=attend_heads,
+                                      )
+            print('Using GATv2 layer')
         else:
             print('not a valid graph layer')
         print(f'Using {self.graph_layer} as graph layer')
@@ -137,7 +147,7 @@ class RelationalCritic(nn.Module):
             if self.dense:
                 gd = Batch.from_data_list(binary_tensors[a_i])
                 gd = gd.to(device = self.device)
-                if self.graph_layer=='GAT':
+                if 'GAT' in self.graph_layer:
                     embedds = self.gnn_layers(gd.x, gd.edge_index)
                 else:
                     embedds = self.gnn_layers(gd.x, gd.edge_index, gd.edge_attr)
