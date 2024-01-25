@@ -2,7 +2,7 @@ alg: MARC
 batch_size: 1024
 buffer_length: 1000000
 critic_hidden_dim: 128
-device: cuda:2
+device: cuda:0
 dir_base: ./experiments
 dir_exp: ./experiments/MARC/pp/2024-01-15_pp_10x10_4a_2p_3o-v3_std_seed6001
 dir_monitor: ./experiments/MARC/pp/2024-01-15_pp_10x10_4a_2p_3o-v3_std_seed6001/monitor
