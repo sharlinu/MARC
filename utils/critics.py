@@ -6,6 +6,13 @@ from itertools import chain
 from torch_geometric.nn import RGCNConv, pool, RGATConv, GATv2Conv, GATConv
 from torch_geometric.data import Data as GeometricData, Batch
 
+class Pool(nn.Module):
+    def __init__(self):
+        super(Pool, self).__init__()
+
+    def forward(self, x, batch):
+        return pool.global_max_pool(x, batch)
+
 
 class RelationalCritic(nn.Module):
     """
@@ -86,6 +93,7 @@ class RelationalCritic(nn.Module):
             print('not a valid graph layer')
         print(f'Using {self.graph_layer} as graph layer')
         # iterate over agents
+        self.pooling = Pool()
         for _ in range(self.n_agents):
             critic = nn.Sequential()
             critic.add_module('critic_fc1', nn.Linear(hidden_dim + self.num_actions * (self.n_agents-1),
@@ -158,7 +166,7 @@ class RelationalCritic(nn.Module):
                 # embedds = self.embedder(unary_tensors[a_i])
                 embedds = self.gnn_layers(embedds, self.gd.edge_index, self.gd.edge_attr)
                 embedds = torch.relu(embedds)
-                x = pool.global_max_pool(embedds, self.gd.batch)
+                x = self.pooling(embedds, self.gd.batch)
 
 
             # extract state encoding for each agent that we're returning Q for

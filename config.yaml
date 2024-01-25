@@ -63,7 +63,7 @@ marc:
   background_id : 'b0'
   abs_id: 'None'
   buffer_length: 100000
-  graph_layer: 'GATv2'
+  graph_layer: 'RGCN'
 
 maac:
   attend_heads: 4
