@@ -27,7 +27,7 @@ class RelationalSAC(object):
                  reward_scale=10.,
                  pol_hidden_dim=128,
                  critic_hidden_dim=128,
-                 graph_layer='RCN', 
+                 graph_layer='RGCN', 
                  device='cuda:0',
                  **kwargs):
         """
@@ -335,6 +335,7 @@ class RelationalSAC(object):
             episode = 0
         save_dict['init_dict']['device'] = device
         print(save_dict['init_dict'])
+        # save_dict['init_dict']['gnn_layers'] = 'RGCN'
         instance = cls(**save_dict['init_dict'])
         instance.init_dict = save_dict['init_dict']
         for a, params in zip(instance.agents, save_dict['agent_params']):

@@ -87,7 +87,7 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
 
     def extract_dense_attributes(self, data):
         # Compute the sum of attributes along the last dimension
-        attribute_sum = np.sum(data, axis=2)
+        attribute_sum = np.sum(abs(data), axis=2)
 
         non_zero_count = np.count_nonzero(attribute_sum)
         # if non_zero_count != self.obj_n:
@@ -141,7 +141,7 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
         for y, row in enumerate(img):
             for x, pixel in enumerate(row):
                 # print(pixel)
-                if self.dense and np.sum(pixel)==0:
+                if self.dense and np.sum(abs(pixel))==0:
                     continue
                 obj = GridObject(x,y, attr=pixel)
                 objs.append(obj)
