@@ -38,7 +38,7 @@ $ python3 main.py
 
 # Evaluation
 After a model has run, it can be found in the folder `experiments/{alg}/{env_name}/{experiment_id}/saved_models/model_name.pth.tar`. 
-For example, to evaluate MAAC we would run:
+For example, to evaluate MARC we would run:
 ```commandline
 $ python3 evaluate_marc.py experiments/MAAC/lbf/2023-09-27_lbf_15x15_8p_1f_coop_std_seed4001/saved_models/ckpt_final.pth.tar
 ```
