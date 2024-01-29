@@ -1,6 +1,3 @@
-# Summary
-This is the code for the paper 'Embracing Relational Reasoning in Multi-Agent Actor-Critic'.
-
 # Requirements used 
 - Python 3.9
 - Pytorch 1.13.1
