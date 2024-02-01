@@ -77,8 +77,9 @@ class RelationalCritic(nn.Module):
             self.gnn_layers = GATConv(in_channels = input_dims[0],
                                       out_channels=attend_dim,
                                       heads=attend_heads,
+                                      v2 = True
                                       )
-            print('Using GAT layer')
+            # print(f'Using GAT layer {"with v2" if config.marc["v2"] else ""}')
         elif self.graph_layer == 'GATv2':
             attend_heads = 4
             assert (hidden_dim % attend_heads) == 0
