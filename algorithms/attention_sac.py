@@ -2,7 +2,7 @@ import torch
 from torch.optim import Adam
 from utils.misc import soft_update, hard_update, enable_gradients, disable_gradients
 from utils.agents import AttentionAgent
-from utils.critics import AttentionCritic, RelationalCritic
+from utils.critics import RelationalCritic
 import numpy as np
 
 
@@ -121,6 +121,11 @@ class RelationalSAC(object):
         """
         # observations = [observations['image']] * 2
         return [a.target_step(obs) for a, obs in zip(self.agents, observations)]
+
+    def critic_embeds(self, obs, acs):
+        unary = [o['unary_tensor'] for o in obs]
+        binary = [[o['binary_tensor']] for o in obs]
+        return self.critic(obs=obs, unary_tensors=unary, binary_tensors=binary, actions=acs)
 
 
     def update_critic(self, sample, soft=True, logger=None, **kwargs):
@@ -661,4 +666,3 @@ class AttentionSAC(object):
             instance.critic_optimizer.load_state_dict(critic_params['critic_optimizer'])
             instance.critic_dev = device
             instance.trgt_critic_dev = device
-        return instance, episode
