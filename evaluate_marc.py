@@ -92,10 +92,8 @@ def run(config):
     elif 'pp' in config.env_id:
         import macpp
         from utils.env_wrappers import GridObs
-
-        env=gym.make(f"macpp-{config.field}x{config.field}-{config.player}a-{config.pp['n_picker']}p-{config.pp['n_objects']}o-v3")
-        #env=gym.make(f"macpp-{config.field}x{config.field}-{config.player}a-{config.pp['n_picker']}p-3o-v3")
-
+        env=gym.make(f"macpp-{config.field}x{config.field}-{config.player}a-{config.pp['n_picker']}p-{config.pp['n_objects']}o-{config.pp['version']}",
+                       debug_mode=False)
         env = GridObs(env)
         attr_mapping = config.pp['attr_mapping']
     else:
@@ -130,7 +128,7 @@ def run(config):
 
         obs = env.reset()
         if config.render:
-            env.render()
+            env.render(save=config.save)
 
         for t_i in range(config.eval_episode_length):
             calc_start = time.time()
@@ -142,7 +140,7 @@ def run(config):
                                   requires_grad=False)
                          for i in range(model.n_agents)]
             # get actions as torch Variables
-            torch_actions = model.target_step(torch_obs,explore=False)
+            torch_actions = model.step(torch_obs,explore=False)
             # convert actions to numpy arrays
             actions = [np.argmax(ac.data.numpy().flatten()) for ac in torch_actions]
             # print('actions', actions)
@@ -151,7 +149,7 @@ def run(config):
                 if 'lbf' in config.env_id:
                     env.render(actions=actions)
                 else:
-                    env.render()
+                    env.render(save=config.save)
                 time.sleep(0.5)
             collect_item['l_infos'].append(infos)
 
@@ -180,18 +178,19 @@ def run(config):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("model_path", help="model_path")
-    parser.add_argument("--save_gifs", action="store_true",
-                        help="Saves gif of each episode into model directory")
     parser.add_argument("--incremental", default=None, type=int,
                         help="Load incremental policy from given episode " +
                              "rather than final policy")
     parser.add_argument("--eval_n_episodes", default=10, type=int)
-    parser.add_argument("--eval_episode_length", default=25, type=int)
+    parser.add_argument("--eval_episode_length", default=50, type=int)
     parser.add_argument("--fps", default=30, type=int)
     parser.add_argument("--render", default=False, action="store_true",
                         help="render")
     parser.add_argument("--benchmark", action="store_false",
                         help="benchmark mode")
+    parser.add_argument("--save", action="store_true",
+                        help="to save visualisation of the environment")
+
     config = parser.parse_args()
     args = vars(config)
     eval_path = Path(config.model_path)
@@ -201,6 +200,6 @@ if __name__ == '__main__':
 
     for k,v in params.items():
         args[k] = v
-
+    # args['field'] = 15
     run(config)
 

@@ -82,9 +82,7 @@ class ReplayBufferMAAC(object):
                              self.rew_buffs[i][:self.filled_i].std()) if self.rew_buffs[i][:self.filled_i].mean() != 0
                         else cast(self.rew_buffs[i][inds])
                         for i in range(self.num_agents)]
-            # print('ret_rews', ret_rews)
-            # print('mean, std 0', self.rew_buffs[0][:self.filled_i].mean(), self.rew_buffs[0][:self.filled_i].std())
-            # print('mean, std 1', self.rew_buffs[1][:self.filled_i].mean(), self.rew_buffs[1][:self.filled_i].std())
+
         else:
             ret_rews = [cast(self.rew_buffs[i][inds]) for i in range(self.num_agents)]
         return ([cast(self.obs_buffs[i][inds]) for i in range(self.num_agents)],
@@ -130,22 +128,15 @@ class ReplayBufferMARC(object):
         self.ac_buffs = []
         self.rew_buffs = []
         self.next_obs_buffs = []
-        # self.next_obs_unary_buffs = []
         self.next_obs_binary_buffs = [deque([], maxlen=max_steps) for _ in range(self.num_agents)]
         self.next_obs_unary_buffs = [deque([], maxlen=max_steps) for _ in range(self.num_agents)]
         self.done_buffs = []
         self.dense = dense
         for odim, adim in zip(obs_dims, ac_dims):
             self.obs_buffs.append(np.zeros((max_steps, odim), dtype=np.float32))
-            # self.obs_unary_buffs.append(np.zeros((max_steps,) + unary_dim, dtype=np.float32))
-
             self.ac_buffs.append(np.zeros((max_steps, adim), dtype=np.float32))
-
             self.rew_buffs.append(np.zeros(max_steps, dtype=np.float32))
-
             self.next_obs_buffs.append(np.zeros((max_steps, odim), dtype=np.float32))
-
-
             self.done_buffs.append(np.zeros(max_steps, dtype=np.uint8))
 
         self.filled_i = 0  # index of first empty location in buffer (last index when full)
@@ -168,8 +159,6 @@ class ReplayBufferMARC(object):
             for agent_i in range(self.num_agents):
                 self.obs_buffs[agent_i] = np.roll(self.obs_buffs[agent_i],
                                                   rollover, axis=0)
-                # self.obs_unary_buffs[agent_i] = np.roll(self.obs_unary_buffs[agent_i],
-                #                                   rollover, axis=0)
                 self.ac_buffs[agent_i] = np.roll(self.ac_buffs[agent_i],
                                                  rollover, axis=0)
                 self.rew_buffs[agent_i] = np.roll(self.rew_buffs[agent_i],
@@ -177,9 +166,6 @@ class ReplayBufferMARC(object):
 
                 self.next_obs_buffs[agent_i] = np.roll(
                     self.next_obs_buffs[agent_i], rollover, axis=0)
-                # self.next_obs_unary_buffs[agent_i] = np.roll(
-                #     self.next_obs_unary_buffs[agent_i], rollover, axis=0)
-
                 self.done_buffs[agent_i] = np.roll(self.done_buffs[agent_i],
                                                    rollover)
             self.curr_i = 0
@@ -203,19 +189,17 @@ class ReplayBufferMARC(object):
                 # print('general buffer length', self.curr_i, self.filled_i)
             else:
                 try:
-                    self.next_obs_unary_buffs[agent_i].insert(self.curr_i, next_observation[agent_i]['unary_tensor'].numpy())
                     self.obs_unary_buffs[agent_i].insert(self.curr_i, observation[agent_i]['unary_tensor'].numpy())
+                    self.next_obs_unary_buffs[agent_i].insert(self.curr_i, next_observation[agent_i]['unary_tensor'].numpy())
                 except IndexError:
                     self.obs_unary_buffs[agent_i][self.curr_i] = observation[agent_i]['unary_tensor'].numpy()
                     self.next_obs_unary_buffs[agent_i][self.curr_i] = next_observation[agent_i]['unary_tensor'].numpy()
 
             self.ac_buffs[agent_i][self.curr_i:self.curr_i + nentries] = actions[agent_i]
             self.rew_buffs[agent_i][self.curr_i:self.curr_i + nentries] = rewards[agent_i]
-
             self.next_obs_buffs[agent_i][self.curr_i:self.curr_i + nentries] = next_observation[agent_i]['image'].flatten()
-
-
             self.done_buffs[agent_i][self.curr_i:self.curr_i + nentries] = dones[agent_i]
+
         self.curr_i += nentries
         if self.filled_i < self.max_steps:
             self.filled_i += nentries
@@ -250,13 +234,13 @@ class ReplayBufferMARC(object):
             out =  ([cast(self.obs_buffs[i][inds]) for i in range(self.num_agents)],
                     [cast([self.obs_unary_buffs[i][ind] for ind in inds]) for i in range(self.num_agents)],
                     # [[cast(self.obs_unary_buffs[i][ind]) for ind in inds] for i in range(self.num_agents)],
-                    [None for i in range(self.num_agents)], # graphs
+                    [None for _ in range(self.num_agents)], # graphs
                     [cast(self.ac_buffs[i][inds]) for i in range(self.num_agents)],
                     ret_rews,
                     [cast(self.next_obs_buffs[i][inds]) for i in range(self.num_agents)],
                     [cast([self.next_obs_unary_buffs[i][ind] for ind in inds]) for i in range(self.num_agents)],
                     # [[cast(self.next_obs_unary_buffs[i][ind]) for ind in inds] for i in range(self.num_agents)],
-                    [None for i in range(self.num_agents)],
+                    [None for _ in range(self.num_agents)],
                     [cast(self.done_buffs[i][inds]) for i in range(self.num_agents)])
         return out
 
@@ -266,8 +250,3 @@ class ReplayBufferMARC(object):
         else:
             inds = np.arange(max(0, self.curr_i - N), self.curr_i)
         return [self.rew_buffs[i][inds].mean() for i in range(self.num_agents)]
-
-
-# Transition = namedtuple('Transition',
-#                         ('state', 'action', 'next_state', 'reward'))
-

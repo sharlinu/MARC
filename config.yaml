@@ -2,16 +2,21 @@ env_name: 'pp'
 exp_id : 'std'
 other: ''
 
+<<<<<<< HEAD
 player: 4
 field: 10
 grid_observation: False 
+=======
+field: 10  
+grid_observation: True
+>>>>>>> 55861f0f427dabb6adeba144e04df0b31a4696fe
 
 alg: 'MAAC'
 n_episodes: 500000
 episode_length: 50
 test_n_episodes: 10
 #tau: 0.01
-device: 'cuda:0'
+device: 'cpu'
 
 pp:
   n_picker: 2
@@ -23,6 +28,19 @@ pp:
                  'id': 3,
                  'carrying': 4,
                  'picker': 5,}
+  size: 'tiny'
+  difficulty: 'easy-'
+  attr_mapping: {
+    'shelves':0,
+    'requests':1,
+    'agents':2,
+    'goals':3,
+    'accessible':4,
+#    'agent_load':5,
+#    'agent_direction':6,
+  }
+
+
 lbf:
   max_food: 4
   force_coop: True
@@ -43,7 +61,7 @@ wolfpack:
   attr_mapping: {'wolf': 0, 'sheep': 1, 'id': 2}
 
 marc:
-  dense: True
+  dense: False
   relational_embedding : False
   background_id : 'b2'
   abs_id: 'None'

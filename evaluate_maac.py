@@ -80,7 +80,7 @@ def run(config):
     elif 'pp' in config.env_id:
         import macpp
         from utils.env_wrappers import FlatObs
-        env=gym.make(f"macpp-{config.field}x{config.field}-{config.player}a-{config.pp['n_picker']}p-{config.pp['n_objects']}o-sparse-v0",
+        env=gym.make(f"macpp-{config.field}x{config.field}-{config.player}a-{config.pp['n_picker']}p-{config.pp['n_objects']}o-{config.pp['version']}",
                        debug_mode=False)
         env = FlatObs(env)
     else:
@@ -106,7 +106,7 @@ def run(config):
 
         obs = env.reset()
         # env.seed(1)
-        if display:
+        if config.render:
             time.sleep(0.5)
             env.render()
         for t_i in range(config.episode_length):
@@ -131,17 +131,17 @@ def run(config):
             # print('obs', obs)
             # print(obs[0])
             # print(obs[1])
-            if display and 'lbf' in config.env_id:
-                time.sleep(0.5)
-                env.render(actions=actions)
-            else:
+            if config.render:
                 time.sleep(0.5)
                 env.render()
+                # env.render(actions=actions)
+            # else:
+            #     time.sleep(0.5)
             collect_item['l_infos'].append(infos)
 
             calc_end = time.time()
             elapsed = calc_end - calc_start
-            if display and (elapsed < ifi):
+            if config.render and (elapsed < ifi):
                 time.sleep(ifi - elapsed)
             ep_rew += sum(rewards)
 
@@ -170,7 +170,7 @@ if __name__ == '__main__':
     parser.add_argument("--test_n_episodes", default=10, type=int)
     parser.add_argument("--test_episode_length", default=50, type=int)
     parser.add_argument("--fps", default=30, type=int)
-    parser.add_argument("--no_render",   action="store_false",
+    parser.add_argument("--render", default=False, action="store_true",
                         help="render")
     parser.add_argument("--benchmark", action="store_false",
                         help="benchmark mode")
