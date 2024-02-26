@@ -20,11 +20,8 @@ def run(config):
     torch.set_num_threads(1)
     env_name = config.env_name
 
-
     # run_num = 1
     run_dir = config.dir_exp
-    log_dir = config.dir_summary
-
 
     torch.manual_seed(config.random_seed)
     np.random.seed(config.random_seed)

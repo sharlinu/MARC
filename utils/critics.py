@@ -20,8 +20,6 @@ class RelationalCritic(nn.Module):
     """
     # TODO previously embedding_size = 16, now we have hidden_dim and 32
     def __init__(self,
-                 # sa_sizes: list,  # TODO at the end we should not need sa_sizes anymore?
-                  #obj_n: int,
                  n_agents: int,
                  spatial_tensors,
                  batch_size: int,
