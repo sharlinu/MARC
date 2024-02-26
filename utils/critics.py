@@ -53,7 +53,14 @@ class RelationalCritic(nn.Module):
         if self.graph_layer == 'RGCN':
             self.gnn_layers = RGCNConv(input_dims[0], hidden_dim, self.nb_edge_types)
         elif self.graph_layer == 'RGAT':
-            self.gnn_layers = RGATConv(input_dims[0], hidden_dim, self.nb_edge_types)
+            attend_heads = 1
+            assert (hidden_dim % attend_heads) == 0
+            attend_dim = hidden_dim // attend_heads
+            self.gnn_layers = RGATConv(in_channels=input_dims[0],
+                                       out_channels=attend_dim,
+                                       num_relations = self.nb_edge_types,
+                                       heads = attend_heads,
+                                       )
             print('This is using RGAT as graph layer')
 
         else:
