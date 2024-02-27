@@ -1,17 +1,13 @@
-env_name: 'pp'
-exp_id : 'std'
+env_name: 'lbf'
+exp_id : 'try'
 other: ''
 
-<<<<<<< HEAD
+
 player: 4
 field: 10
-grid_observation: False 
-=======
-field: 10  
 grid_observation: True
->>>>>>> 55861f0f427dabb6adeba144e04df0b31a4696fe
 
-alg: 'MAAC'
+alg: 'MARC'
 n_episodes: 500000
 episode_length: 50
 test_n_episodes: 10
@@ -61,9 +57,9 @@ wolfpack:
   attr_mapping: {'wolf': 0, 'sheep': 1, 'id': 2}
 
 marc:
-  dense: False
+  dense: True
   relational_embedding : False
-  background_id : 'b2'
+  background_id : 'b0'
   abs_id: 'None'
   buffer_length: 100000
   graph_layer: 'RGCN'
