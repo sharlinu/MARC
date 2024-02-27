@@ -1,14 +1,14 @@
-env_name: 'pp'
-exp_id : 'try'
+env_name: 'lbf'
+exp_id : 'std'
 other: ''
 
-player: 2
-field: 10
+player: 3
+field: 8
 grid_observation: True
 
 alg: 'MARC'
-n_episodes: 300000
-episode_length: 50
+n_episodes: 200000
+episode_length: 25
 test_n_episodes: 10
 #tau: 0.01
 device: 'cuda:0'
@@ -39,8 +39,8 @@ rware:
 
 
 lbf:
-  max_food: 1
-  force_coop: True
+  max_food: 3
+  force_coop: False
   max_player_level: 2
   keep_food: True
   attr_mapping: {'agent': 0, 'id': 1, 'food': 2}

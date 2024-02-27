@@ -123,7 +123,9 @@ class RelationalCritic(nn.Module):
                 binary_tensors = None,
                 agents=None,
                 return_q=True,
-                return_all_q=False,):
+                return_all_q=False,
+                logger = None,
+                niter = 1):
         """
         Inputs:
             inps (list of PyTorch Matrices): Inputs to each agents' encoder
