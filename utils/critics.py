@@ -22,10 +22,10 @@ class RelationalCritic(nn.Module):
                  input_dims: list,
                  hidden_dim: int = 32,
                  norm_in: object = True,
-                 net_code: object = "1g0f",
+                 net_code: object = "1g1if",
                  device: str = 'cuda:0',
-                 graph_layer: str = 'RGCN', 
-                 mp_rounds: object = 1) -> object:
+                 graph_layer: str = 'RGCN',
+                 ) -> object:
         """
         Inputs:
             sa_sizes (list of (int, int)): Size of state and action spaces per
@@ -42,6 +42,7 @@ class RelationalCritic(nn.Module):
         self.batch_size = batch_size
         self.max_reduce = True # TODO hardcoded
         # self.dense = True
+        n_graph_layers, n_dense_layers = parse_code(net_code)
         self.graph_layer = graph_layer
         self.spatial_tensors = np.array(spatial_tensors)
         self.binary_batch = torch.tensor([self.spatial_tensors for _ in range(self.batch_size)])
@@ -49,11 +50,11 @@ class RelationalCritic(nn.Module):
         self.nb_edge_types = len(spatial_tensors)
 
 
-        # self.embedder = nn.Linear(input_dims[0], hidden_dim)
+        self.embedder = nn.Linear(input_dims[0], hidden_dim)
         if self.graph_layer == 'RGCN':
-            self.gnn_layers = RGCNConv(input_dims[0], hidden_dim, self.nb_edge_types)
+            self.gnn_layers = RGCNConv(hidden_dim, hidden_dim, self.nb_edge_types)
         elif self.graph_layer == 'RGAT':
-            self.gnn_layers = RGATConv(input_dims[0], hidden_dim, self.nb_edge_types)
+            self.gnn_layers = RGATConv(hidden_dim, hidden_dim, self.nb_edge_types)
             print('This is using RGAT as graph layer')
 
         else:
@@ -327,14 +328,14 @@ class AttentionCritic(nn.Module):
 
 def parse_code(net_code: str):
     """
-    :param net_code: format <a>g[m]<b>f
+    :param net_code: format <a>g<b>i<c>f
     """
     assert net_code[1]=="g"
     assert net_code[-1]=="f"
     nb_gnn_layers = int(net_code[0])
+    nb_iterations = int(net_code[2])
     nb_dense_layers = int(net_code[-2])
-    is_max = True if net_code[2] == "m" else False
-    return nb_gnn_layers, nb_dense_layers, is_max
+    return nb_gnn_layers, nb_iterations, nb_dense_layers
 
 def batch_to_gd(batch: torch.Tensor, device: str):
     # [B x R x E x E]
