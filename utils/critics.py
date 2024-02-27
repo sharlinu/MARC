@@ -21,7 +21,6 @@ class RelationalCritic(nn.Module):
                  n_actions: int,
                  input_dims: list,
                  hidden_dim: int = 32,
-                 norm_in: object = True,
                  net_code: object = "2g2i1f",
                  device: str = 'cuda:0',
                  graph_layer: str = 'RGCN',
@@ -142,14 +141,13 @@ class RelationalCritic(nn.Module):
                 embedds = self.embedder(gd.x)
                 for _ in range(self.nb_iterations):
                     embedds = self.gnn_layers(embedds, gd.edge_index, gd.edge_attr)
-                    embedds = torch.relu(embedds)
-
+                    # embedds = torch.relu(embedds)
             else:
                 embedds = torch.flatten(unary_tensors[a_i], 0, 1).float().to(device=self.device)
                 embedds = self.embedder(embedds)
                 for _ in range(self.nb_iterations):
                     embedds = self.gnn_layers(embedds, self.gd.edge_index, self.gd.edge_attr)
-                    embedds = torch.relu(embedds)
+                    # embedds = torch.relu(embedds)
                 batch = self.gd.batch
             x = pool.global_max_pool(embedds, batch)
 
