@@ -2,11 +2,17 @@ env_name: 'pp'
 exp_id : 'std'
 other: ''
 
+<<<<<<< HEAD
+player: 4
+field: 10
+grid_observation: False 
+=======
 field: 10  
 grid_observation: True
+>>>>>>> 55861f0f427dabb6adeba144e04df0b31a4696fe
 
-alg: 'MARC'
-n_episodes: 3000000
+alg: 'MAAC'
+n_episodes: 500000
 episode_length: 50
 test_n_episodes: 10
 #tau: 0.01
@@ -14,16 +20,14 @@ device: 'cpu'
 
 pp:
   n_picker: 2
-  n_objects: 2
-  version: 'v5'
+  n_objects: 3
+  version: 'v3'
   attr_mapping: {'agent': 0,
                  'objects': 1,
                  'goals': 2,
-                 'id':3,
-                 'carrying':4,
-                 'picker':5,}
-
-rware:
+                 'id': 3,
+                 'carrying': 4,
+                 'picker': 5,}
   size: 'tiny'
   difficulty: 'easy-'
   attr_mapping: {
@@ -59,7 +63,7 @@ wolfpack:
 marc:
   dense: False
   relational_embedding : False
-  background_id : 'b0'
+  background_id : 'b2'
   abs_id: 'None'
   buffer_length: 100000
   graph_layer: 'RGCN'
