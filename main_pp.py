@@ -60,17 +60,17 @@ def run(config):
         env.reset()
         if config.resume:
             # resume_path = config.resume
-            model_path = glob.glob('{}/saved_models/ckpt_final*'.format(config.resume))[0]
+            model_path = glob.glob('{}/saved_models/ckpt_*'.format(config.resume))[0]
             config.n_episodes = config.n_episodes + config.resume_episodes
             print(f'Training for an additional {config.resume_episodes}')
             model, start_episode = RelationalSAC.init_from_save(model_path, load_critic=True, device=config.device)
-            toResume = input(f'Do you want to resume training {model_path} for {config.resume_episodes} starting at {start_episode}? (yes/no)')
-            if toResume.lower()=='yes':
-                print('resuming training')
-            else:
-                print('Closing connection')
-                import sys
-                sys.exit()
+            # toResume = input(f'Do you want to resume training {model_path} for {config.resume_episodes} starting at {start_episode}? (yes/no)')
+            #if toResume.lower()=='yes':
+            #    print('resuming training')
+            #else:
+            #    print('Closing connection')
+            #    import sys
+            #    sys.exit()
             # wandb.init(project="MARC", resume=True)
         else:
             start_episode = 0
@@ -86,7 +86,8 @@ def run(config):
                                                critic_hidden_dim=config.critic_hidden_dim,
                                                device=config.device,
                                                reward_scale=config.reward_scale,
-                                               dense=config.marc['dense'])
+                                               dense=config.marc['dense'],
+                                               net_code = config.marc['net_code'])
 
         replay_buffer = ReplayBufferMARC(max_steps=config.marc['buffer_length'],
                                          num_agents=model.n_agents,
@@ -138,7 +139,11 @@ def run(config):
     l_rewards = []
     epymarl_rewards = []
     if config.resume:
-        steps =  3130000 # TODO update this!
+        with open(f'{config.resume}/summary/reward_step.txt') as f:
+            data = f.readlines()
+            steps = int(data[-2].split(',')[0])
+        #next_step_log = steps + config.step_interval_log
+        #steps =  3130000 # TODO update this!
         next_step_log = steps + config.step_interval_log
     else:
         steps = 0
@@ -428,6 +433,7 @@ if __name__ == '__main__':
         with open(f"{args['resume']}/config.yaml", "r") as file:
             params = yaml.load(file, Loader=yaml.FullLoader)
             params['resume'] = args['resume']
+            params['resume_episodes'] = args['resume_episodes']
 
     for k, v in params.items():
         args[k] = v

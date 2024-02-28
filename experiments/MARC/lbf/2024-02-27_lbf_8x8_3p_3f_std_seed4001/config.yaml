@@ -1,0 +1,74 @@
+alg: MARC
+batch_size: 1024
+buffer_length: 1000000
+critic_hidden_dim: 128
+device: cuda:0
+dir_base: ./experiments
+dir_exp: ./experiments/MARC/lbf/2024-02-27_lbf_8x8_3p_3f_std_seed4001
+dir_monitor: ./experiments/MARC/lbf/2024-02-27_lbf_8x8_3p_3f_std_seed4001/monitor
+dir_saved_models: ./experiments/MARC/lbf/2024-02-27_lbf_8x8_3p_3f_std_seed4001/saved_models
+dir_summary: ./experiments/MARC/lbf/2024-02-27_lbf_8x8_3p_3f_std_seed4001/summary
+env_id: lbf_8x8_3p_3f
+env_name: lbf
+episode_length: 50
+exp_id: std
+field: 8
+gamma: 0.99
+grid_observation: true
+lbf:
+  attr_mapping:
+    agent: 0
+    food: 2
+    id: 1
+  force_coop: false
+  keep_food: true
+  max_food: 3
+  max_player_level: 2
+marc:
+  abs_id: None
+  background_id: b0
+  buffer_length: 100000
+  dense: true
+  graph_layer: RGCN
+  relational_embedding: false
+n_episodes: 500000
+norm_rews: true
+num_updates: 4
+other: ''
+pi_lr: 0.001
+player: 3
+pol_hidden_dim: 128
+pp:
+  attr_mapping:
+    agent: 0
+    carrying: 4
+    goals: 2
+    id: 3
+    objects: 1
+    picker: 5
+  n_objects: 3
+  n_picker: 2
+  version: v3
+q_lr: 0.001
+random_seed: 4001
+resume: null
+resume_episodes: null
+reward_scale: 100.0
+rware:
+  attr_mapping:
+    accessible: 4
+    agents: 2
+    goals: 3
+    requests: 1
+    shelves: 0
+  difficulty: easy-
+  size: tiny
+save_interval_log: 100
+seeds:
+- 4001
+step_interval_log: 10000
+steps_per_update: 100
+tau: 0.001
+test_interval: 1000
+test_n_episodes: 10
+use_gpu: true

@@ -51,7 +51,7 @@ def run(config):
         env.reset()
         if config.resume:
             # resume_path = config.resume
-            model_path = glob.glob('{}/saved_models/ckpt_final*'.format(config.resume))[0]
+            model_path = glob.glob('{}/saved_models/ckpt_*'.format(config.resume))[0]
             config.n_episodes = config.n_episodes + config.resume_episodes
             print(f'Training for an additional {config.resume_episodes}')
             model, start_episode = RelationalSAC.init_from_save(model_path, load_critic=True, device=config.device)
@@ -77,7 +77,8 @@ def run(config):
                                                critic_hidden_dim=config.critic_hidden_dim,
                                                graph_layer = config.marc['graph_layer'],
                                                device=config.device,
-                                               reward_scale=config.reward_scale)
+                                               reward_scale=config.reward_scale,
+                                               net_code=config.marc['net_code'])
 
         replay_buffer = ReplayBufferMARC(max_steps=config.marc['buffer_length'],
                                          num_agents=model.n_agents,
@@ -93,7 +94,7 @@ def run(config):
         env.reset()
         if config.resume:
             # resume_path = config.resume
-            model_path = glob.glob('{}/saved_models/ckpt_final*'.format(config.resume))[0]
+            model_path = glob.glob('{}/saved_models/ckpt_*'.format(config.resume))[0]
             config.n_episodes = config.n_episodes + config.resume_episodes
             print(f'Training for an additional {config.resume_episodes}')
             model, start_episode = AttentionSAC.init_from_save(model_path, load_critic=True, device=config.device)
@@ -128,7 +129,9 @@ def run(config):
     l_rewards = []
     epymarl_rewards = []
     if config.resume:
-        steps =  3130000 # TODO update this!
+        with open(f'{config.resume}/summary/reward_step.txt') as f:
+            data = f.readlines()
+            steps = int(data[-2].split(',')[0])
         next_step_log = steps + config.step_interval_log
     else:
         steps = 0
@@ -433,6 +436,7 @@ if __name__ == '__main__':
         with open(f"{args['resume']}/config.yaml", "r") as file:
             params = yaml.load(file, Loader=yaml.FullLoader)
             params['resume'] = args['resume']
+            params['resume_episodes'] = args['resume_episodes']
 
     for k, v in params.items():
         args[k] = v

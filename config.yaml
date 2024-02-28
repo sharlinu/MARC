@@ -10,7 +10,6 @@ alg: 'MARC'
 n_episodes: 200000
 episode_length: 25
 test_n_episodes: 10
-#tau: 0.01
 device: 'cuda:0'
 
 pp:
@@ -20,9 +19,9 @@ pp:
   attr_mapping: {'agent': 0,
                  'objects': 1,
                  'goals': 2,
-                 'id':3,
-                 'carrying':4,
-                 'picker':5,}
+                 'id': 3,
+                 'carrying': 4,
+                 'picker': 5,}
 
 rware:
   size: 'tiny'
@@ -64,6 +63,7 @@ marc:
   abs_id: 'None'
   buffer_length: 100000
   graph_layer: 'RGCN'
+  net_code: '2g1i1f'
 
 maac:
   attend_heads: 4

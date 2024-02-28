@@ -27,9 +27,10 @@ class RelationalSAC(object):
                  reward_scale=10.,
                  pol_hidden_dim=128,
                  critic_hidden_dim=128,
-                 graph_layer='RCN', 
+                 graph_layer='RGCN', 
                  device='cuda:0',
                  dense= True,
+                 net_code = '1g1i1f',
                  **kwargs):
         """
         Inputs:
@@ -63,7 +64,8 @@ class RelationalSAC(object):
                                        hidden_dim=critic_hidden_dim,
                                        graph_layer = graph_layer,
                                        device = device,
-                                       dense = dense)
+                                       dense = dense,
+                                       net_code = net_code)
         self.target_critic = RelationalCritic(
                                         n_agents = self.n_agents,
                                         # obs = obs,
@@ -74,7 +76,8 @@ class RelationalSAC(object):
                                         hidden_dim=critic_hidden_dim,
                                         graph_layer = graph_layer, 
                                         device=device,
-                                        dense = dense)
+                                        dense = dense,
+                                        net_code = net_code)
         hard_update(self.target_critic, self.critic) # hard update only at the beginning to initialise
         self.critic_optimizer = Adam(self.critic.parameters(), lr=q_lr,
                                      weight_decay=1e-3)
@@ -285,7 +288,10 @@ class RelationalSAC(object):
                       gamma=0.95, tau=0.01,
                       pi_lr=0.01, q_lr=0.01,
                       reward_scale=10.,
-                      pol_hidden_dim=64, critic_hidden_dim=64, attend_heads=4,
+                      pol_hidden_dim=64,
+                      critic_hidden_dim=64,
+                      attend_heads=4,
+                      net_code = '1g1i1f',
                       device='cuda:0',
                       **kwargs):
         """
@@ -322,6 +328,7 @@ class RelationalSAC(object):
                      'device':device,
                      'graph_layer':graph_layer,
                      'dense': dense,
+                     'net_code': net_code,
                      }
 
         instance = cls(**init_dict)
@@ -344,6 +351,7 @@ class RelationalSAC(object):
             episode = 0
         save_dict['init_dict']['device'] = device
         print(save_dict['init_dict'])
+        # save_dict['init_dict']['gnn_layers'] = 'RGCN'
         instance = cls(**save_dict['init_dict'])
         instance.init_dict = save_dict['init_dict']
         for a, params in zip(instance.agents, save_dict['agent_params']):

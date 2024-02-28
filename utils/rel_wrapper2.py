@@ -53,7 +53,6 @@ class BPushWrapper(gym.ObservationWrapper):
         return obs
 
 
-
 class AbsoluteVKBWrapper(gym.ObservationWrapper):
     """
     Add a vkb key-value pair, which represents the state as a vectorised knowledge base.
@@ -148,9 +147,6 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
                     for rel_idx, func in enumerate(self.rel_deter_func):
                         if func(obj1, obj2, direction_vec):
                             self.spatial_tensors[rel_idx][obj_idx1, obj_idx2] = 1.0
-                    # for abs_rel_idx, abs_func in enumerate(self.abs_rel_func):
-                    #     if abs_func(obj1, obj2, self.attr_mapping):
-                    #         self.abstract_tensors[abs_rel_idx][obj_idx1, obj_idx2] = 1.0
 
         all_binaries = self.spatial_tensors  # + self.abstract_tensors
         binary_tensors = torch.tensor(all_binaries)
@@ -170,7 +166,6 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
         -------
 
         """
-        #obs = obs.copy()
         for ob in obs:
             ob['unary_tensor'], ob['binary_tensor'] = self.img2vkb(ob['image'])
         return obs
@@ -229,7 +224,6 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
             rel_func = [is_food, is_agent, is_other_player]
         elif id in ['none', 'None']:
             rel_func = []
-
         return rel_func
 
 class GATWrapper(gym.ObservationWrapper):
@@ -360,7 +354,7 @@ def to_gd(data: torch.Tensor, unary_t, GAT = False) -> GeometricData:
     data : heterogeneous adjacency matrix (nb_relations, nb_objects, nb_objects)
     """
     # nb_objects = nb_objects
-    # x = torch.arange(nb_objects).view(-1, 1) # TODO change to actual node features i.e. the unary tensors
+    # x = torch.arange(nb_objects).view(-1, 1) #
     nz = torch.nonzero(data)
 
 
@@ -552,7 +546,5 @@ if __name__ == "__main__":
             time.sleep(0.5)
 
         done = np.all(ndone)
-        # pygame.event.pump()  # process event queue
-    # print(env.players[0].score, env.players[1].score)
 
 
