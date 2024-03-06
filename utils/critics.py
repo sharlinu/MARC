@@ -175,9 +175,11 @@ class RelationalCritic(nn.Module):
                 embedds = self.embedder(embedds)
                 for _ in range(self.nb_iterations):
                     embedds = self.gnn_layers(embedds, self.gd.edge_index, self.gd.edge_attr)
-                batch = self.gd.batch
-            x = pool.global_max_pool(embedds, batch)
 
+                batch = self.gd.batch
+            self.node_embeddings.append(embedds)
+            x = pool.global_max_pool(embedds, batch)
+            self.graph_embeddings.append(x)
             # extract state encoding for each agent that we're returning Q for
             other_actions = actions.copy()
             other_actions.pop(a_i)
