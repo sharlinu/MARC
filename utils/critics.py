@@ -45,6 +45,7 @@ class RelationalCritic(nn.Module):
         self.device = device
         self.batch_size = batch_size
         self.max_reduce = True # TODO hardcoded
+        self.embed_size = 16
         self.dense = dense
 
         self.nb_graph_layers, self.nb_iterations, self.nb_dense_layers = parse_code(net_code)
@@ -53,16 +54,16 @@ class RelationalCritic(nn.Module):
         self.binary_batch = torch.tensor([self.spatial_tensors for _ in range(self.batch_size)])
         self.gd, self.slices = batch_to_gd(self.binary_batch, self.device)  # makes adjs geometric data usable for torch geometric
         self.nb_edge_types = len(spatial_tensors)
-        self.embedder = nn.Linear(input_dims[0], hidden_dim)
+        self.embedder = nn.Linear(input_dims[0], self.embed_size)
         if self.graph_layer == 'RGCN':
             input_args = 'x, edge_index, edge_attr'
-            gnn = (RGCNConv(hidden_dim, hidden_dim, self.nb_edge_types), 'x, edge_index, edge_attr -> x')
+            gnn = (RGCNConv(self.embed_size, self.embed_size, self.nb_edge_types), 'x, edge_index, edge_attr -> x')
         elif self.graph_layer == 'RGAT':
             input_args = 'x, edge_index, edge_attr'
-            attend_heads = 4
-            assert (hidden_dim % attend_heads) == 0
-            attend_dim = hidden_dim // attend_heads
-            gnn = (RGATConv(in_channels=hidden_dim,
+            attend_heads = 1
+            assert (self.embed_size % attend_heads) == 0
+            attend_dim = self.embed_size // attend_heads
+            gnn = (RGATConv(in_channels=self.embed_size,
                                        out_channels=attend_dim,
                                        num_relations = self.nb_edge_types,
                                        heads = attend_heads,
@@ -70,24 +71,25 @@ class RelationalCritic(nn.Module):
                    'x, edge_index, edge_attr -> x')
             print('Using RGAT as graph layer')
         elif self.graph_layer == 'GAT':
+            input_args = 'x, edge_index'
             attend_heads = 4
-            assert (hidden_dim % attend_heads) == 0
-            attend_dim = hidden_dim // attend_heads
+            assert (self.embed_size % attend_heads) == 0
+            attend_dim = self.embed_size // attend_heads
 
-            self.gnn_layers = GATConv(in_channels = input_dims[0],
+            gnn = (GATConv(in_channels = input_dims[0],
                                       out_channels=attend_dim,
                                       heads=attend_heads,
                                       v2 = True
-                                      )
+                                      ), 'x, edge_index -> x')
         elif self.graph_layer == 'GATv2':
-            attend_heads = 4
-            assert (hidden_dim % attend_heads) == 0
-            attend_dim = hidden_dim // attend_heads
-
-            self.gnn_layers = GATv2Conv(in_channels = input_dims[0],
+            input_args = 'x, edge_index'
+            attend_heads = 1
+            assert (self.embed_size % attend_heads) == 0
+            attend_dim = self.embed_size // attend_heads
+            gnn = (GATv2Conv(in_channels=input_dims[0],
                                       out_channels=attend_dim,
                                       heads=attend_heads,
-                                      )
+                                      ), 'x, edge_index -> x')
             print('Using GATv2 layer')
         else:
             print('not a valid graph layer')
@@ -102,7 +104,7 @@ class RelationalCritic(nn.Module):
         self.pooling = Pool()
         for _ in range(self.n_agents):
             critic = nn.Sequential()
-            critic.add_module('critic_fc1', nn.Linear(hidden_dim + self.num_actions * (self.n_agents-1),
+            critic.add_module('critic_fc1', nn.Linear(self.embed_size + self.num_actions * (self.n_agents-1),
                                                       hidden_dim)) # takes in 128+6*2 , out 128
             critic.add_module('critic_nl', nn.LeakyReLU())
             critic.add_module('critic_fc2', nn.Linear(hidden_dim, self.num_actions))
@@ -163,13 +165,13 @@ class RelationalCritic(nn.Module):
                 gd = Batch.from_data_list(binary_tensors[a_i])
                 gd = gd.to(device = self.device)
                 batch = gd.batch
-                embedds = self.embedder(gd.x)
-                for _ in range(self.nb_iterations):
-                    embedds = self.gnn_layers(embedds, gd.edge_index, gd.edge_attr)
-                # if 'GAT' in self.graph_layer:
-                #     embedds = self.gnn_layers(gd.x, gd.edge_index)
-                # else:
-                #     embedds = self.gnn_layers(gd.x, gd.edge_index, gd.edge_attr)
+                if self.graph_layer in ['RGCN', 'RGAT']:
+                    embedds = self.embedder(gd.x)
+                    for _ in range(self.nb_iterations):
+                        embedds = self.gnn_layers(embedds, gd.edge_index, gd.edge_attr)
+                else:
+                    embedds = self.gnn_layers(gd.x, gd.edge_index)
+
             else:
                 embedds = torch.flatten(unary_tensors[a_i], 0, 1).float().to(device=self.device)
                 embedds = self.embedder(embedds)

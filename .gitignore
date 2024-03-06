@@ -14,6 +14,7 @@ model.pt
 nohup.out
 experiments/*/*/*TEST*
 nohup.out
+.ipynb_checkpoints/
 # Compiled Java class files
 *.class
 
@@ -23,7 +24,7 @@ nohup.out
 
 # Log files
 *.log
-ckpt_best_avg_r*
+# ckpt_best_avg_r*
 monitor/
 evaluate/
 summary/agent*/
