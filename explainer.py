@@ -14,16 +14,15 @@ import gym
 import macpp
 from utils.env_wrappers import GridObs
 from utils.rel_wrapper2 import AbsoluteVKBWrapper
-
+from PIL import Image
 import yaml
 import matplotlib.pyplot as plt
-import torch.nn.functional as Fun
-
-from sklearn.cluster import KMeans, MeanShift, DBSCAN
-from sklearn.model_selection import train_test_split
 from sklearn.manifold import TSNE
-from sklearn.decomposition import PCA
-# from sklearn.metrics import pairwise_distances_argmin_minl
+import umap
+import dash
+from dash.exceptions import PreventUpdate
+from dash import dcc, html
+from dash.dependencies import Input, Output
 
 def plot_activation_space(data):
     # rows = len(data)
@@ -38,7 +37,7 @@ def plot_activation_space(data):
 
 def run(config):
     model_path = config.model_path
-
+    print(f'Loading model from {model_path}')
     # create folder for evaluating
     eval_path = Path(config.model_path)
     eval_path = Path(*eval_path.parts[:-2])
@@ -61,13 +60,17 @@ def run(config):
     ifi = 1 / config.fps  # inter-frame interval
     l_ep_rew = []
     embeddings = ['node_embeddings', 'node_concepts', 'graph_embeddings']
-
+    df_full = pd.DataFrame()
+    df_full_graph = pd.DataFrame()
+    graph_embedds = torch.empty((0,128))
+    node_embedds = torch.empty((0, 128))
     for ep_i in range(config.eval_n_episodes):
-        directory = f'plots/episode_{ep_i}'
+        directory = f'plots/pp/episode_{ep_i}'
         os.makedirs(directory, exist_ok=True)
         node_embeddings = []
         node_concepts = []
         graph_embeddings = []
+        images = []
         print("Episode %i of %i" % (ep_i + 1, config.eval_n_episodes))
 
         ep_rew = 0
@@ -77,22 +80,18 @@ def run(config):
 
         labels_1 = torch.empty((0,6))
         labels_2 = torch.empty((0,6))
-        # attr_mapping: {'agent': 0,
-        #              'objects': 1,
-        #              'goals': 2,
-        #              'id':3,
-        #              'carrying':4,
-        #              'picker':5,}
+
         q_values_a = []
         q_values_b = []
         if config.render:
             env.render()
 
         for t_i in range(config.eval_episode_length):
-            calc_start = time.time()
-
+            if config.render:
+                img = f"{directory}/step_{t_i}.png"
+                env.render(save=config.save, name=img)
+                images.append(Image.open(img))
             # rearrange observations to be per agent, and convert to torch Variable
-
             torch_obs = [np.expand_dims(ob['image'].flatten(), axis=0) for ob in obs]
             torch_obs = [Variable(torch.Tensor(torch_obs[i]).view(1, -1),
                                   requires_grad=False)
@@ -113,44 +112,34 @@ def run(config):
 
             # print('actions', actions)
             obs, rewards, dones, infos = env.step(actions)
-            if config.render:
-                env.render(save=config.save, name=f"{directory}/step_{t_i}.png")
-                time.sleep(0.1)
             # if config.save:
             #     env.save(f"{directory}/step_{t_i}.png")
-            calc_end = time.time()
-            elapsed = calc_end - calc_start
-            if config.render and (elapsed < ifi):
-                time.sleep(ifi - elapsed)
             ep_rew += sum(rewards)
-
             if all(dones):
                 break
 
 
-        l_ep_rew.append(ep_rew)
-        # # print("Reward: {}".format(ep_rew))
-        #
-        # for embedding in embeddings:
-        #     directory = f'episode{ep_i}/{embedding}_agent0'
-        #     if os.path.exists(directory):
-        #         os.remove(directory)
-        #     os.makedirs(directory)
-        #     for idx, tensor in enumerate(eval(embedding)):
-        #         torch.save(tensor[0], f"{directory}/tensor{idx}.pt")
 
+        if t_i==39:
+            continue
+        print('using graph embeddings')
+        l_ep_rew.append(ep_rew)
         temp1 = torch.vstack([node_embeddings[i][0] for i in range(len(node_embeddings))])
         graph_plots_a = torch.vstack([graph_embeddings[i][0] for i in range(len(graph_embeddings))])
-        graph_plots_b = torch.vstack([graph_embeddings[i][1] for i in range(len(graph_embeddings))])
+        # graph_plots_b = torch.vstack([graph_embeddings[i][1] for i in range(len(graph_embeddings))])
+        graph_embedds  = torch.cat([graph_embedds, graph_plots_a])
+        node_embedds = torch.cat([node_embedds, temp1])
         # temp2 = torch.vstack([node_embeddings[i][1] for i in range(len(node_embeddings))])
         # batch = [node_embeddings[i][0].shape[0] for i in range(len(node_embeddings))]
-        batch = [i for i, n in enumerate(node_embeddings) for _ in range(len(n[0]))]
+        steps = [i for i, n in enumerate(node_embeddings) for _ in range(len(n[0]))]
+        batch_images = [images[i] for i, n in enumerate(node_embeddings) for _ in range(len(n[0]))]
+
         # activation = torch.vstack([temp1, temp2]).detach().numpy()
         activation = temp1.detach().numpy()
-        # graph_activation = graph_plots.detach().numpy()
-        graph_activation = torch.vstack([graph_plots_a, graph_plots_b]).detach().numpy()
+        graph_activation = graph_plots_a.detach().numpy()
+        # graph_activation = torch.vstack([graph_plots_a, graph_plots_b]).detach().numpy()
         graph_labels = [i for i in range(len(graph_plots_a))]
-        graph_labels = 2 * graph_labels
+        graph_labels =  graph_labels
         # labels = torch.vstack([labels_1,labels_2])
         labels = labels_1
         unique_features, inverse_indices = torch.unique(labels, dim=0, return_inverse=True)
@@ -189,43 +178,22 @@ def run(config):
         df = pd.DataFrame(d, columns=['x', 'y', 'z'])
         df_graph = pd.DataFrame(d_graph, columns=['x', 'y', 'z'])
         df_graph['steps'] = graph_labels
-        q_values = q_values_a + q_values_b
-        agents = [0 for _ in range(len(q_values_a))] + [1 for _ in range(len(q_values_b))]
+        q_values = q_values_a #+ q_values_b
+        agents = [0 for _ in range(len(q_values_a))] # + [1 for _ in range(len(q_values_b))]
         df_graph['q_values'] = q_values
         df_graph['agent'] = agents
         df['label'] = fin_labels
-        df['batch'] = batch
-        # frames = []
-        # fig = go.Figure(
-        #     data=[go.Scatter3d(x=[], y=[], z=[],
-        #                        mode="markers",
-        #                        marker=dict(color="red",
-        #                                    size=10))])
+        df['steps'] = steps
+        df['images'] = batch_images
+        df_graph['images'] = images
 
-        # for b in set(batch):
-        #     frames.append(go.Frame(data=go.Scatter3d(
-        #         x=df[df['batch'] == b]['x'],
-        #         y=df[df['batch'] == b]['y'],
-        #         z=df[df['batch'] == b]['z'],
-        #         name=df[df['batch'] == b]['label'],
-        #     ),
-        #         traces=[0],
-        #         name=f'frame{b}'
-        #         ))
-        # fig.update(frames=frames)
-        # fig.update_layout(updatemenus=[dict(type="buttons",
-        #                                     buttons=[dict(label="Play",
-        #                                                   method="animate",
-        #                                                   args=[None, dict(frame=dict(redraw=True, fromcurrent=True,
-        #                                                                               mode='immediate'))])])])
-        # fig = px.scatter_3d(df, x='x', y='y', z='z', color='label')
         min_ax = min(min(df['x']), min(df['y']), min(df['z']))
         max_ax = max(max(df['x']), max(df['y']), max(df['z']))
         fig = px.scatter_3d(df,
                             x='x',
                             y='y',
                             z='z',
-                            animation_frame='batch',
+                            animation_frame='steps',
                             color='label',
                             range_x=[min_ax, max_ax],
                             range_y=[min_ax, max_ax],
@@ -233,21 +201,17 @@ def run(config):
                             )
 
         fig.update_scenes(aspectmode='cube')
-        fig.show()
-        fig.write_html(f"plots/episode_{ep_i}/node_embeddings.html")
+        # fig.show()
+        fig.write_html(f"plots/pp/episode_{ep_i}/node_embeddings.html")
 
         fig_full = px.scatter_3d(df,
                             x='x',
                             y='y',
                             z='z',
-                            # animation_frame='batch',
                             color='label',
-                            # range_x=[min_ax, max_ax],
-                            # range_y=[min_ax, max_ax],
-                            # range_z=[min_ax, max_ax],
                             )
         fig_full.show()
-        fig_full.write_html(f"plots/episode_{ep_i}/full_node_embeddings.html")
+        fig_full.write_html(f"plots/pp/episode_{ep_i}/full_node_embeddings.html")
 
         fig_graph = px.scatter_3d(df_graph,
                             x='x',
@@ -264,7 +228,7 @@ def run(config):
                                'steps': True}
                             )
         fig_graph.show()
-        fig_graph.write_html(f"plots/episode_{ep_i}/q_embeddings.html")
+        fig_graph.write_html(f"plots/pp/episode_{ep_i}/q_embeddings.html")
 
         fig_graph = px.scatter_3d(df_graph,
                             x='x',
@@ -281,10 +245,92 @@ def run(config):
                                    'steps':False}
                             )
         fig_graph.show()
-        fig_graph.write_html(f"plots/episode_{ep_i}/graph_embeddings.html")
+        fig_graph.write_html(f"plots/pp/episode_{ep_i}/graph_embeddings.html")
+        df['episode'] = ep_i
+        df_graph['episode'] = ep_i
+        df_full = pd.concat([df_full, df])
+        df_full_graph = pd.concat([df_full_graph, df_graph])
 
-    print("Average reward: {}".format(round(sum(l_ep_rew)/config.eval_n_episodes),2))
+    print("Average reward: {}".format(round(sum(l_ep_rew)/len(l_ep_rew)),3))
     env.close()
+
+    model = umap.UMAP(n_components=3)
+
+    # input needs to be (n_samples, n_features)
+    # d = tsne_model.fit_transform(activation)
+    d_graph = model.fit_transform(graph_embedds.detach().numpy())
+    d_node = model.fit_transform(node_embedds.detach().numpy())
+    df_full_graph['x'] = d_graph[:, 0]
+    df_full_graph['y'] = d_graph[:, 1]
+    df_full_graph['z'] = d_graph[:, 2]
+
+    df_full['x'] = d_node[:, 0]
+    df_full['y'] = d_node[:, 1]
+    df_full['z'] = d_node[:, 2]
+
+    app = dash.Dash(__name__)
+
+    fig_full = px.scatter_3d(df_full,
+                             x='x',
+                             y='y',
+                             z='z',
+                             color='label',
+                             hover_data=
+                             {'x': False,
+                              'y': False,
+                              'z': False,
+                              # 'fruit_level': True,
+                              # 'agent_level': True,
+                              # 'agent_id': True,
+                              'steps': True,
+                              'episode': True},
+                             custom_data = ["images"]
+                             )
+    fig_full.write_html(f"plots/pp/all_node_embeddings.html")
+    # fig_full.update_layout(clickmode='event+select')
+
+    fig_full_graph = px.scatter_3d(df_full_graph,
+                             x='x',
+                             y='y',
+                             z='z',
+                             color='q_values',
+                             hover_data=
+                             {'x': False,
+                              'y': False,
+                              'z': False,
+                              'q_values': True,
+                              'agent': True,
+                              'steps': True,
+                              'episode': True},
+                             custom_data = ["images"]
+                             )
+    fig_full.write_html(f"plots/pp/all_node_embeddings.html")
+    # fig_full.update_layout(clickmode='event+select')
+
+
+    app.layout = html.Div(
+        [
+            dcc.Graph(
+                id="graph_interaction",
+                figure=fig_full,
+                style={'display': 'inline-block', 'width': '100vh'}
+            ),
+            html.Img(id='image', src='',style={'display':'inline-block', 'width': '80vh'})
+        ]
+
+    )
+
+    @app.callback(
+        Output('image', 'src'),
+        Input('graph_interaction', 'hoverData'))
+    def open_url(hoverData):
+        if hoverData:
+            return hoverData["points"][0]["customdata"][0]
+        else:
+            raise PreventUpdate
+
+
+    return app
 
 
 
@@ -293,8 +339,8 @@ if __name__ == '__main__':
     parser.add_argument("--model_path",
                         default='experiments/MARC/pp/2024-01-24_pp_10x10_2a_1p_2o-v3_b0_std_seed4001/saved_models/ckpt_final.pth.tar',
                         help="model_path")
-    parser.add_argument("--eval_n_episodes", default=1, type=int)
-    parser.add_argument("--eval_episode_length", default=25, type=int)
+    parser.add_argument("--eval_n_episodes", default=30, type=int)
+    parser.add_argument("--eval_episode_length", default=40, type=int)
     parser.add_argument("--fps", default=30, type=int)
     parser.add_argument("--render", default=True, action="store_true",
                         help="render")
@@ -312,4 +358,6 @@ if __name__ == '__main__':
     for k,v in params.items():
         args[k] = v
 
-    run(config)
+    app = run(config)
+    app.run_server(debug=True)
+

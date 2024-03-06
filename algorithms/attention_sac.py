@@ -68,7 +68,6 @@ class RelationalSAC(object):
                                        net_code = net_code)
         self.target_critic = RelationalCritic(
                                         n_agents = self.n_agents,
-                                        # obs = obs,
                                         spatial_tensors=spatial_tensors,
                                         batch_size = batch_size,
                                         n_actions=n_actions,
