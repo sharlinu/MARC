@@ -45,7 +45,7 @@ class RelationalCritic(nn.Module):
         self.device = device
         self.batch_size = batch_size
         self.max_reduce = True # TODO hardcoded
-        self.embed_size = 16
+        self.embed_size = 128
         self.dense = dense
 
         self.nb_graph_layers, self.nb_iterations, self.nb_dense_layers = parse_code(net_code)
@@ -76,7 +76,7 @@ class RelationalCritic(nn.Module):
             assert (self.embed_size % attend_heads) == 0
             attend_dim = self.embed_size // attend_heads
 
-            gnn = (GATConv(in_channels = input_dims[0],
+            gnn = (GATConv(in_channels = self.embed_size,
                                       out_channels=attend_dim,
                                       heads=attend_heads,
                                       v2 = True
@@ -165,12 +165,13 @@ class RelationalCritic(nn.Module):
                 gd = Batch.from_data_list(binary_tensors[a_i])
                 gd = gd.to(device = self.device)
                 batch = gd.batch
+                embedds = self.embedder(gd.x)
                 if self.graph_layer in ['RGCN', 'RGAT']:
-                    embedds = self.embedder(gd.x)
+
                     for _ in range(self.nb_iterations):
                         embedds = self.gnn_layers(embedds, gd.edge_index, gd.edge_attr)
                 else:
-                    embedds = self.gnn_layers(gd.x, gd.edge_index)
+                    embedds = self.gnn_layers(embedds, gd.edge_index)
 
             else:
                 embedds = torch.flatten(unary_tensors[a_i], 0, 1).float().to(device=self.device)

@@ -1,5 +1,5 @@
 env_name: 'lbf'
-exp_id : 'std'
+exp_id : 'try'
 other: ''
 
 player: 3
@@ -10,7 +10,7 @@ alg: 'MARC'
 n_episodes: 200000
 episode_length: 25
 test_n_episodes: 10
-device: 'cuda:0'
+device: 'cpu'
 
 pp:
   n_picker: 1
@@ -22,6 +22,14 @@ pp:
                  'id': 3,
                  'carrying': 4,
                  'picker': 5,}
+
+lbf:
+  max_food: 3
+  force_coop: False
+  max_player_level: 2
+  keep_food: True
+  attr_mapping: {'agent': 0, 'id': 1, 'food': 2}
+
 
 rware:
   size: 'tiny'
@@ -36,13 +44,6 @@ rware:
 #    'agent_direction':6,
   }
 
-
-lbf:
-  max_food: 3
-  force_coop: False
-  max_player_level: 2
-  keep_food: True
-  attr_mapping: {'agent': 0, 'id': 1, 'food': 2}
 
 bpush:
   penalty: 0.01
@@ -62,7 +63,7 @@ marc:
   background_id : 'b0'
   abs_id: 'None'
   buffer_length: 100000
-  graph_layer: 'RGCN'
+  graph_layer: 'GAT'
   net_code: '2g1i1f'
 
 maac:

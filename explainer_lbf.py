@@ -367,7 +367,7 @@ def run(config):
         [
             dcc.Graph(
                 id="graph_interaction",
-                figure=fig_full_linear,
+                figure=fig_full,
                 style={'display': 'inline-block', 'width': '100vh', 'height': '90vh'}
             ),
             html.Img(id='image', src='',style={'display':'inline-block', 'width': '70vh'})
@@ -391,9 +391,10 @@ def run(config):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_path",
-                        default ='experiments/MARC/lbf/2024-02-27_lbf_8x8_3p_3f_std_seed4001/saved_models/ckpt_best_avg_r1.0.pth.tar',
+                        # default ='experiments/MARC/lbf/2024-02-27_lbf_8x8_3p_3f_std_seed4001/saved_models/ckpt_best_avg_r1.0.pth.tar',
+                        default='experiments/MARC/lbf/2024-02-28_lbf_8x8_3p_3f_2i_std_seed4001/saved_models/ckpt_best_avg_r1.0.pth.tar',
     help="model_path")
-    parser.add_argument("--eval_n_episodes", default=2, type=int)
+    parser.add_argument("--eval_n_episodes", default=30, type=int)
     parser.add_argument("--eval_episode_length", default=25, type=int)
     parser.add_argument("--fps", default=30, type=int)
     parser.add_argument("--render", default=True, action="store_true",
