@@ -25,6 +25,7 @@ class RelationalSAC(object):
                  pi_lr=0.01,
                  q_lr=0.01,
                  reward_scale=10.,
+                 embed_size = 128,
                  pol_hidden_dim=128,
                  critic_hidden_dim=128,
                  graph_layer='RGCN', 
@@ -65,7 +66,9 @@ class RelationalSAC(object):
                                        graph_layer = graph_layer,
                                        device = device,
                                        dense = dense,
-                                       net_code = net_code)
+                                       net_code = net_code,
+                                       embed_size = embed_size,
+                                       )
         self.target_critic = RelationalCritic(
                                         n_agents = self.n_agents,
                                         spatial_tensors=spatial_tensors,
@@ -76,7 +79,9 @@ class RelationalSAC(object):
                                         graph_layer = graph_layer, 
                                         device=device,
                                         dense = dense,
-                                        net_code = net_code)
+                                        net_code = net_code,
+                                        embed_size = embed_size,
+                                        )
         hard_update(self.target_critic, self.critic) # hard update only at the beginning to initialise
         self.critic_optimizer = Adam(self.critic.parameters(), lr=q_lr,
                                      weight_decay=1e-3)
@@ -287,9 +292,9 @@ class RelationalSAC(object):
                       gamma=0.95, tau=0.01,
                       pi_lr=0.01, q_lr=0.01,
                       reward_scale=10.,
+                      embed_size = 128,
                       pol_hidden_dim=64,
                       critic_hidden_dim=64,
-                      attend_heads=4,
                       net_code = '1g1i1f',
                       device='cuda:0',
                       **kwargs):
@@ -328,6 +333,7 @@ class RelationalSAC(object):
                      'graph_layer':graph_layer,
                      'dense': dense,
                      'net_code': net_code,
+                     'embed_size': embed_size,
                      }
 
         instance = cls(**init_dict)

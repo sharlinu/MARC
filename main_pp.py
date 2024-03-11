@@ -6,9 +6,6 @@ from gym.spaces import Box
 from torch.autograd import Variable
 from warnings import filterwarnings  # noqa
 import macpp
-# filterwarnings(action='ignore',
-#                         category=DeprecationWarning,
-#                         module='gym') # TODO update
 from utils.buffer import ReplayBufferMARC, ReplayBufferMAAC
 from algorithms.attention_sac import AttentionSAC, RelationalSAC
 from utils.rel_wrapper2 import AbsoluteVKBWrapper, GATWrapper
@@ -22,12 +19,7 @@ def run(config):
     torch.set_num_threads(1)
     env_name = config.env_name
 
-
-    # run_num = 1
     run_dir = config.dir_exp
-    log_dir = config.dir_summary
-
-
     torch.manual_seed(config.random_seed)
     np.random.seed(config.random_seed)
     if config.exp_id == 'std':
@@ -81,6 +73,7 @@ def run(config):
                                                pi_lr=config.pi_lr,
                                                q_lr=config.q_lr,
                                                gamma=config.gamma,
+                                                embed_size=config.marc['embed_size'],
                                                graph_layer = config.marc['graph_layer'],
                                                pol_hidden_dim=config.pol_hidden_dim,
                                                critic_hidden_dim=config.critic_hidden_dim,
