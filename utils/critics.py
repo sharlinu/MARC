@@ -26,7 +26,8 @@ class RelationalCritic(nn.Module):
                  n_actions: int,
                  input_dims: list,
                  dense: bool,
-                 hidden_dim: int = 32,
+                 embed_size: int = 128,
+                 hidden_dim: int = 128,
                  net_code: str = "1g1i1f",
                  device: str = 'cuda:0',
                  graph_layer: str = 'RGCN',
@@ -45,7 +46,8 @@ class RelationalCritic(nn.Module):
         self.device = device
         self.batch_size = batch_size
         self.max_reduce = True # TODO hardcoded
-        self.embed_size = 128
+        self.embed_size = embed_size
+        print(f'Using an embedding size of {self.embed_size}')
         self.dense = dense
 
         self.nb_graph_layers, self.nb_iterations, self.nb_dense_layers = parse_code(net_code)
@@ -72,7 +74,7 @@ class RelationalCritic(nn.Module):
             print('Using RGAT as graph layer')
         elif self.graph_layer == 'GAT':
             input_args = 'x, edge_index'
-            attend_heads = 4
+            attend_heads = 1
             assert (self.embed_size % attend_heads) == 0
             attend_dim = self.embed_size // attend_heads
 
@@ -86,7 +88,7 @@ class RelationalCritic(nn.Module):
             attend_heads = 1
             assert (self.embed_size % attend_heads) == 0
             attend_dim = self.embed_size // attend_heads
-            gnn = (GATv2Conv(in_channels=input_dims[0],
+            gnn = (GATv2Conv(in_channels=self.embed_size,
                                       out_channels=attend_dim,
                                       heads=attend_heads,
                                       ), 'x, edge_index -> x')
@@ -167,12 +169,10 @@ class RelationalCritic(nn.Module):
                 batch = gd.batch
                 embedds = self.embedder(gd.x)
                 if self.graph_layer in ['RGCN', 'RGAT']:
-
                     for _ in range(self.nb_iterations):
                         embedds = self.gnn_layers(embedds, gd.edge_index, gd.edge_attr)
                 else:
                     embedds = self.gnn_layers(embedds, gd.edge_index)
-
             else:
                 embedds = torch.flatten(unary_tensors[a_i], 0, 1).float().to(device=self.device)
                 embedds = self.embedder(embedds)

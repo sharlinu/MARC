@@ -4,11 +4,11 @@ buffer_length: 1000000
 critic_hidden_dim: 128
 device: cuda:0
 dir_base: ./experiments
-dir_exp: ./experiments/MARC/lbf/2024-02-28_lbf_8x8_3p_3f_std_seed4001
-dir_monitor: ./experiments/MARC/lbf/2024-02-28_lbf_8x8_3p_3f_std_seed4001/monitor
-dir_saved_models: ./experiments/MARC/lbf/2024-02-28_lbf_8x8_3p_3f_std_seed4001/saved_models
-dir_summary: ./experiments/MARC/lbf/2024-02-28_lbf_8x8_3p_3f_std_seed4001/summary
-env_id: lbf_8x8_3p_3f
+dir_exp: ./experiments/MARC/lbf/2024-03-08_lbf_8x8_3p_3f_48dim_std_seed4001
+dir_monitor: ./experiments/MARC/lbf/2024-03-08_lbf_8x8_3p_3f_48dim_std_seed4001/monitor
+dir_saved_models: ./experiments/MARC/lbf/2024-03-08_lbf_8x8_3p_3f_48dim_std_seed4001/saved_models
+dir_summary: ./experiments/MARC/lbf/2024-03-08_lbf_8x8_3p_3f_48dim_std_seed4001/summary
+env_id: lbf_8x8_3p_3f_48dim
 env_name: lbf
 episode_length: 25
 exp_id: std
@@ -29,13 +29,14 @@ marc:
   background_id: b0
   buffer_length: 100000
   dense: true
+  embed_size: 48
   graph_layer: RGCN
-  net_code: 1g2i1f
+  net_code: 1g1i1f
   relational_embedding: false
-n_episodes: 200000
+n_episodes: 300000
 norm_rews: true
 num_updates: 4
-other: ''
+other: _48dim
 pi_lr: 0.001
 player: 3
 pol_hidden_dim: 128

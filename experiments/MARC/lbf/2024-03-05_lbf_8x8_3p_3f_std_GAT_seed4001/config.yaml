@@ -4,10 +4,10 @@ buffer_length: 1000000
 critic_hidden_dim: 128
 device: cuda:0
 dir_base: ./experiments
-dir_exp: ./experiments/MARC/lbf/2024-03-05_lbf_8x8_3p_3f_std_seed4001
-dir_monitor: ./experiments/MARC/lbf/2024-03-05_lbf_8x8_3p_3f_std_seed4001/monitor
-dir_saved_models: ./experiments/MARC/lbf/2024-03-05_lbf_8x8_3p_3f_std_seed4001/saved_models
-dir_summary: ./experiments/MARC/lbf/2024-03-05_lbf_8x8_3p_3f_std_seed4001/summary
+dir_exp: ./experiments/MARC/lbf/2024-03-05_lbf_8x8_3p_3f_std_GAT_seed4001
+dir_monitor: ./experiments/MARC/lbf/2024-03-05_lbf_8x8_3p_3f_std_GAT_seed4001/monitor
+dir_saved_models: ./experiments/MARC/lbf/2024-03-05_lbf_8x8_3p_3f_std_GAT_seed4001/saved_models
+dir_summary: ./experiments/MARC/lbf/2024-03-05_lbf_8x8_3p_3f_std_GAT_seed4001/summary
 env_id: lbf_8x8_3p_3f
 env_name: lbf
 episode_length: 25

@@ -86,9 +86,9 @@ def run(config):
     embeddings = ['node_embeddings', 'node_concepts', 'graph_embeddings']
     df_full = pd.DataFrame()
     df_full_graph = pd.DataFrame()
-    graph_embedds = torch.empty((0,128))
+    graph_embedds = torch.empty((0,16))
     linear_embedds = torch.empty((0, 128))
-    node_embedds = torch.empty((0, 128))
+    node_embedds = torch.empty((0, 16))
     for ep_i in range(config.eval_n_episodes):
         directory = f'plots/lbf/episode_{ep_i}'
         os.makedirs(directory, exist_ok=True)
@@ -312,7 +312,7 @@ def run(config):
                              y='y',
                              z='z',
                              color='label',
-                             size = 'steps',
+                             # size = 'steps',
                              hover_data=
                              {'x': False,
                               'y': False,
@@ -349,7 +349,7 @@ def run(config):
                                    y='linear_y',
                                    z='linear_z',
                                    color='q_values',
-                                   size = 'steps',
+                                   # size = 'steps',
                                    hover_data=
                                    {'linear_x': False,
                                     'linear_y': False,
@@ -395,6 +395,7 @@ if __name__ == '__main__':
                         default='experiments/MARC/lbf/2024-02-28_lbf_8x8_3p_3f_2i_std_seed4001/saved_models/ckpt_best_avg_r1.0.pth.tar',
     help="model_path")
     parser.add_argument("--eval_n_episodes", default=30, type=int)
+    parser.add_argument("--eval_n_episodes", default=10, type=int)
     parser.add_argument("--eval_episode_length", default=25, type=int)
     parser.add_argument("--fps", default=30, type=int)
     parser.add_argument("--render", default=True, action="store_true",

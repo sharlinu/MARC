@@ -1,14 +1,14 @@
 env_name: 'lbf'
 exp_id : 'try'
-other: ''
+other: '_2g2i_48'
 
-player: 3
-field: 8
+player: 2
+field: 10
 grid_observation: True
 
 alg: 'MARC'
-n_episodes: 200000
-episode_length: 25
+n_episodes: 300000
+episode_length: 50
 test_n_episodes: 10
 device: 'cpu'
 
@@ -40,9 +40,15 @@ rware:
     'agents':2,
     'goals':3,
     'accessible':4,
-#    'agent_load':5,
-#    'agent_direction':6,
   }
+
+
+lbf:
+  max_food: 3
+  force_coop: False
+  max_player_level: 2
+  keep_food: True
+  attr_mapping: {'agent': 0, 'id': 1, 'food': 2}
 
 
 bpush:
@@ -63,8 +69,9 @@ marc:
   background_id : 'b0'
   abs_id: 'None'
   buffer_length: 100000
-  graph_layer: 'GAT'
-  net_code: '2g1i1f'
+  graph_layer: 'RGCN'
+  net_code: '2g2i1f'
+  embed_size: 48
 
 maac:
   attend_heads: 4
