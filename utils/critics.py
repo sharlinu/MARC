@@ -81,7 +81,7 @@ class RelationalCritic(nn.Module):
             gnn = (GATConv(in_channels = self.embed_size,
                                       out_channels=attend_dim,
                                       heads=attend_heads,
-                                      v2 = True
+                                      # v2 = True
                                       ), 'x, edge_index -> x')
         elif self.graph_layer == 'GATv2':
             input_args = 'x, edge_index'
