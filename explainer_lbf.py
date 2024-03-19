@@ -58,7 +58,7 @@ def run(config):
     os.makedirs(eval_path, exist_ok=True)
 
     config.device = 'cpu'
-    model, _ = RelationalSAC.init_from_save(model_path, device=config.device)
+    model, _ = RelationalSAC.init_from_save(model_path, device=config.device, load_critic=True)
     model.critic.critics_head[0].critic_nl.register_forward_hook(get_activation('critic_nl'))
     from lbforaging.foraging import ForagingEnv
     env=ForagingEnv(
@@ -86,9 +86,13 @@ def run(config):
     embeddings = ['node_embeddings', 'node_concepts', 'graph_embeddings']
     df_full = pd.DataFrame()
     df_full_graph = pd.DataFrame()
-    graph_embedds = torch.empty((0,16))
-    linear_embedds = torch.empty((0, 128))
-    node_embedds = torch.empty((0, 16))
+    try:
+        embed_size = config.marc['embed_size']
+    except KeyError:
+        embed_size = 128
+    graph_embedds = torch.empty((0,embed_size))
+    node_embedds = torch.empty((0, embed_size))
+    linear_embedds = torch.empty((0,128))
     for ep_i in range(config.eval_n_episodes):
         directory = f'plots/lbf/episode_{ep_i}'
         os.makedirs(directory, exist_ok=True)
@@ -389,10 +393,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_path",
                         # default ='experiments/MARC/lbf/2024-02-27_lbf_8x8_3p_3f_std_seed4001/saved_models/ckpt_best_avg_r1.0.pth.tar',
-                        # default='experiments/MARC/lbf/2024-02-29_lbf_8x8_3p_3f_2g_std_seed4001/saved_models/ckpt_final.pth.tar',
-                        default='experiments/MARC/lbf/2024-02-29_lbf_8x8_3p_3f_2i_std_seed4001/saved_models/ckpt_final.pth.tar',
-                        help="model_path")
-    parser.add_argument("--eval_n_episodes", default=10, type=int)
+                        default='experiments/MARC/lbf/2024-02-28_lbf_8x8_3p_3f_2i_std_seed4001/saved_models/ckpt_best_avg_r1.0.pth.tar',
+    help="model_path")
+    parser.add_argument("--eval_n_episodes", default=30, type=int)
     parser.add_argument("--eval_episode_length", default=25, type=int)
     parser.add_argument("--fps", default=30, type=int)
     parser.add_argument("--render", default=True, action="store_true",
@@ -401,6 +404,7 @@ if __name__ == '__main__':
                         help="save step images")
     parser.add_argument("--benchmark", action="store_false",
                         help="benchmark mode")
+    parser.add_argument("--port", default=8050, type=int)
     config = parser.parse_args()
     args = vars(config)
     eval_path = Path(config.model_path)
@@ -412,4 +416,4 @@ if __name__ == '__main__':
         args[k] = v
 
     app = run(config)
-    app.run_server(debug=True)
+    app.run_server(debug=True, port=config.port)

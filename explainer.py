@@ -2,10 +2,7 @@ import argparse
 import numpy as np
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
-import pygame
 import torch
-import time
 from pathlib import Path
 from torch.autograd import Variable
 from algorithms.attention_sac import RelationalSAC
@@ -40,7 +37,7 @@ def plot_activation_space(data):
     ax.legend(handles=scatter.legend_elements()[0], bbox_to_anchor=(1.05, 1))
 
     # plt.savefig(os.path.join(path, f"{layer_num}_layer{naming_help}.png"))
-    plt.show()
+    # plt.show()
 
 def run(config):
     model_path = config.model_path
@@ -54,7 +51,6 @@ def run(config):
     config.device = 'cpu'
     model, _ = RelationalSAC.init_from_save(model_path, device=config.device, load_critic=True)
     model.critic.critics_head[0].critic_nl.register_forward_hook(get_activation('critic_nl'))
-
     env = gym.make(f"macpp-{config.field}x{config.field}-{config.player}a-{config.pp['n_picker']}p-{config.pp['n_picker']}o-v3", debug_mode=False)
     env = GridObs(env)
     attr_mapping = config.pp['attr_mapping']
@@ -70,15 +66,22 @@ def run(config):
                                  background_id=config.marc['background_id'],
                                  abs_id=config.marc['abs_id']
                                  )
+    else:
+        ValueError
+
     model.prep_rollouts(device='cpu')
     ifi = 1 / config.fps  # inter-frame interval
     l_ep_rew = []
     embeddings = ['node_embeddings', 'node_concepts', 'graph_embeddings']
     df_full = pd.DataFrame()
     df_full_graph = pd.DataFrame()
-    graph_embedds = torch.empty((0,config.marc['embed_size']))
+    try:
+        embed_size = config.marc['embed_size']
+    except KeyError:
+        embed_size = 128
+    graph_embedds = torch.empty((0, embed_size))
+    node_embedds = torch.empty((0, embed_size))
     linear_embedds = torch.empty((0, 128))
-    node_embedds = torch.empty((0, config.marc['embed_size']))
     for ep_i in range(config.eval_n_episodes):
         directory = f'plots/pp/episode_{ep_i}'
         os.makedirs(directory, exist_ok=True)
@@ -139,7 +142,7 @@ def run(config):
 
 
 
-        if t_i==39:
+        if t_i>23:
             continue
         print('using graph embeddings')
         l_ep_rew.append(ep_rew)
@@ -168,25 +171,54 @@ def run(config):
         # Create a dictionary to map each unique feature vector to a label
         label_dict = {tuple(feature.tolist()): str(feature) for feature in unique_features}
         # colour_dict = {tuple(feature.tolist()): colour for colour, feature in enumerate(unique_features)}
-        label_dict[(0.0, 0.0, 1.0, 0.0, 0.0, 0.0)] = 'goal'
-        label_dict[(0.0, 1.0, 0.0, 0.0, 0.0, 0.0)] = 'object'
-        label_dict[(1.0, 0.0, 0.0, 0.0, -1.0, 0.0)] = 'dropper'
-        label_dict[(1.0, 0.0, 0.0, 1.0, -1.0, 1.0)] = 'id_picker'
-        label_dict[(1.0, 1.0, 0.0, 0.0, -1.0, 0.0)] = 'dropper'
-        label_dict[(1.0, 1.0, 0.0, 0.0, 1.0, 0.0)] = 'dropper+obj'
-        label_dict[(1.0, 1.0, 0.0, 1.0, 1.0, 0.0)] = 'id_dropper+obj'
-        label_dict[(1.0, 1.0, 0.0, 1.0, -1.0, 0.0)] = 'id_dropper+iobj'
-        label_dict[(1.0, 0.0, 0.0, 1.0, -1.0, 0.0)] = 'id_dropper'
-        label_dict[(1.0, 0.0, 0.0, 0.0, -1.0, 1.0)] = 'picker'
-        label_dict[(1.0, 1.0, 1.0, 1.0, -1.0, 0.0)] = 'id_dropper+obj+goal'
-        label_dict[(1.0, 1.0, 0.0, 1.0, 1.0, 1.0)] = 'id_picker+obj'
-        label_dict[(1.0, 1.0, 0.0, 0.0, 1.0, 1.0)] = 'picker+obj'
-        label_dict[(1.0, 1.0, 1.0, 0.0, 1.0, 1.0)] = 'picker+obj+goal'
-        label_dict[(1.0, 1.0, 0.0, 0.0, -1.0, 1.0)] = 'picker+obj'
-        label_dict[(0.0, 1.0, 1.0, 0.0, 0.0, 0.0)] = 'full_goal'
-        label_dict[(1.0, 1.0, 1.0, 0.0, -1.0, 0.0)] = 'dropper+obj+goal'
-        label_dict[(1.0, 0.0, 1.0, 1.0, -1.0, 1.0)] = 'id_picker+goal'
-        label_dict[(1.0, 0.0, 1.0, 0.0, -1.0, 0.0)] = 'dropper+goal'
+        if config.marc['graph_layer'] == 'GAT':
+            for i in range(config.field):
+                for j in range(config.field):
+                    label_dict[(0.0, 0.0, 1.0, 0.0, 0.0, 0.0, i, j)] = 'goal'
+                    label_dict[(0.0, 1.0, 0.0, 0.0, 0.0, 0.0, i, j)] = 'object'
+                    label_dict[(1.0, 0.0, 0.0, 0.0, -1.0, 0.0,i,j)] = 'dropper'
+                    label_dict[(1.0, 0.0, 0.0, 1.0, -1.0, 1.0,i,j)] = 'id_picker'
+                    label_dict[(1.0, 1.0, 0.0, 0.0, 1.0, 0.0,i,j)] = 'dropper+obj'
+                    label_dict[(1.0, 1.0, 0.0, 1.0, 1.0, 0.0,i,j)] = 'id_dropper+obj'
+                    label_dict[(1.0, 1.0, 0.0, 1.0, -1.0, 0.0,i,j)] = 'id_dropper+iobj'
+                    label_dict[(1.0, 0.0, 0.0, 1.0, -1.0, 0.0,i,j)] = 'id_dropper'
+                    label_dict[(1.0, 0.0, 0.0, 0.0, -1.0, 1.0,i,j)] = 'picker'
+                    label_dict[(1.0, 1.0, 1.0, 1.0, -1.0, 0.0,i,j)] = 'id_dropper+obj+goal'
+                    label_dict[(1.0, 1.0, 0.0, 1.0, 1.0, 1.0,i,j)] = 'id_picker+obj'
+                    label_dict[(1.0, 1.0, 0.0, 0.0, 1.0, 1.0,i,j)] = 'picker+obj'
+                    label_dict[(1.0, 1.0, 1.0, 0.0, 1.0, 1.0,i,j)] = 'picker+obj+goal'
+                    label_dict[(1.0, 1.0, 0.0, 0.0, -1.0, 1.0,i,j)] = 'picker+obj'
+                    label_dict[(0.0, 1.0, 1.0, 0.0, 0.0, 0.0,i,j)] = 'full_goal'
+                    label_dict[(1.0, 1.0, 1.0, 0.0, -1.0, 0.0,i,j)] = 'dropper+obj+goal'
+                    label_dict[(1.0, 0.0, 1.0, 1.0, -1.0, 1.0,i,j)] = 'id_picker+goal'
+                    label_dict[(1.0, 0.0, 1.0, 0.0, -1.0, 0.0,i,j)] = 'dropper+goal'
+        else:
+            label_dict[(0.0, 0.0, 1.0, 0.0, 0.0, 0.0)] = 'goal'
+            label_dict[(0.0, 1.0, 0.0, 0.0, 0.0, 0.0)] = 'object'
+            label_dict[(1.0, 0.0, 0.0, 0.0, -1.0, 0.0)] = 'dropper'
+            label_dict[(1.0, 0.0, 0.0, 1.0, -1.0, 0.0)] = 'dropper'
+            label_dict[(1.0, 0.0, 0.0, 1.0, -1.0, 1.0)] = 'picker'
+            label_dict[(1.0, 0.0, 0.0, 0.0, -1.0, 1.0)] = 'picker'
+            label_dict[(1.0, 1.0, 0.0, 0.0, 1.0, 0.0)] = 'dropper+obj'
+            label_dict[(1.0, 1.0, 0.0, 1.0, 1.0, 0.0)] = 'dropper+obj'
+            label_dict[(1.0, 1.0, 0.0, 1.0, -1.0, 0.0)] = 'dropper+iobj'
+            label_dict[(1.0, 1.0, 0.0, 0.0, -1.0, 0.0)] = 'dropper+iobj'
+
+            label_dict[(1.0, 1.0, 1.0, 1.0, -1.0, 0.0)] = 'dropper+obj+goal'
+            label_dict[(1.0, 1.0, 1.0, 0.0, -1.0, 0.0)] = 'dropper+obj+goal'
+            label_dict[(1.0, 1.0, 0.0, 1.0, 1.0, 1.0)] = 'picker+obj'
+            label_dict[(1.0, 1.0, 0.0, 0.0, 1.0, 1.0)] = 'picker+obj'
+            label_dict[(1.0, 1.0, 1.0, 0.0, 1.0, 1.0)] = 'picker+obj+goal'
+            label_dict[(1.0, 1.0, 1.0, 1.0, 1.0, 1.0)] = 'picker+obj+goal'
+            label_dict[(1.0, 1.0, 0.0, 0.0, -1.0, 1.0)] = 'picker+iobj'
+            label_dict[(1.0, 1.0, 0.0, 1.0, -1.0, 1.0)] = 'picker+iobj'
+            label_dict[(0.0, 1.0, 1.0, 0.0, 0.0, 0.0)] = 'full_goal'
+            label_dict[(1.0, 0.0, 1.0, 1.0, -1.0, 1.0)] = 'picker+goal'
+            label_dict[(1.0, 0.0, 1.0, 0.0, -1.0, 1.0)] = 'picker+goal'
+            label_dict[(1.0, 0.0, 1.0, 0.0, -1.0, 0.0)] = 'dropper+goal'
+            label_dict[(1.0, 0.0, 1.0, 1.0, -1.0, 0.0)] = 'dropper+goal'
+            label_dict[(1.0, 1.0, 0.0, 0.0, -1.0, 0.0)] = 'dropper+iobj'
+            label_dict[(1.0, 1.0, 0.0, 1.0, -1.0, 0.0)] = 'dropper+iobj'
         # Create label vector
         fin_labels = ([label_dict[tuple(feature.tolist())] for feature in labels])
 
@@ -300,6 +332,7 @@ def run(config):
                              y='y',
                              z='z',
                              color='label',
+                             # size='steps',
                              hover_data=
                              {'x': False,
                               'y': False,
@@ -332,6 +365,23 @@ def run(config):
     fig_full.write_html(f"plots/pp/all_node_embeddings.html")
     # fig_full.update_layout(clickmode='event+select')
 
+    # fig_full_linear = px.scatter_3d(df_full_graph,
+    #                                x='linear_x',
+    #                                y='linear_y',
+    #                                z='linear_z',
+    #                                color='q_values',
+    #                                # size = 'steps',
+    #                                hover_data=
+    #                                {'linear_x': False,
+    #                                 'linear_y': False,
+    #                                 'linear_z': False,
+    #                                 'q_values': True,
+    #                                 'agent': True,
+    #                                 'steps': True,
+    #                                 'episode': True},
+    #                                custom_data=["images"]
+    #                                )
+    # fig_full_linear.write_html(f"plots/lbf/all_linear_embeddings.html")
 
 
     fig_full_linear = px.scatter_3d(df_full_graph,
@@ -361,8 +411,22 @@ def run(config):
                 style={'display': 'inline-block', 'width': '100vh'}
             ),
             html.Img(id='image', src='',style={'display':'inline-block', 'width': '80vh'})
-        ]
-
+            # dcc.Graph(
+            #     id="graph_full",
+            #     figure=fig_full_graph,
+            #     style={'display': 'inline-block', 'width': '100vh'},
+            #
+            # ),
+            # dcc.Graph(
+            #     id="graph_interaction",
+            #     figure=fig_full_linear,
+            #     style={'display': 'inline-block', 'width': '100vh'},
+            #
+            # ),
+            # html.Img(id='image', src='',style={'display':'inline-block', 'width': '80vh'}),
+            # html.Img(id='image2', src='', style={'display': 'inline-block', 'width': '80vh'})
+        ],
+    title=f'{config.marc["net_code"]}'
     )
 
     @app.callback(
@@ -374,6 +438,15 @@ def run(config):
         else:
             raise PreventUpdate
 
+    # @app.callback(
+    #     Output('image2', 'src'),
+    #     Input('graph_full', 'hoverData'))
+    # def open_url(hoverData):
+    #     if hoverData:
+    #         return hoverData["points"][0]["customdata"][0]
+    #     else:
+    #         raise PreventUpdate
+
 
     return app
 
@@ -384,9 +457,12 @@ if __name__ == '__main__':
     parser.add_argument("--model_path",
                         # default='experiments/MARC/pp/2024-01-24_pp_10x10_2a_1p_2o-v3_b0_std_seed4001/saved_models/ckpt_final.pth.tar',
                         default = 'experiments/MARC/pp/2024-03-12_pp_5x5_2a_1p_1o-v3_GAT_std_seed4001/saved_models/ckpt_best_avg_r1.6320000886917114.pth.tar',
+                        # default='experiments/MARC/pp/2024-03-05_pp_10x10_2a_1p_2o-v3_std_seed4001/saved_models/ckpt_best_avg_r1.149999976158142.pth.tar',
+                        # default='experiments/MARC/pp/2024-03-12_pp_5x5_2a_1p_1o-v3_std_seed4001/saved_models/ckpt_best_avg_r*',
+                        # default = 'experiments/MARC/pp/2024-03-12_pp_5x5_2a_1p_1o-v3_std_seed4001/saved_models/ckpt_best_avg_r3.626000165939331.pth.tar'
                         help="model_path")
     parser.add_argument("--eval_n_episodes", default=30, type=int)
-    parser.add_argument("--eval_episode_length", default=40, type=int)
+    parser.add_argument("--eval_episode_length", default=25, type=int)
     parser.add_argument("--fps", default=30, type=int)
     parser.add_argument("--render", default=True, action="store_true",
                         help="render")
@@ -394,6 +470,8 @@ if __name__ == '__main__':
                         help="save step images")
     parser.add_argument("--benchmark", action="store_false",
                         help="benchmark mode")
+    parser.add_argument("--port", default=8050,
+                        help="dash port")
     config = parser.parse_args()
     args = vars(config)
     eval_path = Path(config.model_path)
@@ -405,5 +483,5 @@ if __name__ == '__main__':
         args[k] = v
 
     app = run(config)
-    app.run_server(debug=True)
+    app.run_server(debug=True, port=config.port)
 
