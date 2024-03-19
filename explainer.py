@@ -2,10 +2,7 @@ import argparse
 import numpy as np
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
-import pygame
 import torch
-import time
 from pathlib import Path
 from torch.autograd import Variable
 from algorithms.attention_sac import RelationalSAC
@@ -23,6 +20,13 @@ import dash
 from dash.exceptions import PreventUpdate
 from dash import dcc, html
 from dash.dependencies import Input, Output
+
+hook_activation = {}
+def get_activation(name):
+    def hook(model, input, output):
+        hook_activation[name] = output.detach()
+    return hook
+
 
 def plot_activation_space(data):
     # rows = len(data)
@@ -45,9 +49,12 @@ def run(config):
     os.makedirs(eval_path, exist_ok=True)
 
     config.device = 'cpu'
-    model, _ = RelationalSAC.init_from_save(model_path, device=config.device, load_critic=True )
-
-    env=gym.make(f"macpp-5x5-2a-1p-1o-v3", debug_mode=False)
+    model, _ = RelationalSAC.init_from_save(model_path, device=config.device, load_critic=True)
+    model.critic.critics_head[0].critic_nl.register_forward_hook(get_activation('critic_nl'))
+    env = gym.make(f"macpp-{config.field}x{config.field}-{config.player}a-{config.pp['n_picker']}p-{config.pp['n_picker']}o-v3",
+                   debug_mode=False,
+                   # render_mode='human'
+                   )
     env = GridObs(env)
     attr_mapping = config.pp['attr_mapping']
     if config.marc['graph_layer'] == 'GAT':
@@ -55,13 +62,16 @@ def run(config):
                          attr_mapping=attr_mapping,
                          dense=config.marc['dense'],
                          )
-    else:
+    elif config.marc['graph_layer'] =='RGCN':
         env = AbsoluteVKBWrapper(env,
-                             attr_mapping=attr_mapping,
-                             dense=config.marc['dense'],
-                             background_id=config.marc['background_id'],
-                             abs_id=config.marc['abs_id']
-                             )
+                                 attr_mapping=attr_mapping,
+                                 dense=config.marc['dense'],
+                                 background_id=config.marc['background_id'],
+                                 abs_id=config.marc['abs_id']
+                                 )
+    else:
+        ValueError
+
     model.prep_rollouts(device='cpu')
     ifi = 1 / config.fps  # inter-frame interval
     l_ep_rew = []
@@ -74,18 +84,18 @@ def run(config):
         embed_size = 128
     graph_embedds = torch.empty((0, embed_size))
     node_embedds = torch.empty((0, embed_size))
+    linear_embedds = torch.empty((0, 128))
     for ep_i in range(config.eval_n_episodes):
         directory = f'plots/pp/episode_{ep_i}'
         os.makedirs(directory, exist_ok=True)
         node_embeddings = []
         node_concepts = []
         graph_embeddings = []
+        linear_embeddings = []
+        state_label = []
         images = []
         print("Episode %i of %i" % (ep_i + 1, config.eval_n_episodes))
-
         ep_rew = 0
-
-
         obs = env.reset()
 
         if config.marc['graph_layer'] == 'GAT':
@@ -99,8 +109,10 @@ def run(config):
         q_values_b = []
         if config.render:
             env.render()
-
+        label = 0
+        rewards = [-0.1,-0.1]
         for t_i in range(config.eval_episode_length):
+
             if config.render:
                 img = f"{directory}/step_{t_i}.png"
                 env.render(save=config.save, name=img)
@@ -118,6 +130,8 @@ def run(config):
             node_embeddings.append(model.critic.node_embeddings)
             node_concepts.append(model.critic.node_concepts)
             graph_embeddings.append(model.critic.graph_embeddings)
+            linear_embeddings.append(hook_activation['critic_nl'])
+
             labels_1 = torch.cat([labels_1, obs[0]['unary_tensor']])
             labels_2 = torch.cat([labels_2, obs[1]['unary_tensor']])
             # convert actions to numpy arrays
@@ -125,7 +139,24 @@ def run(config):
             actions = [np.argmax(ac.data.numpy().flatten()) for ac in torch_actions]
 
             # print('actions', actions)
+            import time
+            # time.sleep(1)
+            # print(rewards)
+            if sum(rewards) == -0.2:
+                pass
+            elif rewards[0] == 0.4:
+                label +=1
+            elif sum(rewards) == 0.8:
+                label += 1
+            elif sum(rewards) == 2.8:
+                label += 1
+            else:
+                print(f'rewards are not categorised with  {rewards}')
+                time.sleep(10)
+            state_label.append(label)
+            # print(state_label)
             obs, rewards, dones, infos = env.step(actions)
+
             # if config.save:
             #     env.save(f"{directory}/step_{t_i}.png")
             ep_rew += sum(rewards)
@@ -141,7 +172,9 @@ def run(config):
         temp1 = torch.vstack([node_embeddings[i][0] for i in range(len(node_embeddings))])
         graph_plots_a = torch.vstack([graph_embeddings[i][0] for i in range(len(graph_embeddings))])
         # graph_plots_b = torch.vstack([graph_embeddings[i][1] for i in range(len(graph_embeddings))])
+        linear = torch.vstack([linear_embeddings[i][0] for i in range(len(linear_embeddings))])
         graph_embedds  = torch.cat([graph_embedds, graph_plots_a])
+        linear_embedds = torch.cat([linear_embedds, linear])
         node_embedds = torch.cat([node_embedds, temp1])
         # temp2 = torch.vstack([node_embeddings[i][1] for i in range(len(node_embeddings))])
         # batch = [node_embeddings[i][0].shape[0] for i in range(len(node_embeddings))]
@@ -228,7 +261,9 @@ def run(config):
         df['label'] = fin_labels
         df['steps'] = steps
         df['images'] = batch_images
+        df_graph['state'] = state_label
         df_graph['images'] = images
+
 
         min_ax = min(min(df['x']), min(df['y']), min(df['z']))
         max_ax = max(max(df['x']), max(df['y']), max(df['z']))
@@ -248,45 +283,45 @@ def run(config):
         fig.write_html(f"plots/pp/episode_{ep_i}/node_embeddings.html")
 
         fig_full = px.scatter_3d(df,
-                            x='x',
-                            y='y',
-                            z='z',
-                            color='label',
-                            )
+                                 x='x',
+                                 y='y',
+                                 z='z',
+                                 color='label',
+                                 )
         # fig_full.show()
         fig_full.write_html(f"plots/pp/episode_{ep_i}/full_node_embeddings.html")
 
         fig_graph = px.scatter_3d(df_graph,
-                            x='x',
-                            y='y',
-                            z='z',
-                            color='q_values',
-                            hover_name="q_values",
-                            hover_data=
-                              {'x': False,
-                               'y': False,
-                               'z': False,
-                               'agent': True,
-                               'q_values': False,
-                               'steps': True}
-                            )
+                                  x='x',
+                                  y='y',
+                                  z='z',
+                                  color='q_values',
+                                  hover_name="q_values",
+                                  hover_data=
+                                  {'x': False,
+                                   'y': False,
+                                   'z': False,
+                                   'agent': True,
+                                   'q_values': False,
+                                   'steps': True}
+                                  )
         # fig_graph.show()
         fig_graph.write_html(f"plots/pp/episode_{ep_i}/q_embeddings.html")
 
         fig_graph = px.scatter_3d(df_graph,
-                            x='x',
-                            y='y',
-                            z='z',
-                            color='steps',
-                            hover_name="steps",
-                            hover_data=
+                                  x='x',
+                                  y='y',
+                                  z='z',
+                                  color='steps',
+                                  hover_name="steps",
+                                  hover_data=
                                   {'x':False,
                                    'y': False,
                                    'z': False,
                                    'agent':True,
                                    'q_values':True,
                                    'steps':False}
-                            )
+                                  )
         # fig_graph.show()
         fig_graph.write_html(f"plots/pp/episode_{ep_i}/graph_embeddings.html")
         df['episode'] = ep_i
@@ -303,9 +338,13 @@ def run(config):
     # d = tsne_model.fit_transform(activation)
     d_graph = model.fit_transform(graph_embedds.detach().numpy())
     d_node = model.fit_transform(node_embedds.detach().numpy())
+    d_linear = model.fit_transform(linear_embedds.detach().numpy())
     df_full_graph['x'] = d_graph[:, 0]
     df_full_graph['y'] = d_graph[:, 1]
     df_full_graph['z'] = d_graph[:, 2]
+    df_full_graph['linear_x'] = d_linear[:, 0]
+    df_full_graph['linear_y'] = d_linear[:, 1]
+    df_full_graph['linear_z'] = d_linear[:, 2]
 
     df_full['x'] = d_node[:, 0]
     df_full['y'] = d_node[:, 1]
@@ -334,20 +373,20 @@ def run(config):
     # fig_full.update_layout(clickmode='event+select')
 
     fig_full_graph = px.scatter_3d(df_full_graph,
-                             x='x',
-                             y='y',
-                             z='z',
-                             color='q_values',
-                             hover_data=
-                             {'x': False,
-                              'y': False,
-                              'z': False,
-                              'q_values': True,
-                              'agent': True,
-                              'steps': True,
-                              'episode': True},
-                             custom_data = ["images"]
-                             )
+                                   x='x',
+                                   y='y',
+                                   z='z',
+                                   color='state',
+                                   hover_data=
+                                   {'x': False,
+                                    'y': False,
+                                    'z': False,
+                                    'q_values': True,
+                                    'agent': True,
+                                    'steps': True,
+                                    'episode': True},
+                                   custom_data = ["images"]
+                                   )
     fig_full.write_html(f"plots/pp/all_node_embeddings.html")
     # fig_full.update_layout(clickmode='event+select')
 
@@ -369,28 +408,39 @@ def run(config):
     #                                )
     # fig_full_linear.write_html(f"plots/lbf/all_linear_embeddings.html")
 
+
+    fig_full_linear = px.scatter_3d(df_full_graph,
+                                   x='linear_x',
+                                   y='linear_y',
+                                   z='linear_z',
+                                   color='q_values',
+                                   # size = 'steps',
+                                   hover_data=
+                                   {'linear_x': False,
+                                    'linear_y': False,
+                                    'linear_z': False,
+                                    'q_values': True,
+                                    'agent': True,
+                                    'steps': True,
+                                    'episode': True},
+                                   custom_data=["images"]
+                                   )
+    fig_full_linear.write_html(f"plots/lbf/all_linear_embeddings.html")
+    if config.plot_type=='nodes':
+        fig = fig_full
+    elif config.plot_type=='graph':
+        fig = fig_full_graph
+    elif config.plot_type=='linear':
+        fig = fig_full_linear
+
     app.layout = html.Div(
         [
             dcc.Graph(
                 id="graph_interaction",
-                figure=fig_full_graph,
-                style={'display': 'inline-block', 'width': '100vh'},
-
+                figure=fig,
+                style={'display': 'inline-block', 'width': '100vh'}
             ),
-            # dcc.Graph(
-            #     id="graph_full",
-            #     figure=fig_full_graph,
-            #     style={'display': 'inline-block', 'width': '100vh'},
-            #
-            # ),
-            # dcc.Graph(
-            #     id="graph_interaction",
-            #     figure=fig_full_linear,
-            #     style={'display': 'inline-block', 'width': '100vh'},
-            #
-            # ),
-            html.Img(id='image', src='',style={'display':'inline-block', 'width': '80vh'}),
-            # html.Img(id='image2', src='', style={'display': 'inline-block', 'width': '80vh'})
+            html.Img(id='image', src='',style={'display':'inline-block', 'width': '40vh'})
         ],
     title=f'{config.marc["net_code"]}'
     )
@@ -422,11 +472,12 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_path",
                         # default='experiments/MARC/pp/2024-01-24_pp_10x10_2a_1p_2o-v3_b0_std_seed4001/saved_models/ckpt_final.pth.tar',
+                        # default = 'experiments/MARC/pp/2024-03-12_pp_5x5_2a_1p_1o-v3_GAT_std_seed4001/saved_models/ckpt_best_avg_r1.6320000886917114.pth.tar',
                         # default='experiments/MARC/pp/2024-03-05_pp_10x10_2a_1p_2o-v3_std_seed4001/saved_models/ckpt_best_avg_r1.149999976158142.pth.tar',
                         # default='experiments/MARC/pp/2024-03-12_pp_5x5_2a_1p_1o-v3_std_seed4001/saved_models/ckpt_best_avg_r*',
-                        default='experiments/MARC/pp/2024-03-12_pp_5x5_2a_1p_1o-v3_std_seed4001/saved_models/ckpt_final.pth.tar',
                         # default = 'experiments/MARC/pp/2024-03-12_pp_5x5_2a_1p_1o-v3_std_seed4001/saved_models/ckpt_best_avg_r3.626000165939331.pth.tar'
                         help="model_path")
+    parser.add_argument("--plot_type", default='nodes')
     parser.add_argument("--eval_n_episodes", default=30, type=int)
     parser.add_argument("--eval_episode_length", default=25, type=int)
     parser.add_argument("--fps", default=30, type=int)
@@ -449,5 +500,5 @@ if __name__ == '__main__':
         args[k] = v
 
     app = run(config)
-    app.run_server(debug=True, port=config.port)
+    app.run_server(debug=False, port=config.port)
 
