@@ -23,13 +23,11 @@ import dash
 from dash.exceptions import PreventUpdate
 from dash import dcc, html
 from dash.dependencies import Input, Output
-
 hook_activation = {}
 def get_activation(name):
     def hook(model, input, output):
         hook_activation[name] = output.detach()
     return hook
-
 
 def plot_activation_space(data):
     # rows = len(data)
@@ -52,51 +50,31 @@ def run(config):
     os.makedirs(eval_path, exist_ok=True)
 
     config.device = 'cpu'
-    model, _ = RelationalSAC.init_from_save(model_path, device=config.device, load_critic=True)
+    model, _ = RelationalSAC.init_from_save(model_path, device=config.device)
     model.critic.critics_head[0].critic_nl.register_forward_hook(get_activation('critic_nl'))
 
     env = gym.make(f"macpp-{config.field}x{config.field}-{config.player}a-{config.pp['n_picker']}p-{config.pp['n_picker']}o-v3", debug_mode=False)
     env = GridObs(env)
-    attr_mapping = config.pp['attr_mapping']
-    if config.marc['graph_layer'] == 'GAT':
-        env = GATWrapper(env=env,
-                         attr_mapping=attr_mapping,
-                         dense=config.marc['dense'],
-                         )
-    elif config.marc['graph_layer'] =='RGCN':
-        env = AbsoluteVKBWrapper(env,
-                                 attr_mapping=attr_mapping,
-                                 dense=config.marc['dense'],
-                                 background_id=config.marc['background_id'],
-                                 abs_id=config.marc['abs_id']
-                                 )
+
     model.prep_rollouts(device='cpu')
     ifi = 1 / config.fps  # inter-frame interval
     l_ep_rew = []
-    embeddings = ['node_embeddings', 'node_concepts', 'graph_embeddings']
     df_full = pd.DataFrame()
     df_full_graph = pd.DataFrame()
-    graph_embedds = torch.empty((0,config.marc['embed_size']))
-    linear_embedds = torch.empty((0, 128))
-    node_embedds = torch.empty((0, config.marc['embed_size']))
+    graph_embedds = torch.empty((0,128))
     for ep_i in range(config.eval_n_episodes):
         directory = f'plots/pp/episode_{ep_i}'
         os.makedirs(directory, exist_ok=True)
         node_embeddings = []
-        node_concepts = []
-        graph_embeddings = []
         linear_embeddings = []
+        graph_embeddings = []
         images = []
         print("Episode %i of %i" % (ep_i + 1, config.eval_n_episodes))
         ep_rew = 0
         obs = env.reset()
 
-        if config.marc['graph_layer'] == 'GAT':
-            labels_1 = torch.empty((0,8))
-            labels_2 = torch.empty((0,8))
-        else:
-            labels_1 = torch.empty((0,6))
-            labels_2 = torch.empty((0,6))
+        labels_1 = torch.empty((0,8))
+        labels_2 = torch.empty((0,8))
 
         q_values_a = []
         q_values_b = []
@@ -109,22 +87,21 @@ def run(config):
                 env.render(save=config.save, name=img)
                 images.append(Image.open(img))
             # rearrange observations to be per agent, and convert to torch Variable
-            torch_obs = [np.expand_dims(ob['image'].flatten(), axis=0) for ob in obs]
             torch_obs = [Variable(torch.Tensor(torch_obs[i]).view(1, -1),
                                   requires_grad=False)
                          for i in range(model.n_agents)]
             # get actions as torch Variables
-            torch_actions = model.step(torch_obs,explore=False)
-            q_a,q_b = model.critic_embeds(obs, torch_actions)
+            torch_actions = model.step(torch_obs, explore=False)
+            q_a, q_b = model.critic_embeds(obs, torch_actions)
             q_values_a.append(float(q_a.squeeze().detach().numpy()))
             q_values_b.append(float(q_b.squeeze().detach().numpy()))
-            node_embeddings.append(model.critic.node_embeddings)
-            node_concepts.append(model.critic.node_concepts)
-            graph_embeddings.append(model.critic.graph_embeddings)
             linear_embeddings.append(hook_activation['critic_nl'])
 
-            labels_1 = torch.cat([labels_1, obs[0]['unary_tensor']])
-            labels_2 = torch.cat([labels_2, obs[1]['unary_tensor']])
+            # node_embeddings.append(model.critic.node_embeddings)
+            # node_concepts.append(model.critic.node_concepts)
+            # graph_embeddings.append(model.critic.graph_embeddings)
+            # labels_1 = torch.cat([labels_1, obs[0]['unary_tensor']])
+            # labels_2 = torch.cat([labels_2, obs[1]['unary_tensor']])
             # convert actions to numpy arrays
 
             actions = [np.argmax(ac.data.numpy().flatten()) for ac in torch_actions]
@@ -143,13 +120,7 @@ def run(config):
             continue
         print('using graph embeddings')
         l_ep_rew.append(ep_rew)
-        temp1 = torch.vstack([node_embeddings[i][0] for i in range(len(node_embeddings))])
-        graph_plots_a = torch.vstack([graph_embeddings[i][0] for i in range(len(graph_embeddings))])
-        # graph_plots_b = torch.vstack([graph_embeddings[i][1] for i in range(len(graph_embeddings))])
-        linear = torch.vstack([linear_embeddings[i][0] for i in range(len(linear_embeddings))])
-        graph_embedds  = torch.cat([graph_embedds, graph_plots_a])
-        linear_embedds = torch.cat([linear_embedds, linear])
-        node_embedds = torch.cat([node_embedds, temp1])
+
         # temp2 = torch.vstack([node_embeddings[i][1] for i in range(len(node_embeddings))])
         # batch = [node_embeddings[i][0].shape[0] for i in range(len(node_embeddings))]
         steps = [i for i, n in enumerate(node_embeddings) for _ in range(len(n[0]))]
@@ -157,10 +128,6 @@ def run(config):
 
         # activation = torch.vstack([temp1, temp2]).detach().numpy()
         activation = temp1.detach().numpy()
-        graph_activation = graph_plots_a.detach().numpy()
-        # graph_activation = torch.vstack([graph_plots_a, graph_plots_b]).detach().numpy()
-        graph_labels = [i for i in range(len(graph_plots_a))]
-        graph_labels =  graph_labels
         # labels = torch.vstack([labels_1,labels_2])
         labels = labels_1
         unique_features, inverse_indices = torch.unique(labels, dim=0, return_inverse=True)
@@ -191,7 +158,7 @@ def run(config):
         fin_labels = ([label_dict[tuple(feature.tolist())] for feature in labels])
 
         print(activation.shape)
-        tsne_model = TSNE(n_components=3, perplexity=2)
+        tsne_model = TSNE(n_components=3, perplexity=5)
         # input needs to be (n_samples, n_features)
         d = tsne_model.fit_transform(activation)
         d_graph = tsne_model.fit_transform(graph_activation)
@@ -231,7 +198,7 @@ def run(config):
                                  z='z',
                                  color='label',
                                  )
-        # fig_full.show()
+        fig_full.show()
         fig_full.write_html(f"plots/pp/episode_{ep_i}/full_node_embeddings.html")
 
         fig_graph = px.scatter_3d(df_graph,
@@ -248,7 +215,7 @@ def run(config):
                                    'q_values': False,
                                    'steps': True}
                                   )
-        # fig_graph.show()
+        fig_graph.show()
         fig_graph.write_html(f"plots/pp/episode_{ep_i}/q_embeddings.html")
 
         fig_graph = px.scatter_3d(df_graph,
@@ -265,7 +232,7 @@ def run(config):
                                    'q_values':True,
                                    'steps':False}
                                   )
-        # fig_graph.show()
+        fig_graph.show()
         fig_graph.write_html(f"plots/pp/episode_{ep_i}/graph_embeddings.html")
         df['episode'] = ep_i
         df_graph['episode'] = ep_i
@@ -281,13 +248,9 @@ def run(config):
     # d = tsne_model.fit_transform(activation)
     d_graph = model.fit_transform(graph_embedds.detach().numpy())
     d_node = model.fit_transform(node_embedds.detach().numpy())
-    d_linear = model.fit_transform(linear_embedds.detach().numpy())
     df_full_graph['x'] = d_graph[:, 0]
     df_full_graph['y'] = d_graph[:, 1]
     df_full_graph['z'] = d_graph[:, 2]
-    df_full_graph['linear_x'] = d_linear[:, 0]
-    df_full_graph['linear_y'] = d_linear[:, 1]
-    df_full_graph['linear_z'] = d_linear[:, 2]
 
     df_full['x'] = d_node[:, 0]
     df_full['y'] = d_node[:, 1]
@@ -333,31 +296,11 @@ def run(config):
     # fig_full.update_layout(clickmode='event+select')
 
 
-
-    fig_full_linear = px.scatter_3d(df_full_graph,
-                                   x='linear_x',
-                                   y='linear_y',
-                                   z='linear_z',
-                                   color='q_values',
-                                   # size = 'steps',
-                                   hover_data=
-                                   {'linear_x': False,
-                                    'linear_y': False,
-                                    'linear_z': False,
-                                    'q_values': True,
-                                    'agent': True,
-                                    'steps': True,
-                                    'episode': True},
-                                   custom_data=["images"]
-                                   )
-    fig_full_linear.write_html(f"plots/lbf/all_linear_embeddings.html")
-
-
     app.layout = html.Div(
         [
             dcc.Graph(
                 id="graph_interaction",
-                figure=fig_full_graph,
+                figure=fig_full,
                 style={'display': 'inline-block', 'width': '100vh'}
             ),
             html.Img(id='image', src='',style={'display':'inline-block', 'width': '80vh'})

@@ -81,7 +81,7 @@ class RelationalCritic(nn.Module):
             gnn = (GATConv(in_channels = self.embed_size,
                                       out_channels=attend_dim,
                                       heads=attend_heads,
-                                      v2 = True
+                                      # v2 = True
                                       ), 'x, edge_index -> x')
         elif self.graph_layer == 'GATv2':
             input_args = 'x, edge_index'
@@ -178,7 +178,6 @@ class RelationalCritic(nn.Module):
                 embedds = self.embedder(embedds)
                 for _ in range(self.nb_iterations):
                     embedds = self.gnn_layers(embedds, self.gd.edge_index, self.gd.edge_attr)
-
                 batch = self.gd.batch
             self.node_embeddings.append(embedds)
             x = pool.global_max_pool(embedds, batch)

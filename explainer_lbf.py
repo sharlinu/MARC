@@ -383,10 +383,7 @@ def run(config):
             return hoverData["points"][0]["customdata"][0]
         else:
             raise PreventUpdate
-
     return app
-
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
