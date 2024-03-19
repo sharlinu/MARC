@@ -178,7 +178,6 @@ class RelationalCritic(nn.Module):
                 embedds = self.embedder(embedds)
                 for _ in range(self.nb_iterations):
                     embedds = self.gnn_layers(embedds, self.gd.edge_index, self.gd.edge_attr)
-
                 batch = self.gd.batch
             self.node_embeddings.append(embedds)
             x = pool.global_max_pool(embedds, batch)
