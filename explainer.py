@@ -93,7 +93,7 @@ def run(config):
         images = []
         print("Episode %i of %i" % (ep_i + 1, config.eval_n_episodes))
         ep_rew = 0
-        obs = env.reset()
+        obs = env.reset(seed=ep_i)
 
         if config.marc['graph_layer'] == 'GAT':
             labels_1 = torch.empty((0,8))
@@ -161,10 +161,14 @@ def run(config):
                 break
 
 
-
+        # print(rewards, t_i)
         if t_i>23:
-            continue
-        print('using graph embeddings')
+        #     continue
+            success = 0
+            print('using graph embeddings even though stuck')
+        else:
+            success = 1
+
         l_ep_rew.append(ep_rew)
         temp1 = torch.vstack([node_embeddings[i][0] for i in range(len(node_embeddings))])
         graph_plots_a = torch.vstack([graph_embeddings[i][0] for i in range(len(graph_embeddings))])
@@ -251,6 +255,7 @@ def run(config):
         df = pd.DataFrame(d, columns=['x', 'y', 'z'])
         df_graph = pd.DataFrame(d_graph, columns=['x', 'y', 'z'])
         df_graph['steps'] = graph_labels
+        df_graph['success'] = success
         q_values = q_values_a #+ q_values_b
         agents = [0 for _ in range(len(q_values_a))] # + [1 for _ in range(len(q_values_b))]
         df_graph['q_values'] = q_values
@@ -258,6 +263,7 @@ def run(config):
         df['label'] = fin_labels
         df['steps'] = steps
         df['images'] = batch_images
+        df['success'] = success
         df_graph['state'] = state_label
         df_graph['images'] = images
 
@@ -373,7 +379,7 @@ def run(config):
                                    x='x',
                                    y='y',
                                    z='z',
-                                   color='state',
+                                   color=config.hue,
                                    hover_data=
                                    {'x': False,
                                     'y': False,
@@ -480,6 +486,7 @@ if __name__ == '__main__':
     parser.add_argument("--fps", default=30, type=int)
     parser.add_argument("--render", default=True, action="store_true",
                         help="render")
+    parser.add_argument('--hue', default='q_values', help='what hue the plot should have')
     parser.add_argument("--save", default=True, action="store_true",
                         help="save step images")
     parser.add_argument("--benchmark", action="store_false",
