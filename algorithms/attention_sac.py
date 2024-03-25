@@ -2,7 +2,7 @@ import torch
 from torch.optim import Adam
 from utils.misc import soft_update, hard_update, enable_gradients, disable_gradients
 from utils.agents import AttentionAgent
-from utils.critics import RelationalCritic
+from utils.critics import RelationalCritic, AttentionCritic
 import numpy as np
 
 
@@ -459,6 +459,12 @@ class AttentionSAC(object):
         """
         return [a.target_step(obs) for a, obs in zip(self.agents, observations)]
 
+    def critic_embeds(self, obs, acs):
+        critic_in = list(zip(obs, acs))
+        critic_rets = self.critic(critic_in, regularize=True, niter=self.niter)
+        return critic_rets
+
+
     def update_critic(self, sample, soft=True, logger=None, **kwargs):
         """
         Update central critic for all agents
@@ -611,9 +617,9 @@ class AttentionSAC(object):
                       reward_scale=10.,
                       pol_hidden_dim=128, critic_hidden_dim=128, attend_heads=4,
                       **kwargs):
+
         """
         Instantiate instance of this class from multi-agent environment
-
         env: Multi-agent Gym environment
         gamma: discount factor
         tau: rate of update for target networks

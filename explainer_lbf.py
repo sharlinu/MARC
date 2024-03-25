@@ -416,4 +416,4 @@ if __name__ == '__main__':
         args[k] = v
 
     app = run(config)
-    app.run_server(debug=True, port=config.port)
+    app.run_server(debug=False, port=config.port)

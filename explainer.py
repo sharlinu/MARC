@@ -51,7 +51,10 @@ def run(config):
     config.device = 'cpu'
     model, _ = RelationalSAC.init_from_save(model_path, device=config.device, load_critic=True)
     model.critic.critics_head[0].critic_nl.register_forward_hook(get_activation('critic_nl'))
-    env = gym.make(f"macpp-{config.field}x{config.field}-{config.player}a-{config.pp['n_picker']}p-{config.pp['n_picker']}o-v3", debug_mode=False)
+    env = gym.make(f"macpp-{config.field}x{config.field}-{config.player}a-{config.pp['n_picker']}p-{config.pp['n_picker']}o-v3",
+                   debug_mode=False,
+                   # render_mode='human'
+                   )
     env = GridObs(env)
     attr_mapping = config.pp['attr_mapping']
     if config.marc['graph_layer'] == 'GAT':
@@ -89,6 +92,7 @@ def run(config):
         node_concepts = []
         graph_embeddings = []
         linear_embeddings = []
+        state_label = []
         images = []
         print("Episode %i of %i" % (ep_i + 1, config.eval_n_episodes))
         ep_rew = 0
@@ -134,6 +138,18 @@ def run(config):
 
             # print('actions', actions)
             obs, rewards, dones, infos = env.step(actions)
+            # import time.sleep(1)
+            if sum(rewards) == -0.2:
+                state_label.append(0)
+            elif rewards[0] == 0.4:
+                state_label.append(2)
+            elif sum(rewards) == 0.8:
+                state_label.append(1)
+            elif sum(rewards) == 2.8:
+                state_label.append(3)
+            else:
+                print(f'rewards are not categorised with  {rewards}')
+            print(state_label)
             # if config.save:
             #     env.save(f"{directory}/step_{t_i}.png")
             ep_rew += sum(rewards)
@@ -238,7 +254,9 @@ def run(config):
         df['label'] = fin_labels
         df['steps'] = steps
         df['images'] = batch_images
+        df_graph['state'] = state_label
         df_graph['images'] = images
+
 
         min_ax = min(min(df['x']), min(df['y']), min(df['z']))
         max_ax = max(max(df['x']), max(df['y']), max(df['z']))
@@ -351,7 +369,7 @@ def run(config):
                                    x='x',
                                    y='y',
                                    z='z',
-                                   color='q_values',
+                                   color='state_label',
                                    hover_data=
                                    {'x': False,
                                     'y': False,
@@ -401,30 +419,21 @@ def run(config):
                                    custom_data=["images"]
                                    )
     fig_full_linear.write_html(f"plots/lbf/all_linear_embeddings.html")
-
+    if config.plot_type=='nodes':
+        fig = fig_full
+    elif config.plot_type=='graph':
+        fig = fig_full_graph
+    elif config.plot_type=='linear':
+        fig = fig_full_linear
 
     app.layout = html.Div(
         [
             dcc.Graph(
                 id="graph_interaction",
-                figure=fig_full_graph,
+                figure=fig,
                 style={'display': 'inline-block', 'width': '100vh'}
             ),
-            html.Img(id='image', src='',style={'display':'inline-block', 'width': '80vh'})
-            # dcc.Graph(
-            #     id="graph_full",
-            #     figure=fig_full_graph,
-            #     style={'display': 'inline-block', 'width': '100vh'},
-            #
-            # ),
-            # dcc.Graph(
-            #     id="graph_interaction",
-            #     figure=fig_full_linear,
-            #     style={'display': 'inline-block', 'width': '100vh'},
-            #
-            # ),
-            # html.Img(id='image', src='',style={'display':'inline-block', 'width': '80vh'}),
-            # html.Img(id='image2', src='', style={'display': 'inline-block', 'width': '80vh'})
+            html.Img(id='image', src='',style={'display':'inline-block', 'width': '40vh'})
         ],
     title=f'{config.marc["net_code"]}'
     )
@@ -456,11 +465,12 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_path",
                         # default='experiments/MARC/pp/2024-01-24_pp_10x10_2a_1p_2o-v3_b0_std_seed4001/saved_models/ckpt_final.pth.tar',
-                        default = 'experiments/MARC/pp/2024-03-12_pp_5x5_2a_1p_1o-v3_GAT_std_seed4001/saved_models/ckpt_best_avg_r1.6320000886917114.pth.tar',
+                        # default = 'experiments/MARC/pp/2024-03-12_pp_5x5_2a_1p_1o-v3_GAT_std_seed4001/saved_models/ckpt_best_avg_r1.6320000886917114.pth.tar',
                         # default='experiments/MARC/pp/2024-03-05_pp_10x10_2a_1p_2o-v3_std_seed4001/saved_models/ckpt_best_avg_r1.149999976158142.pth.tar',
                         # default='experiments/MARC/pp/2024-03-12_pp_5x5_2a_1p_1o-v3_std_seed4001/saved_models/ckpt_best_avg_r*',
                         # default = 'experiments/MARC/pp/2024-03-12_pp_5x5_2a_1p_1o-v3_std_seed4001/saved_models/ckpt_best_avg_r3.626000165939331.pth.tar'
                         help="model_path")
+    parser.add_argument("--plot_type", default='nodes')
     parser.add_argument("--eval_n_episodes", default=30, type=int)
     parser.add_argument("--eval_episode_length", default=25, type=int)
     parser.add_argument("--fps", default=30, type=int)
@@ -483,5 +493,5 @@ if __name__ == '__main__':
         args[k] = v
 
     app = run(config)
-    app.run_server(debug=True, port=config.port)
+    app.run_server(debug=False, port=config.port)
 
