@@ -51,7 +51,10 @@ def run(config):
     config.device = 'cpu'
     model, _ = RelationalSAC.init_from_save(model_path, device=config.device, load_critic=True)
     model.critic.critics_head[0].critic_nl.register_forward_hook(get_activation('critic_nl'))
-    env = gym.make(f"macpp-{config.field}x{config.field}-{config.player}a-{config.pp['n_picker']}p-{config.pp['n_picker']}o-v3", debug_mode=False)
+    env = gym.make(f"macpp-{config.field}x{config.field}-{config.player}a-{config.pp['n_picker']}p-{config.pp['n_picker']}o-v3",
+                   debug_mode=False,
+                   # render_mode='human'
+                   )
     env = GridObs(env)
     attr_mapping = config.pp['attr_mapping']
     if config.marc['graph_layer'] == 'GAT':
@@ -153,6 +156,19 @@ def run(config):
             state_label.append(label)
             # print(state_label)
             obs, rewards, dones, infos = env.step(actions)
+
+            # import time.sleep(1)
+            if sum(rewards) == -0.2:
+                state_label.append(0)
+            elif rewards[0] == 0.4:
+                state_label.append(2)
+            elif sum(rewards) == 0.8:
+                state_label.append(1)
+            elif sum(rewards) == 2.8:
+                state_label.append(3)
+            else:
+                print(f'rewards are not categorised with  {rewards}')
+            print(state_label)
 
             # if config.save:
             #     env.save(f"{directory}/step_{t_i}.png")
@@ -429,7 +445,6 @@ def run(config):
                                    custom_data=["images"]
                                    )
     fig_full_linear.write_html(f"plots/lbf/all_linear_embeddings.html")
-
     if config.plot_type=='nodes':
         fig = fig_full
     elif config.plot_type=='graph':

@@ -67,8 +67,8 @@ def run(config):
         else:
             start_episode = 0
             model = RelationalSAC.init_from_env(env,
-                                                spatial_tensors=env.spatial_tensors,
-                                                batch_size = config.batch_size,
+                                               spatial_tensors=env.spatial_tensors,
+                                               batch_size = config.batch_size,
                                                tau=config.tau,
                                                pi_lr=config.pi_lr,
                                                q_lr=config.q_lr,
@@ -462,7 +462,8 @@ if __name__ == '__main__':
                             f"_{args['player']}a" \
                             f"_{args['pp']['n_picker']}p" \
                             f"_{args['pp']['n_objects']}o" \
-                            f"-{args['pp']['version']}"
+                            f"-{args['pp']['version']}" \
+                             f"-{args['other']}"
             del args['bpush'], args['lbf'], args['wolfpack'], args['rware']
         elif 'rware' in args['env_name']:
             args['env_id'] = f"{args['env_name']}" \
