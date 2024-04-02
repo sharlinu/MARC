@@ -168,7 +168,7 @@ class AttentionCritic(nn.Module):
     observation and action, and can also attend over the other agents' encoded
     observations and actions.
     """
-    def __init__(self, sa_sizes, hidden_dim=32, norm_in=True, attend_heads=1):
+    def __init__(self, sa_sizes, hidden_dim=32, norm_in=True, attend_heads=1, hard=True):
         """
         Inputs:
             sa_sizes (list of (int, int)): Size of state and action spaces per agent
@@ -180,9 +180,10 @@ class AttentionCritic(nn.Module):
         super(AttentionCritic, self).__init__()
         assert (hidden_dim % attend_heads) == 0
         self.sa_sizes = sa_sizes
-        self.nagents = len(sa_sizes)
+        self.n_agents = len(sa_sizes)
         self.attend_heads = attend_heads
-
+        self.hard = hard
+        self.rnn_hidden_dim = hidden_dim
         self.critic_encoders = nn.ModuleList()
         self.critics = nn.ModuleList()
 
@@ -214,14 +215,18 @@ class AttentionCritic(nn.Module):
             state_encoder.add_module('s_enc_nl', nn.LeakyReLU())
             self.state_encoders.append(state_encoder)
 
+        if self.hard:
+            self.hard_bi_GRU = nn.GRU(self.rnn_hidden_dim * 2, self.rnn_hidden_dim, bidirectional=True) # , batch_first=True
+            self.hard_encoding = nn.Linear(self.rnn_hidden_dim * 2, 2)
+
         attend_dim = hidden_dim // attend_heads
         self.key_extractors = nn.ModuleList()
         self.selector_extractors = nn.ModuleList()
         self.value_extractors = nn.ModuleList()
         for i in range(attend_heads):
-            self.key_extractors.append(nn.Linear(hidden_dim, attend_dim, bias=False))
-            self.selector_extractors.append(nn.Linear(hidden_dim, attend_dim, bias=False))
-            self.value_extractors.append(nn.Sequential(nn.Linear(hidden_dim,
+            self.key_extractors.append(nn.Linear(hidden_dim, attend_dim, bias=False)) # k
+            self.selector_extractors.append(nn.Linear(hidden_dim, attend_dim, bias=False)) # q
+            self.value_extractors.append(nn.Sequential(nn.Linear(hidden_dim, # v
                                                                 attend_dim),
                                                        nn.LeakyReLU()))
 
@@ -240,7 +245,7 @@ class AttentionCritic(nn.Module):
         gradients from the critic loss function multiple times
         """
         for p in self.shared_parameters():
-            p.grad.data.mul_(1. / self.nagents)
+            p.grad.data.mul_(1. / self.n_agents)
 
     def forward(self, inps, agents=None, return_q=True, return_all_q=False,
                 regularize=False, return_attend=False, logger=None, niter=0):
@@ -266,6 +271,7 @@ class AttentionCritic(nn.Module):
         sa_encodings = [encoder(inp) for encoder, inp in zip(self.critic_encoders, inps)]
         # extract state encoding for each agent that we're returning Q for
         s_encodings = [self.state_encoders[a_i](states[a_i]) for a_i in agents]
+
         # extract keys for each head for each agent
         all_head_keys = [[k_ext(enc) for enc in sa_encodings] for k_ext in self.key_extractors]
         # extract sa values for each head for each agent
@@ -277,6 +283,45 @@ class AttentionCritic(nn.Module):
         other_all_values = [[] for _ in range(len(agents))]
         all_attend_logits = [[] for _ in range(len(agents))]
         all_attend_probs = [[] for _ in range(len(agents))]
+
+        if self.hard:
+            # Hard Attention
+            h_out = sa_encodings.copy()
+            # h = h_out.reshape(-1, self.n_agents,
+            #                   self.rnn_hidden_dim)  # 把h转化出n_agents维度，(batch_size, n_agents, rnn_hidden_dim)
+            input_hard = []
+            # for each agent get all h_i, h_j pairs
+            for i in range(self.n_agents):
+                # take agent i's hidden state
+                # h_i = h[:, i]  # (batch_size, rnn_hidden_dim)
+                h_i = sa_encodings[i]
+                h_hard_i = []
+                for j in range(self.n_agents):  # concat hidden state tuples (h_i, h_j) for all other agents
+                    if j != i:
+                        h_hard_i.append(torch.cat([h_i, sa_encodings[j]], dim=-1))
+                # j 循环结束之后，h_hard_i是一个list里面装着n_agents - 1个维度为(batch_size, rnn_hidden_dim * 2)的tensor
+                h_hard_i = torch.stack(h_hard_i, dim=0)
+                input_hard.append(h_hard_i)
+            # i循环结束之后，input_hard是一个list里面装着n_agents个维度为(n_agents - 1, batch_size, rnn_hidden_dim * 2)的tensor
+            input_hard = torch.stack(input_hard, dim=-2)
+            # 最终得到维度(n_agents - 1, batch_size * n_agents, rnn_hidden_dim * 2)，可以输入了
+            input_hard = input_hard.view(self.n_agents - 1, -1, self.rnn_hidden_dim * 2)
+
+            # h_hard = torch.zeros((2 * 1, size, self.rnn_hidden_dim))  # 因为是双向GRU，每个GRU只有一层，所以第一维是2 * 1
+            # if self.cuda:
+            #     h_hard = h_hard.cuda()
+            h_hard, _ = self.hard_bi_GRU(input_hard) #h_hard  # (n_agents - 1,batch_size * n_agents,rnn_hidden_dim * 2)
+            h_hard = h_hard.permute(1, 0, 2)  # (batch_size * n_agents, n_agents - 1, rnn_hidden_dim * 2)
+            h_hard = h_hard.reshape(-1,
+                                    self.rnn_hidden_dim * 2)  # (batch_size * n_agents * (n_agents - 1), rnn_hidden_dim * 2)
+
+            # 得到hard权重, (n_agents, batch_size, 1,  n_agents - 1)，多出一个维度，下面加权求和的时候要用
+            hard_weights = self.hard_encoding(h_hard)
+            hard_weights = F.gumbel_softmax(hard_weights, tau=0.01)
+            # print(hard_weights)
+            hard_weights = hard_weights[:, 1].view(-1, self.n_agents, 1, self.n_agents - 1)
+            hard_weights = hard_weights.permute(1, 0, 2, 3)
+
         # calculate attention per head
         for curr_head_keys, curr_head_values, curr_head_selectors in zip(
                 all_head_keys, all_head_values, all_head_selectors):
@@ -285,11 +330,15 @@ class AttentionCritic(nn.Module):
                 keys = [k for j, k in enumerate(curr_head_keys) if j != a_i]
                 values = [v for j, v in enumerate(curr_head_values) if j != a_i]
                 # calculate attention across agents
+
                 attend_logits = torch.matmul(selector.view(selector.shape[0], 1, -1),
                                              torch.stack(keys).permute(1, 2, 0))
+                # TODO option 1: if hard, then we need filter here
+                attend_logits = attend_logits * hard_weights[i, :, :, :]
                 # scale dot-products by size of key (from Attention is All You Need)
-                scaled_attend_logits = attend_logits / np.sqrt(keys[0].shape[1])
+                scaled_attend_logits = attend_logits / np.sqrt(keys[0].shape[1]) # unchanged
                 attend_weights = F.softmax(scaled_attend_logits, dim=2)
+                # TODO option 2 would be just to put filter after attention weights
                 other_values = (torch.stack(values).permute(1, 2, 0) *
                                 attend_weights).sum(dim=2)
                 other_all_values[i].append(other_values)
@@ -298,11 +347,12 @@ class AttentionCritic(nn.Module):
         # calculate Q per agent
         all_rets = []
         for i, a_i in enumerate(agents):
-            head_entropies = [(-((probs + 1e-8).log() * probs).squeeze(1).sum(1) # -((probs + 1e-8).log() * probs).squeeze().sum(1)
-                               .mean()) for probs in all_attend_probs[i]]
+            # head_entropies = [(-((probs + 1e-8).log() * probs).squeeze(1).sum(1) # -((probs + 1e-8).log() * probs).squeeze().sum(1)
+            #                    .mean()) for probs in all_attend_probs[i]]
             # 2 agents: squeeze(1) gives (1024,1), whereas squeeze() gives (1024,)
-            # TODO change here to cater for 2 player games! squeeze() --> squeeze(1) because otherwise (1024, 1, 1) is squeezed to hard
+            # changed here to cater for 2 player games! squeeze() --> squeeze(1) because otherwise (1024, 1, 1) is squeezed to hard
             agent_rets = []
+
             critic_in = torch.cat((s_encodings[i], *other_all_values[i]), dim=1)
             all_q = self.critics[a_i](critic_in)
             int_acs = actions[a_i].max(dim=1, keepdim=True)[1]
@@ -319,11 +369,6 @@ class AttentionCritic(nn.Module):
                 agent_rets.append(regs)
             if return_attend:
                 agent_rets.append(np.array(all_attend_probs[i]))
-            if logger is not None:
-                logger.add_scalars('agent%i/attention' % a_i,
-                                   dict(('head%i_entropy' % h_i, ent) for h_i, ent
-                                        in enumerate(head_entropies)),
-                                   niter)
             if len(agent_rets) == 1:
                 all_rets.append(agent_rets[0])
             else:

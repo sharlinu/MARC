@@ -79,9 +79,10 @@ class ReplayBufferMAAC(object):
         if norm_rews:
             ret_rews = [cast((self.rew_buffs[i][inds] -
                               self.rew_buffs[i][:self.filled_i].mean()) /
-                             self.rew_buffs[i][:self.filled_i].std()) if self.rew_buffs[i][:self.filled_i].mean() != 0
+                             self.rew_buffs[i][:self.filled_i].std()) if (self.rew_buffs[i][:self.filled_i].mean() != 0) and (self.rew_buffs[i][:self.filled_i].std() != 0)
                         else cast(self.rew_buffs[i][inds])
                         for i in range(self.num_agents)]
+
 
         else:
             ret_rews = [cast(self.rew_buffs[i][inds]) for i in range(self.num_agents)]
@@ -212,9 +213,10 @@ class ReplayBufferMARC(object):
         cast = lambda x: Variable(Tensor(x), requires_grad=False).to(device)
         if norm_rews:
             ret_rews = [cast((self.rew_buffs[i][inds] -
-                              self.rew_buffs[i][:self.filled_i].mean()) /
-                             self.rew_buffs[i][:self.filled_i].std()) if self.rew_buffs[i][:self.filled_i].mean() != 0
-                        else cast(self.rew_buffs[i][inds])
+                              self.rew_buffs[i][:self.filled_i].mean()) / self.rew_buffs[i][:self.filled_i].std()) if (
+                    self.rew_buffs[i][:self.filled_i].mean() != 0) and (self.rew_buffs[i][:self.filled_i].std() != 0)
+
+                else cast(self.rew_buffs[i][inds])
                         for i in range(self.num_agents)]
         else:
             ret_rews = [cast(self.rew_buffs[i][inds]) for i in range(self.num_agents)]

@@ -180,10 +180,10 @@ def run(config):
                 actions = [[np.argmax(ac[0]) for ac in agent_actions]]
             next_obs, rewards, dones, infos = env.step(actions)
             rewards, dones = np.array(rewards), np.array(dones)
-            if config.alg=='MAAC':
-                env.envs[0].render()
-            else:
-                env.render()
+            # if config.alg=='MAAC':
+            #     env.envs[0].render()
+            # else:
+            #     env.render()
             if config.alg == 'MAAC' and env.grid_observation:
                 next_obs = tuple([next_obs[:,i][0]['image'].flatten() for i in range(model.n_agents)])
                 next_obs = np.vstack(next_obs)
