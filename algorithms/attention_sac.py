@@ -375,7 +375,6 @@ class RelationalSAC(object):
             instance.critic_dev = device
             instance.trgt_critic_dev = device
 
-
         return instance, episode
 
 class AttentionSAC(object):
@@ -685,3 +684,5 @@ class AttentionSAC(object):
             instance.critic_optimizer.load_state_dict(critic_params['critic_optimizer'])
             instance.critic_dev = device
             instance.trgt_critic_dev = device
+
+        return instance, episode

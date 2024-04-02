@@ -148,7 +148,9 @@ def run(config):
                 label +=1
             elif sum(rewards) == 0.8:
                 label += 1
-            elif sum(rewards) == 2.8:
+            elif sum(rewards) >= 2.8:
+                label += 1
+            elif sum(rewards) == 3.8:
                 label += 1
             else:
                 print(f'rewards are not categorised with  {rewards}')
@@ -157,18 +159,18 @@ def run(config):
             # print(state_label)
             obs, rewards, dones, infos = env.step(actions)
 
-            # import time.sleep(1)
-            if sum(rewards) == -0.2:
-                state_label.append(0)
-            elif rewards[0] == 0.4:
-                state_label.append(2)
-            elif sum(rewards) == 0.8:
-                state_label.append(1)
-            elif sum(rewards) == 2.8:
-                state_label.append(3)
-            else:
-                print(f'rewards are not categorised with  {rewards}')
-            print(state_label)
+            # # import time.sleep(1)
+            # if sum(rewards) == -0.2:
+            #     state_label.append(0)
+            # elif rewards[0] == 0.4:
+            #     state_label.append(2)
+            # elif sum(rewards) == 0.8:
+            #     state_label.append(1)
+            # elif sum(rewards) == 2.8:
+            #     state_label.append(3)
+            # else:
+            #     print(f'rewards are not categorised with  {rewards}')
+            # print(state_label)
 
             # if config.save:
             #     env.save(f"{directory}/step_{t_i}.png")
@@ -263,7 +265,7 @@ def run(config):
         fin_labels = ([label_dict[tuple(feature.tolist())] for feature in labels])
 
         print(activation.shape)
-        tsne_model = TSNE(n_components=3, perplexity=2)
+        tsne_model = TSNE(n_components=3, perplexity=1)
         # input needs to be (n_samples, n_features)
         d = tsne_model.fit_transform(activation)
         d_graph = tsne_model.fit_transform(graph_activation)
@@ -314,7 +316,7 @@ def run(config):
                                   x='x',
                                   y='y',
                                   z='z',
-                                  color='q_values',
+                                  color=config.hue,
                                   hover_name="q_values",
                                   hover_data=
                                   {'x': False,
@@ -331,7 +333,7 @@ def run(config):
                                   x='x',
                                   y='y',
                                   z='z',
-                                  color='steps',
+                                  color=config.hue,
                                   hover_name="steps",
                                   hover_data=
                                   {'x':False,
