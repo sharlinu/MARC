@@ -293,8 +293,12 @@ class RelationalSAC(object):
         a_size = []
         for acsp, obsp in zip(env.action_space,
                               env.observation_space):
-            agent_init_params.append({'num_in_pol': np.ones(shape=obsp['image'].shape).flatten().shape[0],
+            if isinstance(obsp, dict):
+                agent_init_params.append({'num_in_pol': np.ones(shape=obsp['image'].shape).flatten().shape[0],
                                       'num_out_pol': acsp.n})
+            else:
+                agent_init_params.append({'num_in_pol': np.ones(shape=obsp.shape).shape[0],
+                                          'num_out_pol': acsp.n})
             a_size.append(acsp.n)
 
         init_dict = {'gamma': gamma,

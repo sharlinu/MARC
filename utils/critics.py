@@ -22,7 +22,7 @@ class RelationalCritic(nn.Module):
                  input_dims: list,
                  hidden_dim: int = 32,
                  norm_in: object = True,
-                 net_code: object = "1g1if",
+                 net_code: object = "1g1i1f",
                  device: str = 'cuda:0',
                  graph_layer: str = 'RGCN',
                  ) -> object:
@@ -42,7 +42,7 @@ class RelationalCritic(nn.Module):
         self.batch_size = batch_size
         self.max_reduce = True # TODO hardcoded
         # self.dense = True
-        n_graph_layers, n_dense_layers = parse_code(net_code)
+        n_graph_layers, n_dense_layers, _ = parse_code(net_code)
         self.graph_layer = graph_layer
         self.spatial_tensors = np.array(spatial_tensors)
         self.binary_batch = torch.tensor([self.spatial_tensors for _ in range(self.batch_size)])
@@ -50,9 +50,9 @@ class RelationalCritic(nn.Module):
         self.nb_edge_types = len(spatial_tensors)
 
 
-        self.embedder = nn.Linear(input_dims[0], hidden_dim)
+        # self.embedder = nn.Linear(input_dims[0], hidden_dim)
         if self.graph_layer == 'RGCN':
-            self.gnn_layers = RGCNConv(hidden_dim, hidden_dim, self.nb_edge_types)
+            self.gnn_layers = RGCNConv(input_dims[0], hidden_dim, self.nb_edge_types)
         elif self.graph_layer == 'RGAT':
             self.gnn_layers = RGATConv(hidden_dim, hidden_dim, self.nb_edge_types)
             attend_heads = 1
@@ -133,6 +133,7 @@ class RelationalCritic(nn.Module):
             if all(binary_tensors):
                 gd = Batch.from_data_list(binary_tensors[a_i])
                 gd = gd.to(device = self.device)
+                # embedds = self.embedder(gd.x)
                 embedds = self.gnn_layers(gd.x, gd.edge_index, gd.edge_attr)
                 embedds = torch.relu(embedds)
                 x = pool.global_max_pool(embedds, gd.batch)
@@ -286,9 +287,6 @@ class AttentionCritic(nn.Module):
 
         if self.hard:
             # Hard Attention
-            h_out = sa_encodings.copy()
-            # h = h_out.reshape(-1, self.n_agents,
-            #                   self.rnn_hidden_dim)  # 把h转化出n_agents维度，(batch_size, n_agents, rnn_hidden_dim)
             input_hard = []
             # for each agent get all h_i, h_j pairs
             for i in range(self.n_agents):
@@ -394,7 +392,7 @@ def batch_to_gd(batch: torch.Tensor, device: str):
     batch_size = batch.shape[0]
     nb_relations = batch.shape[1] #gets 14 out when full relations
     nb_objects = batch.shape[2] # gets n x n out
-
+    print('shape of the batch is', batch.shape)
     assert batch.shape[2] == batch.shape[3]
 
     # index array for all entities
