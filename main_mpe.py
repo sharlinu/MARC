@@ -148,7 +148,7 @@ def run(config):
     for ep_i in range(start_episode, config.n_episodes):
         obs, agent_id, node_obs, adj = env.reset()
         adj = torch.tensor(adj)
-        graph = [to_gd(torch.tensor(adj[0, agent]), node_obs[0, agent]) for agent in range(env.n_agents)]
+        graph = [to_gd(adj.clone().detach()[0, agent], node_obs[0, agent]) for agent in range(env.n_agents)]
         model.prep_rollouts(device='cpu')
         episode_reward_total = 0
         is_best_avg = False
@@ -175,7 +175,7 @@ def run(config):
             next_obs, agent_id, node_obs, adj, rewards, dones, infos = env.step(actions)
 
             adj = torch.tensor(adj)
-            next_graph = [to_gd(torch.tensor(adj[0,agent]), node_obs[0,agent]) for agent in range(env.n_agents)]
+            next_graph = [to_gd(adj.clone().detach()[0,agent], node_obs[0,agent]) for agent in range(env.n_agents)]
             # obs_n, agent_id_n, node_obs_n, adj_n, reward_n, done_n, info_n
             # rewards, dones = np.array(rewards), np.array(dones)
 
@@ -404,7 +404,7 @@ if __name__ == '__main__':
     config.goal_rew: float = 5
     config.min_dist_thresh: float = 0.1
     config.use_dones: bool = False
-    config.episode_length: int = 50
+    config.episode_length: int = 25
     config.max_edge_dist: float = 1
     config.graph_feat_type: str = "global"
     config.env_name ='GraphMPE'
