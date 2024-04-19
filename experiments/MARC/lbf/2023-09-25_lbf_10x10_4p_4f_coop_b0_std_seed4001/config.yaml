@@ -29,6 +29,7 @@ marc:
   buffer_length: 100000
   dense: true
   relational_embedding: false
+  net_code: 1g1i1f
 n_episodes: 550000
 norm_rews: true
 num_updates: 4
