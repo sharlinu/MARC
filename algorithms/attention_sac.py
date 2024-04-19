@@ -335,12 +335,14 @@ class RelationalSAC(object):
             episode = 0
         save_dict['init_dict']['device'] = device
         print(save_dict['init_dict'])
-        # save_dict['init_dict']['gnn_layers'] = 'RGCN'
+        # save_dict['init_dict']['n_agents'] += 1
+        # save_dict['init_dict']['agent_init_params'] = [save_dict['init_dict']['agent_init_params'][0] for i in range(save_dict['init_dict']['n_agents'])]
+        # save_dict['agent_params'] = save_dict['agent_params'] * save_dict['init_dict']['n_agents']
+        # save_dict['agent_params'].pop(0)
         instance = cls(**save_dict['init_dict'])
         instance.init_dict = save_dict['init_dict']
         for a, params in zip(instance.agents, save_dict['agent_params']):
             a.load_params(params, device=device)
-            # a.policy_optimizer = Adam(a.policy.parameters(), lr=lr)
         instance.pol_dev =  device
         instance.trgt_pol_dev = device
         if load_critic:
@@ -645,6 +647,7 @@ class AttentionSAC(object):
             episode = 0
         for a, params in zip(instance.agents, save_dict['agent_params']):
             a.load_params(params, device=device)
+
         instance.pol_dev = device
         instance.trgt_pol_dev = device
         if load_critic:

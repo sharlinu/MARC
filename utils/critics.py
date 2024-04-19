@@ -22,7 +22,7 @@ class RelationalCritic(nn.Module):
                  input_dims: list,
                  hidden_dim: int = 32,
                  norm_in: object = True,
-                 net_code: object = "1g1if",
+                 net_code: object = "1g1i1f",
                  device: str = 'cuda:0',
                  graph_layer: str = 'RGCN',
                  ) -> object:
@@ -42,7 +42,7 @@ class RelationalCritic(nn.Module):
         self.batch_size = batch_size
         self.max_reduce = True # TODO hardcoded
         # self.dense = True
-        n_graph_layers, n_dense_layers = parse_code(net_code)
+        n_graph_layers, n_dense_layers, nb_dense_layer = parse_code(net_code)
         self.graph_layer = graph_layer
         self.spatial_tensors = np.array(spatial_tensors)
         self.binary_batch = torch.tensor([self.spatial_tensors for _ in range(self.batch_size)])

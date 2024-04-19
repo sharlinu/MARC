@@ -2,14 +2,9 @@ env_name: 'pp'
 exp_id : 'std'
 other: ''
 
-<<<<<<< HEAD
 player: 4
 field: 10
-grid_observation: False 
-=======
-field: 10  
-grid_observation: True
->>>>>>> 55861f0f427dabb6adeba144e04df0b31a4696fe
+grid_observation: False
 
 alg: 'MAAC'
 n_episodes: 500000

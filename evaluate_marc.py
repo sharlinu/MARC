@@ -39,21 +39,8 @@ def run(config):
     os.makedirs(gif_path, exist_ok=True)
     config.device = 'cpu'
     model, _ = RelationalSAC.init_from_save(model_path, device=config.device)
-    if 'boxworld' in config.env_id:
-        from environments.box import BoxWorldEnv
-        env = BoxWorldEnv(
-            players=config.player,
-            field_size=(config.field,config.field),
-            num_colours=config.num_colours,
-            goal_length=config.goal_length,
-            sight=config.field,
-            max_episode_steps=config.episode_length,
-            grid_observation=config.grid_observation,
-            simple=config.simple,
-            single=config.single,
-            deterministic=config.deterministic,
-        )
-    elif 'lbf' in  config.env_id:
+    # config.player +=1
+    if 'lbf' in  config.env_id:
         env = ForagingEnv(
             players=config.player,
             max_player_level=config.lbf['max_player_level'],
@@ -90,6 +77,7 @@ def run(config):
         )
         attr_mapping = config.wolfpack['attr_mapping']
     elif 'pp' in config.env_id:
+        # config.pp['n_objects'] += 1
         import macpp
         from utils.env_wrappers import GridObs
         env=gym.make(f"macpp-{config.field}x{config.field}-{config.player}a-{config.pp['n_picker']}p-{config.pp['n_objects']}o-{config.pp['version']}",
@@ -125,10 +113,9 @@ def run(config):
         # l_rewards = []
         ep_rew = 0
 
-
         obs = env.reset()
         if config.render:
-            env.render(save=config.save)
+            env.render()
 
         for t_i in range(config.eval_episode_length):
             calc_start = time.time()
@@ -140,7 +127,7 @@ def run(config):
                                   requires_grad=False)
                          for i in range(model.n_agents)]
             # get actions as torch Variables
-            torch_actions = model.step(torch_obs,explore=False)
+            torch_actions = model.target_step(torch_obs,explore=False)
             # convert actions to numpy arrays
             actions = [np.argmax(ac.data.numpy().flatten()) for ac in torch_actions]
             # print('actions', actions)
@@ -148,6 +135,7 @@ def run(config):
             if config.render:
                 if 'lbf' in config.env_id:
                     env.render(actions=actions)
+
                 else:
                     env.render(save=config.save)
                 time.sleep(0.5)
