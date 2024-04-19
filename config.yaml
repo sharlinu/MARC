@@ -1,6 +1,6 @@
 env_name: 'lbf'
 exp_id : 'std'
-other: '_25steps'
+other: '_25_steps'
 
 player: 5
 field: 10

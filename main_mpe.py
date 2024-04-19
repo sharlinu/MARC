@@ -15,7 +15,6 @@ from utils.misc import Agent
 from utils.plotting import plot_fig
 from torch_geometric.data import Data as GeometricData
 import wandb
-sys.path.append('github/InforMARL/')
 from envs.env_wrappers import GraphDummyVecEnv, GraphSubprocVecEnv
 from multiagent.MPE_env import MPEEnv, GraphMPEEnv
 
@@ -47,18 +46,18 @@ def make_train_env(all_args: argparse.Namespace, n_rollout_threads):
 
 
 
-def make_parallel_env(env_id, n_rollout_threads, seed):
-    def get_env_fn(rank):
-        def init_env():
-            env = make_env(env_id, discrete_action=True)
-            env.seed(seed + rank * 1000)
-            np.random.seed(seed + rank * 1000)
-            return env
-        return init_env
-    if n_rollout_threads == 1:
-        return DummyVecEnv([get_env_fn(0)])
-    else:
-        return SubprocVecEnv([get_env_fn(i) for i in range(n_rollout_threads)])
+# def make_parallel_env(env_id, n_rollout_threads, seed):
+#     def get_env_fn(rank):
+#         def init_env():
+#             env = make_env(env_id, discrete_action=True)
+#             env.seed(seed + rank * 1000)
+#             np.random.seed(seed + rank * 1000)
+#             return env
+#         return init_env
+#     if n_rollout_threads == 1:
+#         return DummyVecEnv([get_env_fn(0)])
+#     else:
+#         return SubprocVecEnv([get_env_fn(i) for i in range(n_rollout_threads)])
 
 def to_gd(data: torch.Tensor, unary_t) -> GeometricData:
     """
@@ -104,7 +103,7 @@ def run(config):
     env.agents = [None] * len(env.action_space)
     env.n_agents = len(env.action_space)
 
-    env.n_rel_rules =5
+    env.n_rel_rules = 5
     obs, agent_id, node_obs, adj = env.reset()
 
     env.n_attr = node_obs.shape[3]
@@ -148,7 +147,7 @@ def run(config):
     for ep_i in range(start_episode, config.n_episodes):
         obs, agent_id, node_obs, adj = env.reset()
         adj = torch.tensor(adj)
-        graph = [to_gd(adj.clone().detach()[0, agent], node_obs[0, agent]) for agent in range(env.n_agents)]
+        graph = [to_gd(adj[0, agent], node_obs[0, agent]) for agent in range(env.n_agents)]
         model.prep_rollouts(device='cpu')
         episode_reward_total = 0
         is_best_avg = False
@@ -175,7 +174,8 @@ def run(config):
             next_obs, agent_id, node_obs, adj, rewards, dones, infos = env.step(actions)
 
             adj = torch.tensor(adj)
-            next_graph = [to_gd(adj.clone().detach()[0,agent], node_obs[0,agent]) for agent in range(env.n_agents)]
+            next_graph = [to_gd(adj[0,agent], node_obs[0,agent]) for agent in range(env.n_agents)]
+
             # obs_n, agent_id_n, node_obs_n, adj_n, reward_n, done_n, info_n
             # rewards, dones = np.array(rewards), np.array(dones)
 
@@ -321,21 +321,21 @@ def run(config):
     # logger.close()
     wandb.finish()
 
-def make_parallel_MAAC_env(args, seed):
-    def get_env_fn(rank):
-        def init_env():
-            env = make_env(args)
-            env.agents = [Agent() for _ in range(args.player)]
-            # env.grid_observation = args.grid_observation
-            # env.seed(args.random_seed + rank * 1000)
-            np.random.seed(args.random_seed + rank * 1000)
-            return env
-        return init_env
-    # if config.n_rollout_threads == 1:
-    return DummyVecEnv([get_env_fn(0)])
-    # else:
-    #     return SubprocVecEnv([get_env_fn(i) for i in range(config.n_rollout_threads)])
-
+# def make_parallel_MAAC_env(args, seed):
+#     def get_env_fn(rank):
+#         def init_env():
+#             env = make_env(args)
+#             env.agents = [Agent() for _ in range(args.player)]
+#             # env.grid_observation = args.grid_observation
+#             # env.seed(args.random_seed + rank * 1000)
+#             np.random.seed(args.random_seed + rank * 1000)
+#             return env
+#         return init_env
+#     # if config.n_rollout_threads == 1:
+#     return DummyVecEnv([get_env_fn(0)])
+#     # else:
+#     #     return SubprocVecEnv([get_env_fn(i) for i in range(config.n_rollout_threads)])
+#
 
 
 if __name__ == '__main__':
@@ -467,7 +467,7 @@ if __name__ == '__main__':
                 print("Directory removed")
             if toDelete.lower() == 'no':
                 print("It was not possible to continue, an experiment \
-                        folder is required.Terminiting here.")
+                        folder is required.Terminating here.")
                 import sys
 
                 sys.exit()
