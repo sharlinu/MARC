@@ -406,7 +406,7 @@ if __name__ == '__main__':
     config.use_dones: bool = False
     config.episode_length: int = 25
     config.max_edge_dist: float = 1
-    config.graph_feat_type: str = "global"
+    config.graph_feat_type: str = "rgcn"
     config.env_name ='GraphMPE'
     config.seed = 4001
 
