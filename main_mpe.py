@@ -311,7 +311,7 @@ def run(config):
                 except:
                     pass
 
-    plot_fig(l_rewards, 'reward_total', config.dir_summary, show=True)
+    # plot_fig(l_rewards, 'reward_total', config.dir_summary, show=True)
     path_ckpt_final = os.path.join(config.dir_saved_models,
                                           'ckpt_final.pth.tar')
     model.save(filename=path_ckpt_final, episode=ep_i)
@@ -404,7 +404,7 @@ if __name__ == '__main__':
     config.goal_rew: float = 5
     config.min_dist_thresh: float = 0.1
     config.use_dones: bool = False
-    config.episode_length: int = 25
+    # config.episode_length: int = 25
     config.max_edge_dist: float = 1
     config.graph_feat_type: str = "rgcn"
     config.env_name ='GraphMPE'
