@@ -288,10 +288,6 @@ class AttentionCritic(nn.Module):
         all_attend_probs = [[] for _ in range(len(agents))]
 
         if self.hard:
-            # Hard Attention
-            # h_out = sa_encodings.copy()
-            # h = h_out.reshape(-1, self.n_agents,
-            #                   self.rnn_hidden_dim)  # 把h转化出n_agents维度，(batch_size, n_agents, rnn_hidden_dim)
             input_hard = []
             # for each agent get all h_i, h_j pairs
             for i in range(self.n_agents):
@@ -302,32 +298,19 @@ class AttentionCritic(nn.Module):
                 for j in range(self.n_agents):  # concat hidden state tuples (h_i, h_j) for all other agents
                     if j != i:
                         h_hard_i.append(torch.cat([h_i, sa_encodings[j]], dim=-1))
-                # j 循环结束之后，h_hard_i是一个list里面装着n_agents - 1个维度为(batch_size, rnn_hidden_dim * 2)的tensor
                 h_hard_i = torch.stack(h_hard_i, dim=0)
                 input_hard.append(h_hard_i)
-            # i循环结束之后，input_hard是一个list里面装着n_agents个维度为(n_agents - 1, batch_size, rnn_hidden_dim * 2)的tensor
             input_hard = torch.stack(input_hard, dim=-2)
-            # 最终得到维度(n_agents - 1, batch_size * n_agents, rnn_hidden_dim * 2)，可以输入了
             input_hard = input_hard.view(self.n_agents - 1, -1, self.rnn_hidden_dim * 2)
 
-            # h_hard = torch.zeros((2 * 1, size, self.rnn_hidden_dim))
-            # 因为是双向GRU，每个GRU只有一层，所以第一维是2 * 1 # because it is a bidirectional GRU, each GRU has only one layer, so the first dimension is 2 * 1
-
-            # if self.cuda:
-            #     h_hard = h_hard.cuda()
 
             # this outputs for each agent the outputted hidden dim for their respective sequence of n_agents-1
             # dim : # (n_agents - 1,batch_size * n_agents,rnn_hidden_dim * 2)
             h_hard, _ = self.hard_bi_GRU(input_hard) #h_hard
             h_hard = h_hard.permute(1, 0, 2)  # (batch_size * n_agents, n_agents - 1, rnn_hidden_dim * 2)
             h_hard = h_hard.reshape(-1,self.rnn_hidden_dim * 2)  # (batch_size * n_agents * (n_agents - 1), rnn_hidden_dim * 2)
-            # now h_hard is a tensor with each row representing an agent i, another agent j and the hidden state of that set up
-            # 得到hard权重, (n_agents, batch_size, 1,  n_agents - 1)，多出一个维度，下面加权求和的时候要用
-            # hard, (n_agents, batch_size, 1, n_agents - 1), an extra dimension is added, which is used when weighted sum
             hard_weights = self.hard_encoding(h_hard)
             hard_weights = F.gumbel_softmax(hard_weights, tau=0.01)
-            # print(hard_weights)
-            # this removes the 2nd
             hard_weights = hard_weights[:, 1].view(-1, self.n_agents, 1, self.n_agents - 1)
             hard_weights = hard_weights.permute(1, 0, 2, 3)
 

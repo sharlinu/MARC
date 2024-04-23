@@ -111,6 +111,7 @@ def run(config):
                                                pol_hidden_dim=config.pol_hidden_dim,
                                                critic_hidden_dim=config.critic_hidden_dim,
                                                attend_heads=config.maac['attend_heads'],
+                                               hard = config.maac['hard'],
                                                reward_scale=config.reward_scale)
         replay_buffer = ReplayBufferMAAC(config.maac['buffer_length'], model.n_agents,
                                      [np.prod(obsp['image'].shape) if env.grid_observation else obsp.shape[0]
