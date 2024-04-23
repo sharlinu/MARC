@@ -22,10 +22,10 @@ class RelationalCritic(nn.Module):
                  input_dims: list,
                  hidden_dim: int = 32,
                  norm_in: object = True,
-                 net_code: object = "1g0f",
+                 net_code: object = "1g1if",
                  device: str = 'cuda:0',
-                 graph_layer: str = 'RGCN', 
-                 mp_rounds: object = 1) -> object:
+                 graph_layer: str = 'RGCN',
+                 ) -> object:
         """
         Inputs:
             sa_sizes (list of (int, int)): Size of state and action spaces per
@@ -42,6 +42,7 @@ class RelationalCritic(nn.Module):
         self.batch_size = batch_size
         self.max_reduce = True # TODO hardcoded
         # self.dense = True
+        n_graph_layers, n_dense_layers = parse_code(net_code)
         self.graph_layer = graph_layer
         self.spatial_tensors = np.array(spatial_tensors)
         self.binary_batch = torch.tensor([self.spatial_tensors for _ in range(self.batch_size)])
@@ -49,13 +50,20 @@ class RelationalCritic(nn.Module):
         self.nb_edge_types = len(spatial_tensors)
 
 
-        # self.embedder = nn.Linear(input_dims[0], hidden_dim)
+        self.embedder = nn.Linear(input_dims[0], hidden_dim)
         if self.graph_layer == 'RGCN':
-            self.gnn_layers = RGCNConv(input_dims[0], hidden_dim, self.nb_edge_types)
+            self.gnn_layers = RGCNConv(hidden_dim, hidden_dim, self.nb_edge_types)
         elif self.graph_layer == 'RGAT':
-            self.gnn_layers = RGATConv(input_dims[0], hidden_dim, self.nb_edge_types)
+            self.gnn_layers = RGATConv(hidden_dim, hidden_dim, self.nb_edge_types)
+            attend_heads = 1
+            assert (hidden_dim % attend_heads) == 0
+            attend_dim = hidden_dim // attend_heads
+            self.gnn_layers = RGATConv(in_channels=input_dims[0],
+                                       out_channels=attend_dim,
+                                       num_relations = self.nb_edge_types,
+                                       heads = attend_heads,
+                                       )
             print('This is using RGAT as graph layer')
-
         else:
             print('not a valid graph layer')
         print(f'Using {self.graph_layer} as graph layer')
@@ -134,14 +142,6 @@ class RelationalCritic(nn.Module):
                 embedds = self.gnn_layers(embedds, self.gd.edge_index, self.gd.edge_attr)
                 embedds = torch.relu(embedds)
                 x = pool.global_max_pool(embedds, self.gd.batch)
-            # chunks = torch.split(embedds, self.slices, dim=0) # splits it in slices/entities
-            # chunks = [p.unsqueeze(0) for p in chunks] # just adds back another dimension in the beginning
-            # x = torch.cat(chunks, dim=0)
-            # if self.max_reduce:
-            #     # max-pooling layer
-            #     x, _ = torch.max(x, dim=1)
-            # else:
-            #     x = torch.flatten(x, start_dim=1, end_dim=2)
 
 
             # extract state encoding for each agent that we're returning Q for
@@ -168,7 +168,7 @@ class AttentionCritic(nn.Module):
     observation and action, and can also attend over the other agents' encoded
     observations and actions.
     """
-    def __init__(self, sa_sizes, hidden_dim=32, norm_in=True, attend_heads=1):
+    def __init__(self, sa_sizes, hidden_dim=32, norm_in=True, attend_heads=1, hard=True):
         """
         Inputs:
             sa_sizes (list of (int, int)): Size of state and action spaces per agent
@@ -180,12 +180,14 @@ class AttentionCritic(nn.Module):
         super(AttentionCritic, self).__init__()
         assert (hidden_dim % attend_heads) == 0
         self.sa_sizes = sa_sizes
-        self.nagents = len(sa_sizes)
+        self.n_agents = len(sa_sizes)
         self.attend_heads = attend_heads
-
+        self.hard = hard
+        self.rnn_hidden_dim = hidden_dim
         self.critic_encoders = nn.ModuleList()
         self.critics = nn.ModuleList()
 
+        print(f"Uses attention: {'hard' if self.hard else 'soft'}")
         self.state_encoders = nn.ModuleList()
         # iterate over agents
         for sdim, adim in sa_sizes:
@@ -214,14 +216,21 @@ class AttentionCritic(nn.Module):
             state_encoder.add_module('s_enc_nl', nn.LeakyReLU())
             self.state_encoders.append(state_encoder)
 
+        if self.hard:
+            # input_size: self.rnn_hidden_dim * 2 because agent i and j's hidden state are concatenated
+            self.hard_bi_GRU = nn.GRU(self.rnn_hidden_dim * 2, self.rnn_hidden_dim, bidirectional=True) # , batch_first=True
+            # gard_encoding input must be self.rnn_hidden_dim * 2 because it is a bidirectional GRU, the hidden_state dimension are two ways and then concatenated
+            # hard_encoding output must be 2 because it is a binary decision and the gumbel softmax needs to weight over 2 options
+            self.hard_encoding = nn.Linear(self.rnn_hidden_dim * 2, 2)
+
         attend_dim = hidden_dim // attend_heads
         self.key_extractors = nn.ModuleList()
         self.selector_extractors = nn.ModuleList()
         self.value_extractors = nn.ModuleList()
         for i in range(attend_heads):
-            self.key_extractors.append(nn.Linear(hidden_dim, attend_dim, bias=False))
-            self.selector_extractors.append(nn.Linear(hidden_dim, attend_dim, bias=False))
-            self.value_extractors.append(nn.Sequential(nn.Linear(hidden_dim,
+            self.key_extractors.append(nn.Linear(hidden_dim, attend_dim, bias=False)) # k
+            self.selector_extractors.append(nn.Linear(hidden_dim, attend_dim, bias=False)) # q
+            self.value_extractors.append(nn.Sequential(nn.Linear(hidden_dim, # v
                                                                 attend_dim),
                                                        nn.LeakyReLU()))
 
@@ -240,7 +249,7 @@ class AttentionCritic(nn.Module):
         gradients from the critic loss function multiple times
         """
         for p in self.shared_parameters():
-            p.grad.data.mul_(1. / self.nagents)
+            p.grad.data.mul_(1. / self.n_agents)
 
     def forward(self, inps, agents=None, return_q=True, return_all_q=False,
                 regularize=False, return_attend=False, logger=None, niter=0):
@@ -266,6 +275,7 @@ class AttentionCritic(nn.Module):
         sa_encodings = [encoder(inp) for encoder, inp in zip(self.critic_encoders, inps)]
         # extract state encoding for each agent that we're returning Q for
         s_encodings = [self.state_encoders[a_i](states[a_i]) for a_i in agents]
+
         # extract keys for each head for each agent
         all_head_keys = [[k_ext(enc) for enc in sa_encodings] for k_ext in self.key_extractors]
         # extract sa values for each head for each agent
@@ -277,6 +287,34 @@ class AttentionCritic(nn.Module):
         other_all_values = [[] for _ in range(len(agents))]
         all_attend_logits = [[] for _ in range(len(agents))]
         all_attend_probs = [[] for _ in range(len(agents))]
+
+        if self.hard:
+            input_hard = []
+            # for each agent get all h_i, h_j pairs
+            for i in range(self.n_agents):
+                # take agent i's hidden state
+                # h_i = h[:, i]  # (batch_size, rnn_hidden_dim)
+                h_i = sa_encodings[i]
+                h_hard_i = []
+                for j in range(self.n_agents):  # concat hidden state tuples (h_i, h_j) for all other agents
+                    if j != i:
+                        h_hard_i.append(torch.cat([h_i, sa_encodings[j]], dim=-1))
+                h_hard_i = torch.stack(h_hard_i, dim=0)
+                input_hard.append(h_hard_i)
+            input_hard = torch.stack(input_hard, dim=-2)
+            input_hard = input_hard.view(self.n_agents - 1, -1, self.rnn_hidden_dim * 2)
+
+
+            # this outputs for each agent the outputted hidden dim for their respective sequence of n_agents-1
+            # dim : # (n_agents - 1,batch_size * n_agents,rnn_hidden_dim * 2)
+            h_hard, _ = self.hard_bi_GRU(input_hard) #h_hard
+            h_hard = h_hard.permute(1, 0, 2)  # (batch_size * n_agents, n_agents - 1, rnn_hidden_dim * 2)
+            h_hard = h_hard.reshape(-1,self.rnn_hidden_dim * 2)  # (batch_size * n_agents * (n_agents - 1), rnn_hidden_dim * 2)
+            hard_weights = self.hard_encoding(h_hard)
+            hard_weights = F.gumbel_softmax(hard_weights, tau=0.01)
+            hard_weights = hard_weights[:, 1].view(-1, self.n_agents, 1, self.n_agents - 1)
+            hard_weights = hard_weights.permute(1, 0, 2, 3)
+
         # calculate attention per head
         for curr_head_keys, curr_head_values, curr_head_selectors in zip(
                 all_head_keys, all_head_values, all_head_selectors):
@@ -285,10 +323,13 @@ class AttentionCritic(nn.Module):
                 keys = [k for j, k in enumerate(curr_head_keys) if j != a_i]
                 values = [v for j, v in enumerate(curr_head_values) if j != a_i]
                 # calculate attention across agents
+
                 attend_logits = torch.matmul(selector.view(selector.shape[0], 1, -1),
                                              torch.stack(keys).permute(1, 2, 0))
+                if self.hard:
+                    attend_logits = attend_logits * hard_weights[i, :, :, :]
                 # scale dot-products by size of key (from Attention is All You Need)
-                scaled_attend_logits = attend_logits / np.sqrt(keys[0].shape[1])
+                scaled_attend_logits = attend_logits / np.sqrt(keys[0].shape[1]) # unchanged
                 attend_weights = F.softmax(scaled_attend_logits, dim=2)
                 other_values = (torch.stack(values).permute(1, 2, 0) *
                                 attend_weights).sum(dim=2)
@@ -298,11 +339,12 @@ class AttentionCritic(nn.Module):
         # calculate Q per agent
         all_rets = []
         for i, a_i in enumerate(agents):
-            head_entropies = [(-((probs + 1e-8).log() * probs).squeeze(1).sum(1) # -((probs + 1e-8).log() * probs).squeeze().sum(1)
-                               .mean()) for probs in all_attend_probs[i]]
+            # head_entropies = [(-((probs + 1e-8).log() * probs).squeeze(1).sum(1) # -((probs + 1e-8).log() * probs).squeeze().sum(1)
+            #                    .mean()) for probs in all_attend_probs[i]]
             # 2 agents: squeeze(1) gives (1024,1), whereas squeeze() gives (1024,)
-            # TODO change here to cater for 2 player games! squeeze() --> squeeze(1) because otherwise (1024, 1, 1) is squeezed to hard
+            # changed here to cater for 2 player games! squeeze() --> squeeze(1) because otherwise (1024, 1, 1) is squeezed to hard
             agent_rets = []
+
             critic_in = torch.cat((s_encodings[i], *other_all_values[i]), dim=1)
             all_q = self.critics[a_i](critic_in)
             int_acs = actions[a_i].max(dim=1, keepdim=True)[1]
@@ -319,11 +361,6 @@ class AttentionCritic(nn.Module):
                 agent_rets.append(regs)
             if return_attend:
                 agent_rets.append(np.array(all_attend_probs[i]))
-            if logger is not None:
-                logger.add_scalars('agent%i/attention' % a_i,
-                                   dict(('head%i_entropy' % h_i, ent) for h_i, ent
-                                        in enumerate(head_entropies)),
-                                   niter)
             if len(agent_rets) == 1:
                 all_rets.append(agent_rets[0])
             else:
@@ -335,16 +372,14 @@ class AttentionCritic(nn.Module):
 
 def parse_code(net_code: str):
     """
-    :param net_code: format <a>g[m]<b>f
+    :param net_code: format <a>g<b>i<c>f
     """
     assert net_code[1]=="g"
     assert net_code[-1]=="f"
     nb_gnn_layers = int(net_code[0])
+    nb_iterations = int(net_code[2])
     nb_dense_layers = int(net_code[-2])
-    is_max = True if net_code[2] == "m" else False
-    return nb_gnn_layers, nb_dense_layers, is_max
-
-
+    return nb_gnn_layers, nb_iterations, nb_dense_layers
 
 def batch_to_gd(batch: torch.Tensor, device: str):
     # [B x R x E x E]
@@ -379,4 +414,3 @@ def batch_to_gd(batch: torch.Tensor, device: str):
     slices = [max_node for _ in batch_data]
     # print(device)
     return geometric_batch.to(device=device), slices
-

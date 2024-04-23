@@ -276,7 +276,7 @@ class RelationalSAC(object):
                       pi_lr=0.01, q_lr=0.01,
                       reward_scale=10.,
                       graph_layer = 'RGCN',
-                      pol_hidden_dim=64, critic_hidden_dim=64, attend_heads=4,
+                      pol_hidden_dim=64, critic_hidden_dim=64,
                       device='cuda:0',
                       **kwargs):
         """
@@ -367,6 +367,7 @@ class AttentionSAC(object):
                  reward_scale=10.,
                  pol_hidden_dim=128,
                  critic_hidden_dim=128, attend_heads=4,
+                 hard=True, 
                  **kwargs):
         """
         Inputs:
@@ -391,9 +392,9 @@ class AttentionSAC(object):
                                       **params)
                          for params in agent_init_params]
         self.critic = AttentionCritic(sa_size, hidden_dim=critic_hidden_dim,
-                                      attend_heads=attend_heads)
+                                      attend_heads=attend_heads, hard=hard)
         self.target_critic = AttentionCritic(sa_size, hidden_dim=critic_hidden_dim,
-                                             attend_heads=attend_heads)
+                                             attend_heads=attend_heads, hard=hard)
         hard_update(self.target_critic, self.critic)
         self.critic_optimizer = Adam(self.critic.parameters(), lr=q_lr,
                                      weight_decay=1e-3)
@@ -588,7 +589,8 @@ class AttentionSAC(object):
     def init_from_env(cls, env, gamma=0.95, tau=0.01,
                       pi_lr=0.01, q_lr=0.01,
                       reward_scale=10.,
-                      pol_hidden_dim=128, critic_hidden_dim=128, attend_heads=4,
+                     pol_hidden_dim=128, critic_hidden_dim=128, attend_heads=4,
+                     hard = True, 
                       **kwargs):
         """
         Instantiate instance of this class from multi-agent environment
@@ -605,6 +607,7 @@ class AttentionSAC(object):
         if env.grid_observation:
             for acsp, obsp in zip(env.action_space,
                                   env.observation_space):
+                # s_shape = np.prod(obsp['image'].shape)
                 s_shape = np.prod(obsp['image'].shape)
                 agent_init_params.append({'num_in_pol': s_shape,
                                           'num_out_pol': acsp.n})
@@ -623,6 +626,7 @@ class AttentionSAC(object):
                      'pol_hidden_dim': pol_hidden_dim,
                      'critic_hidden_dim': critic_hidden_dim,
                      'attend_heads': attend_heads,
+                     'hard': hard, 
                      'agent_init_params': agent_init_params,
                      'sa_size': sa_size}
         instance = cls(**init_dict)

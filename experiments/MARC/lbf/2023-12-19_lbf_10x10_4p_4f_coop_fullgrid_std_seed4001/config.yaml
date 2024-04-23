@@ -25,6 +25,7 @@ lbf:
   max_food: 4
   max_player_level: 2
 marc:
+  graph_layer: 'RGCN'    
   abs_id: None
   background_id: b0
   buffer_length: 100000

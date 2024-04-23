@@ -53,7 +53,6 @@ class BPushWrapper(gym.ObservationWrapper):
         return obs
 
 
-
 class AbsoluteVKBWrapper(gym.ObservationWrapper):
     """
     Add a vkb key-value pair, which represents the state as a vectorised knowledge base.
@@ -61,11 +60,12 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
     """
     def __init__(self, env, attr_mapping, dense=False, background_id="b3", abs_id='None'):
         super().__init__(env)
-        # self.attribute_labels = ['agents', 'id', 'feature']
-
-
-        self.field_size, _, self.n_attr = env.observation_space[0]['image'].shape
-        print(self.field_size, 'field_size')
+        a, b, c = env.observation_space[0]['image'].shape
+        if b==c:
+            self.n_attr, self.field_size = a,c
+        else:
+            self.field_size, self.n_attr = a,c
+        print(f'field_size:{self.field_size} and n_attributes:{self.n_attr}')
         self.attr_mapping = attr_mapping
         assert len(self.attr_mapping) == self.n_attr, f'Attribute mapping ({len(self.attr_mapping)}) needs to have a key for each attribute ({self.n_attr})'
 
@@ -76,11 +76,6 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
         self.abs_rel_func = self.id_to_abstract_rule_list(self.abs_id)
         self.n_rel_rules = len(self.rel_deter_func)
         print('Number of relational rules', self.n_rel_rules, "+", len(self.abs_rel_func))
-        # number of objects/entities are the number of cells on the grid
-        if not self.dense:
-            self.obj_n = np.prod((self.field_size, self.field_size)) #physical entities
-        else:
-            self.obj_n = env.n_agents + env.n_objects
         self.spatial_tensors = None
         self.prev = None
 
@@ -89,9 +84,6 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
         attribute_sum = np.sum(abs(data), axis=2)
 
         non_zero_count = np.count_nonzero(attribute_sum)
-        # if non_zero_count != self.obj_n:
-        #     print( f'object mismatch: {non_zero_count} non_zerocount but {self.obj_n} objects')
-        # Find the indices of non-zero attribute sums
         non_zero_indices = np.nonzero(attribute_sum)
 
         # Filter out elements whose attributes sum to zero
@@ -102,7 +94,6 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
         for i in range(self.n_attr):
             attribute_vectors.append(np.reshape(filtered_data[:,i], non_zero_count))
 
-        # assert len(attribute_vectors[0]) == self.obj_n, f'{len(attribute_vectors[0])} attribute vectors but {self.obj_n} objects'
         return attribute_vectors
 
     def extract_attributes(self, data):
@@ -155,17 +146,11 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
                     for rel_idx, func in enumerate(self.rel_deter_func):
                         if func(obj1, obj2, direction_vec):
                             self.spatial_tensors[rel_idx][obj_idx1, obj_idx2] = 1.0
-                    for abs_rel_idx, abs_func in enumerate(self.abs_rel_func):
-                        if abs_func(obj1, obj2, self.attr_mapping):
-                            self.abstract_tensors[abs_rel_idx][obj_idx1, obj_idx2] = 1.0
 
         all_binaries = self.spatial_tensors + self.abstract_tensors
         binary_tensors = torch.tensor(all_binaries)
-        # if len(unary_tensors[0]) != self.obj_n:
-        #     unary_t =  np.array([])
-        # else:
         unary_t = torch.Tensor(np.stack(unary_tensors, axis=-1))
-        gd = to_gd(binary_tensors, unary_t, nb_objects=self.obj_n) # TODO
+        gd = to_gd(binary_tensors, unary_t)
         return unary_t, gd
 
     def observation(self, obs):
@@ -180,10 +165,8 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
         -------
 
         """
-        #obs = obs.copy()
         for ob in obs:
-            spatial_VKB = self.img2vkb(ob['image'])
-            ob['unary_tensor'], ob['binary_tensor'] = spatial_VKB
+            ob['unary_tensor'], ob['binary_tensor'] = self.img2vkb(ob['image'])
         return obs
 
     def id_to_rule_list(self, background_id):
@@ -240,10 +223,9 @@ class AbsoluteVKBWrapper(gym.ObservationWrapper):
             rel_func = [is_food, is_agent, is_other_player]
         elif id in ['none', 'None']:
             rel_func = []
-
         return rel_func
 
-def to_gd(data: torch.Tensor, unary_t, nb_objects) -> GeometricData:
+def to_gd(data: torch.Tensor, unary_t) -> GeometricData:
     """
     takes batch of adjacency geometric data and transforms it to a GeometricData object for torch.geometric
 
@@ -252,7 +234,7 @@ def to_gd(data: torch.Tensor, unary_t, nb_objects) -> GeometricData:
     data : heterogeneous adjacency matrix (nb_relations, nb_objects, nb_objects)
     """
     # nb_objects = nb_objects
-    # x = torch.arange(nb_objects).view(-1, 1) # TODO change to actual node features i.e. the unary tensors
+    # x = torch.arange(nb_objects).view(-1, 1) #
     nz = torch.nonzero(data)
 
     # list of all edges and what relationtype they have
@@ -440,7 +422,5 @@ if __name__ == "__main__":
             time.sleep(0.5)
 
         done = np.all(ndone)
-        # pygame.event.pump()  # process event queue
-    # print(env.players[0].score, env.players[1].score)
 
 

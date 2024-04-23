@@ -2,7 +2,11 @@ alg: MARC
 batch_size: 1024
 buffer_length: 1000000
 critic_hidden_dim: 128
+<<<<<<< HEAD
 device: cuda:0
+=======
+device: cuda:3
+>>>>>>> ebbbdb181844ed132e5912745378889e6603192f
 dir_base: ./experiments
 dir_exp: ./experiments/MARC/pp/2024-01-18_pp_10x10_2a_1p_2o-v3_std_seed4001
 dir_monitor: ./experiments/MARC/pp/2024-01-18_pp_10x10_2a_1p_2o-v3_std_seed4001/monitor
@@ -18,6 +22,7 @@ grid_observation: true
 marc:
   abs_id: None
   background_id: b0
+<<<<<<< HEAD
   buffer_length: 100000
   dense: true
   graph_layer: GAT
@@ -26,6 +31,16 @@ n_episodes: 300000
 norm_rews: true
 num_updates: 4
 other: ''
+=======
+  buffer_length: 1000000
+  dense: false
+  graph_layer: RGCN
+  relational_embedding: false
+n_episodes: 250000
+norm_rews: true
+num_updates: 4
+other: _fullgrid
+>>>>>>> ebbbdb181844ed132e5912745378889e6603192f
 pi_lr: 0.001
 player: 2
 pol_hidden_dim: 128

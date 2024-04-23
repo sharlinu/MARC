@@ -111,6 +111,7 @@ def run(config):
                                                pol_hidden_dim=config.pol_hidden_dim,
                                                critic_hidden_dim=config.critic_hidden_dim,
                                                attend_heads=config.maac['attend_heads'],
+                                               hard = config.maac['hard'],
                                                reward_scale=config.reward_scale)
         replay_buffer = ReplayBufferMAAC(config.maac['buffer_length'], model.n_agents,
                                      [np.prod(obsp['image'].shape) if env.grid_observation else obsp.shape[0]
@@ -414,7 +415,7 @@ if __name__ == '__main__':
     parser.add_argument("--tau", default=0.001, type=float) # soft update rate
     parser.add_argument("--gamma", default=0.99, type=float)
     parser.add_argument("--reward_scale", default=100., type=float) # temperature parameter alpha = 1/reward_scale = 0.01 in this case
-    # parser.add_argument("--device",default='cuda:0', type=str)
+    parser.add_argument("--device",default='cuda:0', type=str)
     parser.add_argument('--dir_base', default='./experiments',
                         help='path of the experiment directory')
     config = parser.parse_args()

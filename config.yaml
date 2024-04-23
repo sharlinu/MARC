@@ -1,4 +1,4 @@
-env_name: 'pp'
+env_name: 'lbf'
 exp_id : 'std'
 other: ''
 
@@ -7,7 +7,7 @@ field: 10
 grid_observation: True
 
 alg: 'MARC'
-n_episodes: 3000000
+n_episodes: 500000
 episode_length: 50
 test_n_episodes: 10
 #tau: 0.01
@@ -15,14 +15,28 @@ device: 'cuda:0'
 
 pp:
   n_picker: 2
-  n_objects: 2
-  version: 'v5'
+  n_objects: 3
+  version: 'v3'
   attr_mapping: {'agent': 0,
                  'objects': 1,
                  'goals': 2,
-                 'id':3,
-                 'carrying':4,
-                 'picker':5,}
+                 'id': 3,
+                 'carrying': 4,
+                 'picker': 5,}
+
+rware:
+  size: 'tiny'
+  difficulty: 'easy-'
+  attr_mapping: {
+    'shelves':0,
+    'requests':1,
+    'agents':2,
+    'goals':3,
+    'accessible':4,
+#    'agent_load':5,
+#    'agent_direction':6,
+  }
+
 lbf:
   max_food: 4
   force_coop: True
@@ -51,8 +65,9 @@ marc:
   graph_layer: 'RGCN'
 
 maac:
-  attend_heads: 4
+  attend_heads: 1
   buffer_length: 1000000
+  hard: True
 
 norm_rews : True
 batch_size : 1024

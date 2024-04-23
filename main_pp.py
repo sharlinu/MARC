@@ -12,7 +12,7 @@ import macpp
 from utils.buffer import ReplayBufferMARC, ReplayBufferMAAC
 from algorithms.attention_sac import AttentionSAC, RelationalSAC
 from utils.rel_wrapper2 import AbsoluteVKBWrapper
-from utils.env_wrappers import DummyVecEnv, FlatObs, GridObs
+from utils.env_wrappers import DummyVecEnv, FlatObs, GridObs, PartialGridObs
 import yaml
 from utils.misc import Agent
 from utils.plotting import plot_fig
@@ -37,7 +37,10 @@ def run(config):
             config=vars(config), )
     if config.alg == 'MARC':
         env = make_env(config)
-        env = GridObs(env)
+        if config.env_name == 'pp':
+            env = GridObs(env)
+        elif config.env_name == 'rware':
+            env = PartialGridObs(env)
         env.grid_observation = config.grid_observation
         attr_mapping = getattr(config, env_name)['attr_mapping']
         env = AbsoluteVKBWrapper(env=env,
@@ -51,17 +54,17 @@ def run(config):
         env.reset()
         if config.resume:
             # resume_path = config.resume
-            model_path = glob.glob('{}/saved_models/ckpt_final*'.format(config.resume))[0]
+            model_path = glob.glob('{}/saved_models/ckpt_*'.format(config.resume))[0]
             config.n_episodes = config.n_episodes + config.resume_episodes
             print(f'Training for an additional {config.resume_episodes}')
             model, start_episode = RelationalSAC.init_from_save(model_path, load_critic=True, device=config.device)
-            toResume = input(f'Do you want to resume training {model_path} for {config.resume_episodes} starting at {start_episode}? (yes/no)')
-            if toResume.lower()=='yes':
-                print('resuming training')
-            else:
-                print('Closing connection')
-                import sys
-                sys.exit()
+            # toResume = input(f'Do you want to resume training {model_path} for {config.resume_episodes} starting at {start_episode}? (yes/no)')
+            #if toResume.lower()=='yes':
+            #    print('resuming training')
+            #else:
+            #    print('Closing connection')
+            #    import sys
+            #    sys.exit()
             # wandb.init(project="MARC", resume=True)
         else:
             start_episode = 0
@@ -115,6 +118,7 @@ def run(config):
                                                pol_hidden_dim=config.pol_hidden_dim,
                                                critic_hidden_dim=config.critic_hidden_dim,
                                                attend_heads=config.maac['attend_heads'],
+                                               hard = config.maac['hard'],
                                                reward_scale=config.reward_scale)
         replay_buffer = ReplayBufferMAAC(config.maac['buffer_length'], model.n_agents,
                                      [np.prod(obsp['image'].shape) if env.grid_observation else obsp.shape[0]
@@ -128,7 +132,11 @@ def run(config):
     l_rewards = []
     epymarl_rewards = []
     if config.resume:
-        steps =  3130000 # TODO update this!
+        with open(f'{config.resume}/summary/reward_step.txt') as f:
+            data = f.readlines()
+            steps = int(data[-2].split(',')[0])
+        #next_step_log = steps + config.step_interval_log
+        #steps =  3130000 # TODO update this!
         next_step_log = steps + config.step_interval_log
     else:
         steps = 0
@@ -173,7 +181,10 @@ def run(config):
                 actions = [[np.argmax(ac[0]) for ac in agent_actions]]
             next_obs, rewards, dones, infos = env.step(actions)
             rewards, dones = np.array(rewards), np.array(dones)
-
+            # if config.alg=='MAAC':
+            #     env.envs[0].render()
+            # else:
+            #     env.render()
             if config.alg == 'MAAC' and env.grid_observation:
                 next_obs = tuple([next_obs[:,i][0]['image'].flatten() for i in range(model.n_agents)])
                 next_obs = np.vstack(next_obs)
@@ -202,7 +213,7 @@ def run(config):
                 model.prep_rollouts(device='cpu')
 
             if dones.all() == True:
-                print('done with time step', et_i)
+                # print('done with time step', et_i)
                 break
         steps += et_i
         try:
@@ -323,7 +334,10 @@ def make_parallel_MAAC_env(args, seed):
     def get_env_fn(rank):
         def init_env():
             env = make_env(args)
-            env = FlatObs(env)
+            if args.env_name == 'pp':
+                env = FlatObs(env)
+            elif args.env_name == 'rware':
+                env = PartialGridObs(env)
             env.agents = [Agent() for _ in range(args.player)]
             # env.grid_observation = args.grid_observation
             # env.seed(args.random_seed + rank * 1000)
@@ -335,7 +349,28 @@ def make_parallel_MAAC_env(args, seed):
 
 def make_env(config):
     import gym
-    env = gym.make(f"macpp-{config.field}x{config.field}-{config.player}a-{config.pp['n_picker']}p-{config.pp['n_objects']}o-{config.pp['version']}", debug_mode=False)
+    if config.env_name == 'rware':
+        import rware
+        if config.grid_observation:
+            # env = gym.make(f"rware-img-Nd-{config.rware['size']}-{config.player}ag-{config.rware['difficulty']}v1")
+            env = rware.warehouse.Warehouse(column_height=1,
+                            shelf_columns=3,
+                            shelf_rows=1,
+                            n_agents=2,
+                            msg_bits=0,
+                            sensor_range=5,
+                            request_queue_size=2,
+                            max_inactivity_steps= None,
+                            max_steps=500,
+                            observation_type=rware.warehouse.ObservationType.IMAGE,
+                            image_observation_directional=True,
+                            reward_type= rware.warehouse.RewardType.INDIVIDUAL)
+        else:
+            env = gym.make(f"rware-{config.rware['size']}-{config.player}ag-{config.rware['difficulty']}v1")
+    elif config.env_name == 'pp':
+        env = gym.make(f"macpp-{config.field}x{config.field}-{config.player}a-{config.pp['n_picker']}p-{config.pp['n_objects']}o-{config.pp['version']}", debug_mode=False)
+    else:
+        raise ValueError(f'Cannot identify environment {config.env_name}')
     # env = FlatObs(env)
     return env
 
@@ -374,7 +409,7 @@ if __name__ == '__main__':
     parser.add_argument("--tau", default=0.001, type=float) # soft update rate
     parser.add_argument("--gamma", default=0.99, type=float)
     parser.add_argument("--reward_scale", default=100., type=float) # temperature parameter alpha = 1/reward_scale = 0.01 in this case
-    # parser.add_argument("--device",default='cuda:0', type=str)
+    parser.add_argument("--device",default='cuda:0', type=str)
     parser.add_argument('--dir_base', default='./experiments',
                         help='path of the experiment directory')
     config = parser.parse_args()
@@ -391,6 +426,7 @@ if __name__ == '__main__':
         with open(f"{args['resume']}/config.yaml", "r") as file:
             params = yaml.load(file, Loader=yaml.FullLoader)
             params['resume'] = args['resume']
+            params['resume_episodes'] = args['resume_episodes']
 
     for k, v in params.items():
         args[k] = v
@@ -403,12 +439,12 @@ if __name__ == '__main__':
                              f"{args['player']}p" \
                              f"_{args['lbf']['max_food']}f" \
                              f"{'_coop' if args['lbf']['force_coop'] else ''}{args['other']}v"
-            del args['bpush'], args['wolfpack']
+            del args['bpush'], args['wolfpack'], args['rware'], args['pp']
         elif 'bpush' in args['env_name']:
             args['env_id'] = f"{args['env_name']}" \
                              f"_{args['field']}x{args['field']}" \
                              f"_{args['player']}p"
-            del args['wolfpack'], args['lbf']
+            del args['wolfpack'], args['lbf'], args['rware'], args['pp']
         elif 'wolf' in args['env_name']:
             args[
                 'env_id'] = f"{args['env_name']}" \
@@ -416,7 +452,7 @@ if __name__ == '__main__':
                             f"_{args['player']}w" \
                             f"_{args['wolfpack']['max_food_num']}s" \
                             f"{args['other']}"
-            del args['bpush'], args['lbf']
+            del args['bpush'], args['lbf'], args['rware'], args['pp']
         elif 'grid' in args['env_name']:
             args['env_id'] = f"{args['env_name']}"
             del args['bpush'], args['lbf'], args['wolfpack']
@@ -427,7 +463,14 @@ if __name__ == '__main__':
                             f"_{args['pp']['n_picker']}p" \
                             f"_{args['pp']['n_objects']}o" \
                             f"-{args['pp']['version']}"
-            del args['bpush'], args['lbf'], args['wolfpack']
+            del args['bpush'], args['lbf'], args['wolfpack'], args['rware']
+        elif 'rware' in args['env_name']:
+            args['env_id'] = f"{args['env_name']}" \
+                            f"_{args['rware']['size']}" \
+                            f"_{args['player']}a" \
+                            f"-{args['rware']['difficulty']}"
+            del args['bpush'], args['lbf'], args['wolfpack'], args['pp']
+
         if params['exp_id'] == 'try':
             args['env_id'] = 'TEST'
             args['n_episodes']= 30000
