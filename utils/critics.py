@@ -187,6 +187,7 @@ class AttentionCritic(nn.Module):
         self.critic_encoders = nn.ModuleList()
         self.critics = nn.ModuleList()
 
+        print(f"Uses attention: {'hard' if self.hard else 'soft'}")
         self.state_encoders = nn.ModuleList()
         # iterate over agents
         for sdim, adim in sa_sizes:
@@ -325,12 +326,11 @@ class AttentionCritic(nn.Module):
 
                 attend_logits = torch.matmul(selector.view(selector.shape[0], 1, -1),
                                              torch.stack(keys).permute(1, 2, 0))
-                # TODO option 1: if hard, then we need filter here
-                attend_logits = attend_logits * hard_weights[i, :, :, :]
+                if self.hard:
+                    attend_logits = attend_logits * hard_weights[i, :, :, :]
                 # scale dot-products by size of key (from Attention is All You Need)
                 scaled_attend_logits = attend_logits / np.sqrt(keys[0].shape[1]) # unchanged
                 attend_weights = F.softmax(scaled_attend_logits, dim=2)
-                # TODO option 2 would be just to put filter after attention weights
                 other_values = (torch.stack(values).permute(1, 2, 0) *
                                 attend_weights).sum(dim=2)
                 other_all_values[i].append(other_values)
