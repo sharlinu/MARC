@@ -8,7 +8,7 @@ import torch
 import time
 from pathlib import Path
 from torch.autograd import Variable
-from algorithms.attention_sac import RelationalSAC
+from algorithms.attention_sac import RelationalSAC, AttentionSAC
 import os
 import gym
 import macpp
@@ -50,7 +50,7 @@ def run(config):
     os.makedirs(eval_path, exist_ok=True)
 
     config.device = 'cpu'
-    model, _ = RelationalSAC.init_from_save(model_path, device=config.device)
+    model, _ = AttentionSAC.init_from_save(model_path, device=config.device)
     model.critic.critics_head[0].critic_nl.register_forward_hook(get_activation('critic_nl'))
 
     env = gym.make(f"macpp-{config.field}x{config.field}-{config.player}a-{config.pp['n_picker']}p-{config.pp['n_picker']}o-v3", debug_mode=False)

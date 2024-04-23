@@ -96,7 +96,7 @@ def run(config):
         images = []
         print("Episode %i of %i" % (ep_i + 1, config.eval_n_episodes))
         ep_rew = 0
-        obs = env.reset()
+        obs = env.reset(seed=ep_i)
 
         if config.marc['graph_layer'] == 'GAT':
             labels_1 = torch.empty((0,8))
@@ -109,8 +109,10 @@ def run(config):
         q_values_b = []
         if config.render:
             env.render()
-
+        label = 0
+        rewards = [-0.1,-0.1]
         for t_i in range(config.eval_episode_length):
+
             if config.render:
                 img = f"{directory}/step_{t_i}.png"
                 env.render(save=config.save, name=img)
@@ -137,19 +139,39 @@ def run(config):
             actions = [np.argmax(ac.data.numpy().flatten()) for ac in torch_actions]
 
             # print('actions', actions)
-            obs, rewards, dones, infos = env.step(actions)
-            # import time.sleep(1)
+            import time
+            # time.sleep(1)
+            # print(rewards)
             if sum(rewards) == -0.2:
-                state_label.append(0)
+                pass
             elif rewards[0] == 0.4:
-                state_label.append(2)
+                label +=1
             elif sum(rewards) == 0.8:
-                state_label.append(1)
-            elif sum(rewards) == 2.8:
-                state_label.append(3)
+                label += 1
+            elif sum(rewards) >= 2.8:
+                label += 1
+            elif sum(rewards) == 3.8:
+                label += 1
             else:
                 print(f'rewards are not categorised with  {rewards}')
-            print(state_label)
+                time.sleep(10)
+            state_label.append(label)
+            # print(state_label)
+            obs, rewards, dones, infos = env.step(actions)
+
+            # # import time.sleep(1)
+            # if sum(rewards) == -0.2:
+            #     state_label.append(0)
+            # elif rewards[0] == 0.4:
+            #     state_label.append(2)
+            # elif sum(rewards) == 0.8:
+            #     state_label.append(1)
+            # elif sum(rewards) == 2.8:
+            #     state_label.append(3)
+            # else:
+            #     print(f'rewards are not categorised with  {rewards}')
+            # print(state_label)
+
             # if config.save:
             #     env.save(f"{directory}/step_{t_i}.png")
             ep_rew += sum(rewards)
@@ -157,10 +179,14 @@ def run(config):
                 break
 
 
-
+        # print(rewards, t_i)
         if t_i>23:
-            continue
-        print('using graph embeddings')
+        #     continue
+            success = 0
+            print('using graph embeddings even though stuck')
+        else:
+            success = 1
+
         l_ep_rew.append(ep_rew)
         temp1 = torch.vstack([node_embeddings[i][0] for i in range(len(node_embeddings))])
         graph_plots_a = torch.vstack([graph_embeddings[i][0] for i in range(len(graph_embeddings))])
@@ -239,7 +265,7 @@ def run(config):
         fin_labels = ([label_dict[tuple(feature.tolist())] for feature in labels])
 
         print(activation.shape)
-        tsne_model = TSNE(n_components=3, perplexity=2)
+        tsne_model = TSNE(n_components=3, perplexity=1)
         # input needs to be (n_samples, n_features)
         d = tsne_model.fit_transform(activation)
         d_graph = tsne_model.fit_transform(graph_activation)
@@ -247,6 +273,7 @@ def run(config):
         df = pd.DataFrame(d, columns=['x', 'y', 'z'])
         df_graph = pd.DataFrame(d_graph, columns=['x', 'y', 'z'])
         df_graph['steps'] = graph_labels
+        df_graph['success'] = success
         q_values = q_values_a #+ q_values_b
         agents = [0 for _ in range(len(q_values_a))] # + [1 for _ in range(len(q_values_b))]
         df_graph['q_values'] = q_values
@@ -254,6 +281,7 @@ def run(config):
         df['label'] = fin_labels
         df['steps'] = steps
         df['images'] = batch_images
+        df['success'] = success
         df_graph['state'] = state_label
         df_graph['images'] = images
 
@@ -288,7 +316,7 @@ def run(config):
                                   x='x',
                                   y='y',
                                   z='z',
-                                  color='q_values',
+                                  color=config.hue,
                                   hover_name="q_values",
                                   hover_data=
                                   {'x': False,
@@ -305,7 +333,7 @@ def run(config):
                                   x='x',
                                   y='y',
                                   z='z',
-                                  color='steps',
+                                  color=config.hue,
                                   hover_name="steps",
                                   hover_data=
                                   {'x':False,
@@ -369,7 +397,7 @@ def run(config):
                                    x='x',
                                    y='y',
                                    z='z',
-                                   color='state_label',
+                                   color=config.hue,
                                    hover_data=
                                    {'x': False,
                                     'y': False,
@@ -465,7 +493,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_path",
                         # default='experiments/MARC/pp/2024-01-24_pp_10x10_2a_1p_2o-v3_b0_std_seed4001/saved_models/ckpt_final.pth.tar',
-                        # default = 'experiments/MARC/pp/2024-03-12_pp_5x5_2a_1p_1o-v3_GAT_std_seed4001/saved_models/ckpt_best_avg_r1.6320000886917114.pth.tar',
                         # default='experiments/MARC/pp/2024-03-05_pp_10x10_2a_1p_2o-v3_std_seed4001/saved_models/ckpt_best_avg_r1.149999976158142.pth.tar',
                         # default='experiments/MARC/pp/2024-03-12_pp_5x5_2a_1p_1o-v3_std_seed4001/saved_models/ckpt_best_avg_r*',
                         # default = 'experiments/MARC/pp/2024-03-12_pp_5x5_2a_1p_1o-v3_std_seed4001/saved_models/ckpt_best_avg_r3.626000165939331.pth.tar'
@@ -476,6 +503,7 @@ if __name__ == '__main__':
     parser.add_argument("--fps", default=30, type=int)
     parser.add_argument("--render", default=True, action="store_true",
                         help="render")
+    parser.add_argument('--hue', default='q_values', help='what hue the plot should have')
     parser.add_argument("--save", default=True, action="store_true",
                         help="save step images")
     parser.add_argument("--benchmark", action="store_false",

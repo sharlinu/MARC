@@ -315,7 +315,7 @@ def run(config):
                              x='x',
                              y='y',
                              z='z',
-                             color='label',
+                             color=config.hue,
                              # size = 'steps',
                              hover_data=
                              {'x': False,
@@ -335,7 +335,7 @@ def run(config):
                              x='x',
                              y='y',
                              z='z',
-                             color='q_values',
+                             color=config.hue,
                              hover_data=
                              {'x': False,
                               'y': False,
@@ -352,7 +352,7 @@ def run(config):
                                    x='linear_x',
                                    y='linear_y',
                                    z='linear_z',
-                                   color='q_values',
+                                   color=config.hue,
                                    # size = 'steps',
                                    hover_data=
                                    {'linear_x': False,
@@ -366,12 +366,18 @@ def run(config):
                                    )
     fig_full_linear.write_html(f"plots/lbf/all_linear_embeddings.html")
 
+    if config.plot_type=='nodes':
+        fig = fig_full
+    elif config.plot_type=='graph':
+        fig = fig_full_graph
+    elif config.plot_type=='linear':
+        fig = fig_full_linear
 
     app.layout = html.Div(
         [
             dcc.Graph(
                 id="graph_interaction",
-                figure=fig_full,
+                figure=fig,
                 style={'display': 'inline-block', 'width': '100vh', 'height': '90vh'}
             ),
             html.Img(id='image', src='',style={'display':'inline-block', 'width': '70vh'})
@@ -398,6 +404,8 @@ if __name__ == '__main__':
     parser.add_argument("--eval_n_episodes", default=30, type=int)
     parser.add_argument("--eval_episode_length", default=25, type=int)
     parser.add_argument("--fps", default=30, type=int)
+    parser.add_argument("--hue", default='q_values', type=str)
+    parser.add_argument("--plot_type", default='graph', type=str)
     parser.add_argument("--render", default=True, action="store_true",
                         help="render")
     parser.add_argument("--save", default=True, action="store_true",
