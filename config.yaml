@@ -2,7 +2,6 @@ env_name: 'lbf'
 exp_id : 'std'
 other: '_3g'
 
-<<<<<<< HEAD
 player: 4
 field: 10
 grid_observation: True
