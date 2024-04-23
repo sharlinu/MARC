@@ -288,7 +288,6 @@ class RelationalSAC(object):
                       spatial_tensors,
                       batch_size,
                       dense,
-                      graph_layer,
                       gamma=0.95, tau=0.01,
                       pi_lr=0.01, q_lr=0.01,
                       reward_scale=10.,
