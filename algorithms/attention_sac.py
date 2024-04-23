@@ -2,7 +2,7 @@ import torch
 from torch.optim import Adam
 from utils.misc import soft_update, hard_update, enable_gradients, disable_gradients
 from utils.agents import AttentionAgent
-from utils.critics import AttentionCritic, RelationalCritic
+from utils.critics import RelationalCritic, AttentionCritic
 import numpy as np
 
 
@@ -25,10 +25,13 @@ class RelationalSAC(object):
                  pi_lr=0.01,
                  q_lr=0.01,
                  reward_scale=10.,
+                 embed_size = 128,
                  pol_hidden_dim=128,
                  critic_hidden_dim=128,
                  graph_layer='RGCN', 
                  device='cuda:0',
+                 dense= True,
+                 net_code = '1g1i1f',
                  **kwargs):
         """
         Inputs:
@@ -61,17 +64,24 @@ class RelationalSAC(object):
                                        input_dims=input_dims,
                                        hidden_dim=critic_hidden_dim,
                                        graph_layer = graph_layer,
-                                       device = device)
+                                       device = device,
+                                       dense = dense,
+                                       net_code = net_code,
+                                       embed_size = embed_size,
+                                       )
         self.target_critic = RelationalCritic(
                                         n_agents = self.n_agents,
-                                        # obs = obs,
                                         spatial_tensors=spatial_tensors,
                                         batch_size = batch_size,
                                         n_actions=n_actions,
                                         input_dims=input_dims,
                                         hidden_dim=critic_hidden_dim,
                                         graph_layer = graph_layer, 
-                                        device=device)
+                                        device=device,
+                                        dense = dense,
+                                        net_code = net_code,
+                                        embed_size = embed_size,
+                                        )
         hard_update(self.target_critic, self.critic) # hard update only at the beginning to initialise
         self.critic_optimizer = Adam(self.critic.parameters(), lr=q_lr,
                                      weight_decay=1e-3)
@@ -118,6 +128,11 @@ class RelationalSAC(object):
         """
         # observations = [observations['image']] * 2
         return [a.target_step(obs) for a, obs in zip(self.agents, observations)]
+
+    def critic_embeds(self, obs, acs):
+        unary = [o['unary_tensor'] for o in obs]
+        binary = [[o['binary_tensor']] for o in obs]
+        return self.critic(obs=obs, unary_tensors=unary, binary_tensors=binary, actions=acs)
 
 
     def update_critic(self, sample, soft=True, logger=None, **kwargs):
@@ -272,11 +287,16 @@ class RelationalSAC(object):
     def init_from_env(cls, env,
                       spatial_tensors,
                       batch_size,
+                      dense,
+                      graph_layer,
                       gamma=0.95, tau=0.01,
                       pi_lr=0.01, q_lr=0.01,
                       reward_scale=10.,
                       graph_layer = 'RGCN',
-                      pol_hidden_dim=64, critic_hidden_dim=64,
+                      embed_size = 128,
+                      pol_hidden_dim=64,
+                      critic_hidden_dim=64,
+                      net_code = '1g1i1f',
                       device='cuda:0',
                       **kwargs):
         """
@@ -312,7 +332,9 @@ class RelationalSAC(object):
                      'input_dims': [env.n_attr, env.n_rel_rules],
                      'device':device,
                      'graph_layer':graph_layer,
-                     # the number of attributes and the number of relations
+                     'dense': dense,
+                     'net_code': net_code,
+                     'embed_size': embed_size,
                      }
 
         instance = cls(**init_dict)
@@ -438,6 +460,12 @@ class AttentionSAC(object):
             actions: List of actions for each agent
         """
         return [a.target_step(obs) for a, obs in zip(self.agents, observations)]
+
+    def critic_embeds(self, obs, acs):
+        critic_in = list(zip(obs, acs))
+        critic_rets = self.critic(critic_in, regularize=True, niter=self.niter)
+        return critic_rets
+
 
     def update_critic(self, sample, soft=True, logger=None, **kwargs):
         """
@@ -592,9 +620,9 @@ class AttentionSAC(object):
                      pol_hidden_dim=128, critic_hidden_dim=128, attend_heads=4,
                      hard = True, 
                       **kwargs):
+
         """
         Instantiate instance of this class from multi-agent environment
-
         env: Multi-agent Gym environment
         gamma: discount factor
         tau: rate of update for target networks
@@ -661,4 +689,3 @@ class AttentionSAC(object):
             instance.critic_optimizer.load_state_dict(critic_params['critic_optimizer'])
             instance.critic_dev = device
             instance.trgt_critic_dev = device
-        return instance, episode

@@ -6,12 +6,9 @@ from gym.spaces import Box
 from torch.autograd import Variable
 from warnings import filterwarnings  # noqa
 import macpp
-# filterwarnings(action='ignore',
-#                         category=DeprecationWarning,
-#                         module='gym') # TODO update
 from utils.buffer import ReplayBufferMARC, ReplayBufferMAAC
 from algorithms.attention_sac import AttentionSAC, RelationalSAC
-from utils.rel_wrapper2 import AbsoluteVKBWrapper
+from utils.rel_wrapper2 import AbsoluteVKBWrapper, GATWrapper
 from utils.env_wrappers import DummyVecEnv, FlatObs, GridObs, PartialGridObs
 import yaml
 from utils.misc import Agent
@@ -22,12 +19,7 @@ def run(config):
     torch.set_num_threads(1)
     env_name = config.env_name
 
-
-    # run_num = 1
     run_dir = config.dir_exp
-    log_dir = config.dir_summary
-
-
     torch.manual_seed(config.random_seed)
     np.random.seed(config.random_seed)
     if config.exp_id == 'std':
@@ -43,12 +35,18 @@ def run(config):
             env = PartialGridObs(env)
         env.grid_observation = config.grid_observation
         attr_mapping = getattr(config, env_name)['attr_mapping']
-        env = AbsoluteVKBWrapper(env=env,
+        if config.marc['graph_layer'] == 'GAT':
+            env = GATWrapper(env=env,
                                  attr_mapping=attr_mapping,
                                  dense=config.marc['dense'],
-                                 background_id=config.marc['background_id'],
-                                 abs_id=config.marc['abs_id']
                                  )
+        else:
+            env = AbsoluteVKBWrapper(env=env,
+                              attr_mapping=attr_mapping,
+                              dense=config.marc['dense'],
+                              background_id=config.marc['background_id'],
+                              abs_id=config.marc['abs_id']
+                              )
         env.agents = [None] * len(env.action_space)
         # unary_dim = env.obs_shape['unary']
         env.reset()
@@ -69,17 +67,20 @@ def run(config):
         else:
             start_episode = 0
             model = RelationalSAC.init_from_env(env,
-                                                spatial_tensors=env.spatial_tensors,
-                                                batch_size = config.batch_size,
+                                               spatial_tensors=env.spatial_tensors,
+                                               batch_size = config.batch_size,
                                                tau=config.tau,
                                                pi_lr=config.pi_lr,
                                                q_lr=config.q_lr,
                                                gamma=config.gamma,
+                                                embed_size=config.marc['embed_size'],
                                                graph_layer = config.marc['graph_layer'],
                                                pol_hidden_dim=config.pol_hidden_dim,
                                                critic_hidden_dim=config.critic_hidden_dim,
                                                device=config.device,
-                                               reward_scale=config.reward_scale)
+                                               reward_scale=config.reward_scale,
+                                               dense=config.marc['dense'],
+                                               net_code = config.marc['net_code'])
 
         replay_buffer = ReplayBufferMARC(max_steps=config.marc['buffer_length'],
                                          num_agents=model.n_agents,
@@ -181,10 +182,10 @@ def run(config):
                 actions = [[np.argmax(ac[0]) for ac in agent_actions]]
             next_obs, rewards, dones, infos = env.step(actions)
             rewards, dones = np.array(rewards), np.array(dones)
-            # if config.alg=='MAAC':
-            #     env.envs[0].render()
-            # else:
-            #     env.render()
+            #if config.alg=='MAAC':
+            #    env.envs[0].render()
+            #else:
+            #    env.render()
             if config.alg == 'MAAC' and env.grid_observation:
                 next_obs = tuple([next_obs[:,i][0]['image'].flatten() for i in range(model.n_agents)])
                 next_obs = np.vstack(next_obs)
@@ -462,7 +463,8 @@ if __name__ == '__main__':
                             f"_{args['player']}a" \
                             f"_{args['pp']['n_picker']}p" \
                             f"_{args['pp']['n_objects']}o" \
-                            f"-{args['pp']['version']}"
+                            f"-{args['pp']['version']}" \
+                             f"-{args['other']}"
             del args['bpush'], args['lbf'], args['wolfpack'], args['rware']
         elif 'rware' in args['env_name']:
             args['env_id'] = f"{args['env_name']}" \

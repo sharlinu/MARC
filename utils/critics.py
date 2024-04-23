@@ -3,8 +3,15 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from itertools import chain
-from torch_geometric.nn import RGCNConv, pool, RGATConv
+from torch_geometric.nn import RGCNConv, pool, RGATConv, GATv2Conv, GATConv, Sequential
 from torch_geometric.data import Data as GeometricData, Batch
+
+class Pool(nn.Module):
+    def __init__(self):
+        super(Pool, self).__init__()
+
+    def forward(self, x, batch):
+        return pool.global_max_pool(x, batch)
 
 
 class RelationalCritic(nn.Module):
@@ -13,16 +20,15 @@ class RelationalCritic(nn.Module):
     """
     # TODO previously embedding_size = 16, now we have hidden_dim and 32
     def __init__(self,
-                 # sa_sizes: list,  # TODO at the end we should not need sa_sizes anymore?
-                  #obj_n: int,
                  n_agents: int,
                  spatial_tensors,
                  batch_size: int,
                  n_actions: int,
                  input_dims: list,
-                 hidden_dim: int = 32,
-                 norm_in: object = True,
-                 net_code: object = "1g1if",
+                 dense: bool,
+                 embed_size: int = 128,
+                 hidden_dim: int = 128,
+                 net_code: str = "1g1i1f",
                  device: str = 'cuda:0',
                  graph_layer: str = 'RGCN',
                  ) -> object:
@@ -34,51 +40,80 @@ class RelationalCritic(nn.Module):
             norm_in (bool): Whether to apply BatchNorm to input
         """
         super(RelationalCritic, self).__init__()
-        # self.sa_sizes = sa_sizes # TODO sa_sizes not needed in here anymore
         self.n_agents = n_agents
         self.num_actions = n_actions[0]
         self.critics_head = nn.ModuleList()
         self.device = device
         self.batch_size = batch_size
         self.max_reduce = True # TODO hardcoded
-        # self.dense = True
-        n_graph_layers, n_dense_layers = parse_code(net_code)
+        self.embed_size = embed_size
+        print(f'Using an embedding size of {self.embed_size}')
+        self.dense = dense
+
+        self.nb_graph_layers, self.nb_iterations, self.nb_dense_layers = parse_code(net_code)
         self.graph_layer = graph_layer
         self.spatial_tensors = np.array(spatial_tensors)
         self.binary_batch = torch.tensor([self.spatial_tensors for _ in range(self.batch_size)])
         self.gd, self.slices = batch_to_gd(self.binary_batch, self.device)  # makes adjs geometric data usable for torch geometric
         self.nb_edge_types = len(spatial_tensors)
-
-
-        self.embedder = nn.Linear(input_dims[0], hidden_dim)
+        self.embedder = nn.Linear(input_dims[0], self.embed_size)
         if self.graph_layer == 'RGCN':
-            self.gnn_layers = RGCNConv(hidden_dim, hidden_dim, self.nb_edge_types)
+            input_args = 'x, edge_index, edge_attr'
+            gnn = (RGCNConv(self.embed_size, self.embed_size, self.nb_edge_types), 'x, edge_index, edge_attr -> x')
         elif self.graph_layer == 'RGAT':
-            self.gnn_layers = RGATConv(hidden_dim, hidden_dim, self.nb_edge_types)
+            input_args = 'x, edge_index, edge_attr'
             attend_heads = 1
-            assert (hidden_dim % attend_heads) == 0
-            attend_dim = hidden_dim // attend_heads
-            self.gnn_layers = RGATConv(in_channels=input_dims[0],
+            assert (self.embed_size % attend_heads) == 0
+            attend_dim = self.embed_size // attend_heads
+            gnn = (RGATConv(in_channels=self.embed_size,
                                        out_channels=attend_dim,
                                        num_relations = self.nb_edge_types,
                                        heads = attend_heads,
-                                       )
-            print('This is using RGAT as graph layer')
+                                       ),
+                   'x, edge_index, edge_attr -> x')
+            print('Using RGAT as graph layer')
+        elif self.graph_layer == 'GAT':
+            input_args = 'x, edge_index'
+            attend_heads = 1
+            assert (self.embed_size % attend_heads) == 0
+            attend_dim = self.embed_size // attend_heads
+
+            gnn = (GATConv(in_channels = self.embed_size,
+                                      out_channels=attend_dim,
+                                      heads=attend_heads,
+                                      # v2 = True
+                                      ), 'x, edge_index -> x')
+        elif self.graph_layer == 'GATv2':
+            input_args = 'x, edge_index'
+            attend_heads = 1
+            assert (self.embed_size % attend_heads) == 0
+            attend_dim = self.embed_size // attend_heads
+            gnn = (GATv2Conv(in_channels=self.embed_size,
+                                      out_channels=attend_dim,
+                                      heads=attend_heads,
+                                      ), 'x, edge_index -> x')
+            print('Using GATv2 layer')
         else:
             print('not a valid graph layer')
         print(f'Using {self.graph_layer} as graph layer')
+        gnn_list = []
+        print(f'---- Adding {self.nb_graph_layers} layers and {self.nb_iterations} iterations ----')
+        for i in range(self.nb_graph_layers):
+            gnn_list.append(gnn)
+            gnn_list.append(torch.nn.ReLU(inplace=True))
+        self.gnn_layers = Sequential(input_args, gnn_list)
         # iterate over agents
+        self.pooling = Pool()
         for _ in range(self.n_agents):
             critic = nn.Sequential()
-            critic.add_module('critic_fc1', nn.Linear(hidden_dim + self.num_actions * (self.n_agents-1),
+            critic.add_module('critic_fc1', nn.Linear(self.embed_size + self.num_actions * (self.n_agents-1),
                                                       hidden_dim)) # takes in 128+6*2 , out 128
-
             critic.add_module('critic_nl', nn.LeakyReLU())
             critic.add_module('critic_fc2', nn.Linear(hidden_dim, self.num_actions))
             self.critics_head.append(critic) # one critic for each agent
 
-        # self.shared_modules = [self.embedder, self.gnn_layers]
-        self.shared_modules = [self.gnn_layers]
+        self.shared_modules = [self.embedder, self.gnn_layers]
+        # self.shared_modules = [self.gnn_layers]
 
     def shared_parameters(self):
         """
@@ -103,9 +138,8 @@ class RelationalCritic(nn.Module):
                 agents=None,
                 return_q=True,
                 return_all_q=False,
-                regularize = False,
-                logger=None,
-                niter=0):
+                logger = None,
+                niter = 1):
         """
         Inputs:
             inps (list of PyTorch Matrices): Inputs to each agents' encoder
@@ -119,31 +153,35 @@ class RelationalCritic(nn.Module):
             logger (TensorboardX SummaryWriter): If passed in, important values
                                                  are logged
         """
+        self.node_embeddings = []
+        self.node_concepts = []
+        self.graph_embeddings = []
         if agents is None:
             agents = range(self.n_agents)
 
         all_rets = []
 
         for a_i in agents:
-            # feature embedding
-            # print(unary_tensors[a_i])
-            # embedds = self.embedder(embedds) # seems right so far
-            # RGCN module
 
-            if all(binary_tensors):
+            if self.dense:
                 gd = Batch.from_data_list(binary_tensors[a_i])
                 gd = gd.to(device = self.device)
-                embedds = self.gnn_layers(gd.x, gd.edge_index, gd.edge_attr)
-                embedds = torch.relu(embedds)
-                x = pool.global_max_pool(embedds, gd.batch)
+                batch = gd.batch
+                embedds = self.embedder(gd.x)
+                if self.graph_layer in ['RGCN', 'RGAT']:
+                    for _ in range(self.nb_iterations):
+                        embedds = self.gnn_layers(embedds, gd.edge_index, gd.edge_attr)
+                else:
+                    embedds = self.gnn_layers(embedds, gd.edge_index)
             else:
                 embedds = torch.flatten(unary_tensors[a_i], 0, 1).float().to(device=self.device)
-                # embedds = self.embedder(unary_tensors[a_i])
-                embedds = self.gnn_layers(embedds, self.gd.edge_index, self.gd.edge_attr)
-                embedds = torch.relu(embedds)
-                x = pool.global_max_pool(embedds, self.gd.batch)
-
-
+                embedds = self.embedder(embedds)
+                for _ in range(self.nb_iterations):
+                    embedds = self.gnn_layers(embedds, self.gd.edge_index, self.gd.edge_attr)
+                batch = self.gd.batch
+            self.node_embeddings.append(embedds)
+            x = pool.global_max_pool(embedds, batch)
+            self.graph_embeddings.append(x)
             # extract state encoding for each agent that we're returning Q for
             other_actions = actions.copy()
             other_actions.pop(a_i)

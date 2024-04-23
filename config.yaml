@@ -1,7 +1,8 @@
 env_name: 'lbf'
 exp_id : 'std'
-other: ''
+other: '_3g'
 
+<<<<<<< HEAD
 player: 4
 field: 10
 grid_observation: True
@@ -14,8 +15,8 @@ test_n_episodes: 10
 device: 'cuda:0'
 
 pp:
-  n_picker: 2
-  n_objects: 3
+  n_picker: 1
+  n_objects: 1
   version: 'v3'
   attr_mapping: {'agent': 0,
                  'objects': 1,
@@ -24,6 +25,17 @@ pp:
                  'carrying': 4,
                  'picker': 5,}
 
+<<<<<<< HEAD
+=======
+lbf:
+  max_food: 3
+  force_coop: False
+  max_player_level: 2
+  keep_food: True
+  attr_mapping: {'agent': 0, 'id': 1, 'food': 2}
+
+
+>>>>>>> explainability
 rware:
   size: 'tiny'
   difficulty: 'easy-'
@@ -33,16 +45,15 @@ rware:
     'agents':2,
     'goals':3,
     'accessible':4,
-#    'agent_load':5,
-#    'agent_direction':6,
   }
 
 lbf:
-  max_food: 4
-  force_coop: True
+  max_food: 3
+  force_coop: False
   max_player_level: 2
   keep_food: True
   attr_mapping: {'agent': 0, 'id': 1, 'food': 2}
+
 
 bpush:
   penalty: 0.01
@@ -63,6 +74,8 @@ marc:
   abs_id: 'None'
   buffer_length: 100000
   graph_layer: 'RGCN'
+  net_code: '3g1i1f'
+  embed_size: 48
 
 maac:
   attend_heads: 1

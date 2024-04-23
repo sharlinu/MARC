@@ -3,7 +3,7 @@
 - Pytorch 1.13.1
 - Pytorch Geometric 2.2.0
 - Numpy 1.24.2
-- stable-baselines3==2.0.0
+- baselines
 - gym 0.25.1
 - my [fork](https://github.com/sharlinu/lb-foraging) of the Level-based Foraging environment
 

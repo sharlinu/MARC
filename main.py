@@ -10,7 +10,7 @@ from warnings import filterwarnings  # noqa
 #                         module='gym') # TODO update
 from utils.buffer import ReplayBufferMARC, ReplayBufferMAAC
 from algorithms.attention_sac import AttentionSAC, RelationalSAC
-from utils.rel_wrapper2 import AbsoluteVKBWrapper
+from utils.rel_wrapper2 import AbsoluteVKBWrapper, GATWrapper
 from utils.env_wrappers import DummyVecEnv
 import yaml
 from utils.misc import Agent
@@ -20,11 +20,8 @@ def run(config):
     torch.set_num_threads(1)
     env_name = config.env_name
 
-
     # run_num = 1
     run_dir = config.dir_exp
-    log_dir = config.dir_summary
-
 
     torch.manual_seed(config.random_seed)
     np.random.seed(config.random_seed)
@@ -37,12 +34,18 @@ def run(config):
         env = make_env(config)
         env.grid_observation = config.grid_observation
         attr_mapping = getattr(config, env_name)['attr_mapping']
-        env = AbsoluteVKBWrapper(env=env,
+        if config.marc['graph_layer'] == 'GAT':
+            env = GATWrapper(env=env,
                                  attr_mapping=attr_mapping,
                                  dense=config.marc['dense'],
-                                 background_id=config.marc['background_id'],
-                                 abs_id=config.marc['abs_id']
                                  )
+        else:
+            env = AbsoluteVKBWrapper(env=env,
+                              attr_mapping=attr_mapping,
+                              dense=config.marc['dense'],
+                              background_id=config.marc['background_id'],
+                              abs_id=config.marc['abs_id']
+                              )
         env.agents = [None] * len(env.action_space)
         # unary_dim = env.obs_shape['unary']
         env.reset()
@@ -64,21 +67,23 @@ def run(config):
             start_episode = 0
             model = RelationalSAC.init_from_env(env,
                                                 spatial_tensors=env.spatial_tensors,
+                                                dense = config.marc['dense'],
                                                 batch_size = config.batch_size,
                                                tau=config.tau,
                                                pi_lr=config.pi_lr,
                                                q_lr=config.q_lr,
                                                gamma=config.gamma,
+                                                embed_size= config.marc['embed_size'],
                                                pol_hidden_dim=config.pol_hidden_dim,
                                                critic_hidden_dim=config.critic_hidden_dim,
                                                graph_layer = config.marc['graph_layer'],
                                                device=config.device,
-                                               reward_scale=config.reward_scale)
+                                               reward_scale=config.reward_scale,
+                                               net_code=config.marc['net_code'])
 
         replay_buffer = ReplayBufferMARC(max_steps=config.marc['buffer_length'],
                                          num_agents=model.n_agents,
                                          obs_dims=[np.prod(obsp['image'].shape) for obsp in env.observation_space],
-                                         # unary_dims=[unary_dim for _ in range(model.n_agents)],
                                          ac_dims=[acsp.shape[0] if isinstance(acsp, Box) else acsp.n
                                                   for acsp in env.action_space],
                                          dense=config.marc['dense'])
