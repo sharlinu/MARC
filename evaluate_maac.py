@@ -5,12 +5,13 @@ import torch
 import time
 from pathlib import Path
 from torch.autograd import Variable
-from algorithms.attention_sac import AttentionSAC
+from algorithms.attention_sac import AttentionSAC, RelationalSAC
 import os
 import json
 import yaml
 import matplotlib.pyplot as plt
-
+# from envs.env_wrappers import GraphDummyVecEnv, GraphSubprocVecEnv
+from multiagent.MPE_env import MPEEnv, GraphMPEEnv
 import numpy as np
 
 def run(config):
@@ -26,7 +27,10 @@ def run(config):
     gif_path = '{}/{}'.format(eval_path, 'gifs')
     os.makedirs(gif_path, exist_ok=True)
 
-    maddpg, _ = AttentionSAC.init_from_save(model_path)
+    if config.alg == 'MAAC':
+        model, _ = AttentionSAC.init_from_save(model_path, device=config.device)
+    else:
+        model, _ = RelationalSAC.init_from_save(model_path, device=config.device)
     print(config.env_id)
     if 'boxworld' in config.env_id:
         from environments.box import BoxWorldEnv
@@ -83,10 +87,14 @@ def run(config):
         env=gym.make(f"macpp-{config.field}x{config.field}-{config.player}a-{config.pp['n_picker']}p-{config.pp['n_objects']}o-{config.pp['version']}",
                        debug_mode=False)
         env = FlatObs(env)
+    elif 'MAPE' in config.env_id:
+        # config.env_id =
+        env = GraphMPEEnv(config)
+
     else:
         raise ValueError(f'Cannot cater for the environment {config.env_id}')
 
-    maddpg.prep_rollouts(device='cpu')
+    model.prep_rollouts(device='cpu')
     ifi = 1 / config.fps  # inter-frame interval
     collect_data = {}
     l_ep_rew = []
@@ -104,7 +112,10 @@ def run(config):
         l_rewards = []
         ep_rew = 0
 
-        obs = env.reset()
+        if 'MAPE' in config.env_id:
+            obs, _, _, _ = env.reset()
+        else:
+            obs = env.reset()
         # env.seed(1)
         if config.render:
             time.sleep(0.5)
@@ -116,18 +127,25 @@ def run(config):
             # if config.no_render != False:
             #     frames.append(env.render(mode='rgb_array'))
 
-            # rearrange observations to be per agent, and convert to torch Variable
+        # rearrange observations to be per agent, and convert to torch Variable
             if config.grid_observation:
                 obs = [np.expand_dims(ob['image'].flatten(), axis=0) for ob in obs]
             torch_obs = [Variable(torch.Tensor(obs[i]).view(1, -1),
                                   requires_grad=False)
-                         for i in range(maddpg.n_agents)]
+                         for i in range(model.n_agents)]
+
             # get actions as torch Variables
-            torch_actions = maddpg.target_step(torch_obs)
+            torch_actions = model.target_step(torch_obs)
             # convert actions to numpy arrays
             actions = [np.argmax(ac.data.numpy().flatten()) for ac in torch_actions]
             # print('actions',actions)
-            obs, rewards, dones, infos = env.step(actions)
+            # print(torch_actions)
+            # print(actions)
+            if 'MAPE' in config.env_id:
+                actions = [ac.data.numpy().flatten() for ac in torch_actions]
+                obs, agent_id, node_obs, adj, rewards, dones, infos = env.step(actions)
+            else:
+                obs, rewards, dones, infos = env.step(actions)
             # print('obs', obs)
             # print(obs[0])
             # print(obs[1])
@@ -184,5 +202,24 @@ if __name__ == '__main__':
 
     for k , v in params.items():
         args[k] = v
+
+    config.scenario_name = 'navigation_graph'
+    config.num_agents: int = 7
+    config.world_size = 2
+    config.num_scripted_agents = 0
+    config.num_obstacles: int = 3
+    config.collaborative: bool = False
+    config.max_speed: float = 2
+    config.collision_rew: float = 5
+    config.goal_rew: float = 5
+    config.min_dist_thresh: float = 0.1
+    config.use_dones: bool = False
+    config.episode_length: int = 25
+    config.max_edge_dist: float = 1
+    config.graph_feat_type: str = "rgcn"
+    config.env_name ='GraphMPE'
+    config.seed = 4001
+    config.device = 'cpu'
+    config.grid_observation = False
 
     run(config)
