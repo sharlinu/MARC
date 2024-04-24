@@ -29,6 +29,7 @@ class RelationalCritic(nn.Module):
                  embed_size: int = 128,
                  hidden_dim: int = 128,
                  net_code: str = "1g1i1f",
+                 norm_in: object = True,
                  device: str = 'cuda:0',
                  graph_layer: str = 'RGCN',
                  ) -> object:
@@ -327,6 +328,7 @@ class AttentionCritic(nn.Module):
         all_attend_probs = [[] for _ in range(len(agents))]
 
         if self.hard:
+            # Hard Attention
             input_hard = []
             # for each agent get all h_i, h_j pairs
             for i in range(self.n_agents):
@@ -424,7 +426,7 @@ def batch_to_gd(batch: torch.Tensor, device: str):
     batch_size = batch.shape[0]
     nb_relations = batch.shape[1] #gets 14 out when full relations
     nb_objects = batch.shape[2] # gets n x n out
-
+    print('shape of the batch is', batch.shape)
     assert batch.shape[2] == batch.shape[3]
 
     # index array for all entities

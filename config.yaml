@@ -11,11 +11,11 @@ n_episodes: 500000
 episode_length: 50
 test_n_episodes: 10
 #tau: 0.01
-device: 'cuda:0'
+device: 'cuda'
 
 pp:
-  n_picker: 1
-  n_objects: 1
+  n_picker: 2
+  n_objects: 3
   version: 'v3'
   attr_mapping: {'agent': 0,
                  'objects': 1,
@@ -59,7 +59,7 @@ marc:
   relational_embedding : False
   background_id : 'b0'
   abs_id: 'None'
-  buffer_length: 100000
+  buffer_length: 1000000
   graph_layer: 'RGCN'
   net_code: '2g1i1f'
   embed_size: 48

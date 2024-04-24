@@ -312,8 +312,12 @@ class RelationalSAC(object):
         a_size = []
         for acsp, obsp in zip(env.action_space,
                               env.observation_space):
-            agent_init_params.append({'num_in_pol': np.ones(shape=obsp['image'].shape).flatten().shape[0],
+            if isinstance(obsp, dict):
+                agent_init_params.append({'num_in_pol': np.ones(shape=obsp['image'].shape).flatten().shape[0],
                                       'num_out_pol': acsp.n})
+            else:
+                agent_init_params.append({'num_in_pol': np.ones(shape=obsp.shape).shape[0],
+                                          'num_out_pol': acsp.n})
             a_size.append(acsp.n)
 
         init_dict = {'gamma': gamma,
@@ -356,13 +360,15 @@ class RelationalSAC(object):
             episode = 0
         save_dict['init_dict']['device'] = device
         print(save_dict['init_dict'])
-        # save_dict['init_dict']['gnn_layers'] = 'RGCN'
+        # save_dict['init_dict']['n_agents'] = 7
+        # save_dict['init_dict']['agent_init_params'] = [save_dict['init_dict']['agent_init_params'][0] for _ in range(save_dict['init_dict']['n_agents'])]
+        # save_dict['agent_params'] = save_dict['agent_params'] * save_dict['init_dict']['n_agents']
+        # save_dict['agent_params'].pop(0) # if less agents
         instance = cls(**save_dict['init_dict'])
         instance.init_dict = save_dict['init_dict']
         for a, params in zip(instance.agents, save_dict['agent_params']):
             a.load_params(params, device=device)
-            # a.policy_optimizer = Adam(a.policy.parameters(), lr=lr)
-        instance.pol_dev =  device
+        instance.pol_dev = device
         instance.trgt_pol_dev = device
         if load_critic:
             critic_params = save_dict['critic_params']
