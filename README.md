@@ -1,3 +1,6 @@
+# Related paper
+This code base is the reproducible code for our paper _Embracing Relational Reasoning in Multi-Agent Actor-Critic_ at AAMAS 2024:
+https://www.ifaamas.org/Proceedings/aamas2024/pdfs/p2525.pdf
 # Requirements used 
 - Python 3.9
 - Pytorch 1.13.1
