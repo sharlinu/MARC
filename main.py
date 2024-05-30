@@ -34,17 +34,17 @@ def run(config):
         env = make_env(config)
         env.grid_observation = config.grid_observation
         attr_mapping = getattr(config, env_name)['attr_mapping']
-        if config.marc['graph_layer'] == 'GAT':
+        if config.alg_params['graph_layer'] == 'GAT':
             env = GATWrapper(env=env,
                                  attr_mapping=attr_mapping,
-                                 dense=config.marc['dense'],
+                                 dense=config.alg_params['dense'],
                                  )
         else:
             env = AbsoluteVKBWrapper(env=env,
                               attr_mapping=attr_mapping,
-                              dense=config.marc['dense'],
-                              background_id=config.marc['background_id'],
-                              abs_id=config.marc['abs_id']
+                              dense=config.alg_params['dense'],
+                              background_id=config.alg_params['background_id'],
+                              abs_id=config.alg_params['abs_id']
                               )
         env.agents = [None] * len(env.action_space)
         # unary_dim = env.obs_shape['unary']
@@ -67,28 +67,28 @@ def run(config):
             start_episode = 0
             model = RelationalSAC.init_from_env(env,
                                                 spatial_tensors=env.spatial_tensors,
-                                                dense = config.marc['dense'],
+                                                dense = config.alg_params['dense'],
                                                 batch_size = config.batch_size,
                                                tau=config.tau,
                                                pi_lr=config.pi_lr,
                                                q_lr=config.q_lr,
                                                gamma=config.gamma,
-                                                embed_size= config.marc['embed_size'],
+                                                embed_size= config.alg_params['embed_size'],
                                                pol_hidden_dim=config.pol_hidden_dim,
                                                critic_hidden_dim=config.critic_hidden_dim,
-                                               graph_layer = config.marc['graph_layer'],
+                                               graph_layer = config.alg_params['graph_layer'],
                                                device=config.device,
                                                reward_scale=config.reward_scale,
-                                               net_code=config.marc['net_code'])
+                                               net_code=config.alg_params['net_code'])
 
-        replay_buffer = ReplayBufferMARC(max_steps=config.marc['buffer_length'],
+        replay_buffer = ReplayBufferMARC(max_steps=config.alg_params['buffer_length'],
                                          num_agents=model.n_agents,
                                          obs_dims=[np.prod(obsp['image'].shape) for obsp in env.observation_space],
                                          ac_dims=[acsp.shape[0] if isinstance(acsp, Box) else acsp.n
                                                   for acsp in env.action_space],
-                                         dense=config.marc['dense'])
+                                         dense=config.alg_params['dense'])
 
-    elif config.alg == 'MAAC':
+    elif config.alg in ['MAAC', 'G2ANet']:
         env = make_parallel_MAAC_env(config,seed=1)
         env.grid_observation = config.grid_observation
         env.reset()
@@ -115,10 +115,10 @@ def run(config):
                                                gamma=config.gamma,
                                                pol_hidden_dim=config.pol_hidden_dim,
                                                critic_hidden_dim=config.critic_hidden_dim,
-                                               attend_heads=config.maac['attend_heads'],
-                                               hard = config.maac['hard'],
+                                               attend_heads=config.alg_params['attend_heads'],
+                                               hard = config.alg_params['hard'],
                                                reward_scale=config.reward_scale)
-        replay_buffer = ReplayBufferMAAC(config.maac['buffer_length'], model.n_agents,
+        replay_buffer = ReplayBufferMAAC(config.alg_params['buffer_length'], model.n_agents,
                                      [np.prod(obsp['image'].shape) if env.grid_observation else obsp.shape[0]
                                       for obsp in env.observation_space],
                                      [acsp.shape[0] if isinstance(acsp, Box) else acsp.n
@@ -141,7 +141,7 @@ def run(config):
     path_ckpt_best_avg = '' # TODO could be altered with resume
     for ep_i in range(start_episode, config.n_episodes):
         obs = env.reset()
-        if env.grid_observation and config.alg =='MAAC':
+        if env.grid_observation and config.alg in ['MAAC', 'G2ANet']:
             obs = tuple([obs[:, i][0]['image'].flatten() for i in range(model.n_agents)])
             obs = np.vstack(obs)
             obs = np.expand_dims(obs, axis=0)
@@ -178,14 +178,14 @@ def run(config):
             next_obs, rewards, dones, infos = env.step(actions)
             rewards, dones = np.array(rewards), np.array(dones)
 
-            if config.alg == 'MAAC' and env.grid_observation:
+            if config.alg in ['MAAC', 'G2ANet'] and env.grid_observation:
                 next_obs = tuple([next_obs[:,i][0]['image'].flatten() for i in range(model.n_agents)])
                 next_obs = np.vstack(next_obs)
                 next_obs = np.expand_dims(next_obs, axis=0)
 
             if (config.alg == 'MARC' and all([ob['unary_tensor'].any() for ob in obs + next_obs])):
                 replay_buffer.push(obs, agent_actions, rewards, next_obs, dones)
-            elif config.alg == 'MAAC':
+            elif config.alg in ['MAAC', 'G2ANet']:
                 replay_buffer.push(obs, agent_actions, rewards, next_obs, dones)
             else:
                 print('did not consider transition')
@@ -376,11 +376,11 @@ def make_env(config):
             sparse = config.wolfpack['sparse'],)
         env.n_agents = env.num_players
         env.grid_observation = True
-    elif config.env_name == 'gridworld':
-        from Gridworld_Scripts.Connection import Connection as Conn
-        from Gridworld_Scripts.UnityGridEnv import UnityGridEnv as Env
-        conn = Conn(["server"])
-        env = Env(0, conn)
+    # elif config.env_name == 'gridworld':
+    #     from Gridworld_Scripts.Connection import Connection as Conn
+    #     from Gridworld_Scripts.UnityGridEnv import UnityGridEnv as Env
+    #     conn = Conn(["server"])
+    #     env = Env(0, conn)
     else:
         raise ValueError(f'No known env {config.env_name} ')
     return env
@@ -479,9 +479,14 @@ if __name__ == '__main__':
             args['step_interval_log'] = 200
 
         if args['alg'] == 'MARC':
+            args['alg_params'] =  args['marc']
             del args['maac']
+        elif args['alg'] == 'G2ANet':
+            args['alg_params'] = args['g2anet']
+            del args['maac'], args['marc']
         else:
-            del args['marc']
+            args['alg_params'] = args['maac']
+            del args['marc'], args['g2anet']
 
     dir_collected_data = './experiments/multipleseeds_data_{}_{}_{}'.format(args['alg'], args['env_id'],
                                                                                  args['exp_id'])

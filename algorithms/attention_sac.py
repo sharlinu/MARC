@@ -1,4 +1,5 @@
 import torch
+import wandb
 from torch.optim import Adam
 from utils.misc import soft_update, hard_update, enable_gradients, disable_gradients
 from utils.agents import AttentionAgent
@@ -149,6 +150,16 @@ class RelationalSAC(object):
             next_acs.append(curr_next_ac)
             next_log_pis.append(curr_next_log_pi)
 
+
+        for n, p in self.critic.named_parameters():
+            if 'gnn_layers' in n:
+                # print(n)
+                p.requires_grad = False
+
+        for n, p in self.target_critic.named_parameters():
+            if 'gnn_layers' in n:
+                p.requires_grad = False
+
         critic_rets = self.critic(obs=obs, unary_tensors=unary, binary_tensors=binary, actions=acs,
                                   logger=logger, niter=self.niter)
         next_qs = self.target_critic(obs=next_obs, unary_tensors=next_unary, binary_tensors=next_binary, actions=next_acs)
@@ -164,12 +175,18 @@ class RelationalSAC(object):
 
         q_loss.backward()
 
+        for n, p in self.critic.named_parameters():
+            # if 'gnn_layers' in n:
+                # print(p.grad.view(-1))
+            if p.grad is not None:
+                wandb.log({f'{n}': abs(p.grad).sum()})
+
 
         self.critic.scale_shared_grads()
         grad_norm = torch.nn.utils.clip_grad_norm_(
             self.critic.parameters(), 10 * self.n_agents)
 
-
+        wandb.log({'grad_norm': grad_norm, 'q_loss': q_loss})
         self.critic_optimizer.step()
         self.critic_optimizer.zero_grad()
 
@@ -312,12 +329,13 @@ class RelationalSAC(object):
         a_size = []
         for acsp, obsp in zip(env.action_space,
                               env.observation_space):
-            if isinstance(obsp, dict):
-                agent_init_params.append({'num_in_pol': np.ones(shape=obsp['image'].shape).flatten().shape[0],
+            print(type(obsp))
+            #if isinstance(obsp, dict):
+            agent_init_params.append({'num_in_pol': np.ones(shape=obsp['image'].shape).flatten().shape[0],
                                       'num_out_pol': acsp.n})
-            else:
-                agent_init_params.append({'num_in_pol': np.ones(shape=obsp.shape).shape[0],
-                                          'num_out_pol': acsp.n})
+            #else:
+             #   agent_init_params.append({'num_in_pol': np.ones(shape=obsp.shape).shape[0],
+                                       #   'num_out_pol': acsp.n})
             a_size.append(acsp.n)
 
         init_dict = {'gamma': gamma,

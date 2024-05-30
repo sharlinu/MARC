@@ -1,21 +1,21 @@
-env_name: 'lbf'
+env_name: 'mpe'
 exp_id : 'std'
-other: '_2g'
+other: '_0.25rew'
 
-player: 4
+player: 3
 field: 10
-grid_observation: True
+grid_observation: False
 
-alg: 'MARC'
+alg: 'MAAC'
 n_episodes: 500000
-episode_length: 50
+episode_length: 25
 test_n_episodes: 10
 #tau: 0.01
-device: 'cuda'
+device: 'cuda:1'
 
 pp:
-  n_picker: 2
-  n_objects: 3
+  n_picker: 1
+  n_objects: 2
   version: 'v3'
   attr_mapping: {'agent': 0,
                  'objects': 1,
@@ -61,10 +61,15 @@ marc:
   abs_id: 'None'
   buffer_length: 1000000
   graph_layer: 'RGCN'
-  net_code: '2g1i1f'
+  net_code: '1g1i1f'
   embed_size: 48
 
 maac:
+  attend_heads: 4
+  buffer_length: 1000000
+  hard: False
+
+g2anet:
   attend_heads: 1
   buffer_length: 1000000
   hard: True
