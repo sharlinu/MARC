@@ -28,7 +28,7 @@ def make_train_env(all_args: argparse.Namespace, n_rollout_threads):
             else:
                 print(f"Can not support the {all_args.env_name} environment")
                 raise NotImplementedError
-            env.seed(all_args.seed + rank * 1000)
+            env.seed(all_args.random_seed + rank * 1000)
             return env
 
         return init_env
@@ -122,7 +122,9 @@ def run(config):
                                        critic_hidden_dim=config.critic_hidden_dim,
                                        graph_layer = config.marc['graph_layer'],
                                        device=config.device,
-                                       reward_scale=config.reward_scale)
+                                       reward_scale=config.reward_scale,
+                                       dense=config.marc['dense'],
+                                       net_code=config.marc['net_code'])
 
     replay_buffer = ReplayBufferMPE(max_steps=config.marc['buffer_length'],
                                      num_agents=model.n_agents,
@@ -246,7 +248,9 @@ def run(config):
                 with open('{}/summary/reward_total.txt'.format(run_dir), 'w') as fp:
                     for el in l_rewards:
                         fp.write("{}\n".format(round(el, 2)))
-
+                if ep_i % 5000 == 0:
+                    path_ckpt_eps_tmp = os.path.join(config.dir_saved_models, 'ckpt_ep{}_{}.pth.tar'.format(ep_i, avg_reward))
+                    model.save(filename=path_ckpt_eps_tmp, episode=ep_i)
             if is_best_avg:
                 path_ckpt_best_avg_tmp = os.path.join(config.dir_saved_models,
                                                       'ckpt_best_avg_r{}.pth.tar'.format(avg_reward_best))
@@ -393,28 +397,15 @@ if __name__ == '__main__':
     for k, v in params.items():
         args[k] = v
 
-    config.scenario_name = 'navigation_graph'
-    config.num_agents: int = 3
-    config.world_size = 2
-    config.num_scripted_agents = 0
-    config.num_obstacles: int = 3
-    config.collaborative: bool = False
-    config.max_speed: float = 2
-    config.collision_rew: float = 5
-    config.goal_rew: float = 5
-    config.min_dist_thresh: float = 0.1
-    config.use_dones: bool = False
-    # config.episode_length: int = 25
-    config.max_edge_dist: float = 1
-    config.graph_feat_type: str = "rgcn"
-    config.env_name ='GraphMPE'
-    config.seed = 4001
+
+    # config.seed = 4001
 
     print(f'using {config.device}')
     # deletes arguments that are not used in this experiment
     if not args['resume']:
 
-        args['env_id'] = f"MAPE-{args['num_agents']}p"
+        config.num_agents = config.player
+        args['env_id'] = f"MAPE-{args['num_agents']}p{args['other']}"
 
 
         if params['exp_id'] == 'try':

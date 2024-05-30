@@ -1,16 +1,15 @@
-env_name: 'lbf'
+env_name: 'mpe'
 exp_id : 'std'
-other: '_2g'
+other: '_red_rew0.25'
 
-player: 4
+player: 3
 field: 10
 grid_observation: True
 
 alg: 'MARC'
 n_episodes: 500000
-episode_length: 50
+episode_length: 25
 test_n_episodes: 10
-#tau: 0.01
 device: 'cuda'
 
 pp:
@@ -68,6 +67,21 @@ maac:
   attend_heads: 1
   buffer_length: 1000000
   hard: True
+
+
+scenario_name : 'navigation_graph'
+world_size: 2
+num_scripted_agents : 0
+num_obstacles: 3
+collaborative: False
+max_speed: 2
+collision_rew: 5
+goal_rew:  5
+min_dist_thresh: 0.1
+use_dones: False
+max_edge_dist: 1
+graph_feat_type: "rgcn"
+env_name : 'GraphMPE'
 
 norm_rews : True
 batch_size : 1024

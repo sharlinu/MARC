@@ -88,6 +88,7 @@ class Scenario(BaseScenario):
             Maximum distance to consider to connect the nodes in the graph
         """
         # pull params from args
+        print('Initialising graph navigation')
         self.world_size = args.world_size
         self.num_agents = args.num_agents
         self.num_scripted_agents = args.num_scripted_agents
@@ -404,7 +405,7 @@ class Scenario(BaseScenario):
         if dist_to_goal < self.min_dist_thresh:
             rew += self.goal_rew
         else:
-            rew -= dist_to_goal
+            rew -= 0.25 * dist_to_goal
         if agent.collide:
             for a in world.agents:
                 # do not consider collision with itself
@@ -679,22 +680,22 @@ if __name__ == "__main__":
     # from multiagent.policy import InteractivePolicy
 
     # makeshift argparser
-    class Args:
-        def __init__(self):
-            self.num_agents: int = 2
-            self.world_size = 2
-            self.num_scripted_agents = 0
-            self.num_obstacles: int = 0
-            self.collaborative: bool = False
-            self.max_speed: Optional[float] = 2
-            self.collision_rew: float = 5
-            self.goal_rew: float = 5
-            self.min_dist_thresh: float = 0.1
-            self.use_dones: bool = False
-            self.episode_length: int = 25
-            self.max_edge_dist: float = 1
-            # self.graph_feat_type: str = "global"
-            self.graph_feat_type: str = 'rgcn'
+    # class Args:
+    #     def __init__(self):
+    #         self.num_agents: int = 2
+    #         self.world_size = 2
+    #         self.num_scripted_agents = 0
+    #         self.num_obstacles: int = 0
+    #         self.collaborative: bool = False
+    #         self.max_speed: Optional[float] = 2
+    #         self.collision_rew: float = 5
+    #         self.goal_rew: float = 5
+    #         self.min_dist_thresh: float = 0.1
+    #         self.use_dones: bool = False
+    #         self.episode_length: int = 25
+    #         self.max_edge_dist: float = 1
+    #         # self.graph_feat_type: str = "global"
+    #         self.graph_feat_type: str = 'rgcn'
 
     args = Args()
 
