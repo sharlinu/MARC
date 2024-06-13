@@ -1,16 +1,15 @@
-env_name: 'mpe'
+env_name: 'pp'
 exp_id : 'std'
-other: '_0.25rew'
+other: '_freeze'
 
-player: 3
+player: 2
 field: 10
-grid_observation: False
+grid_observation: True
 
-alg: 'MAAC'
-n_episodes: 500000
+alg: 'MARC'
+n_episodes: 250000
 episode_length: 25
 test_n_episodes: 10
-#tau: 0.01
 device: 'cuda:1'
 
 pp:
@@ -61,7 +60,7 @@ marc:
   abs_id: 'None'
   buffer_length: 1000000
   graph_layer: 'RGCN'
-  net_code: '1g1i1f'
+  net_code: '2g1i1f'
   embed_size: 48
 
 maac:
@@ -73,6 +72,26 @@ g2anet:
   attend_heads: 1
   buffer_length: 1000000
   hard: True
+
+
+scenario_name : 'navigation_graph'
+world_size: 2
+num_scripted_agents : 0
+num_obstacles: 3
+collaborative: False
+max_speed: 2
+collision_rew: 5
+goal_rew:  5
+min_dist_thresh: 0.1
+use_dones: False
+max_edge_dist: 1
+# obs_type : 'global'
+# num_nbd_entities : 3
+# share_env : False
+use_comm : False
+graph_feat_type: "rgcn"
+#algorithm_name : 'MAAC'
+# env_name : 'GraphMPE'
 
 norm_rews : True
 batch_size : 1024

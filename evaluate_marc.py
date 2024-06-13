@@ -8,17 +8,9 @@ import os
 import json
 import sys
 import gym
-sys.path.insert(0, '/Users/sharlinu/Desktop/github/MABoxWorld/environments')
-sys.path.insert(0, '/Users/sharlinu/Desktop/github/MABoxWorld/Images')
-sys.path.insert(0, '/Users/sharlinu/Desktop/github/MABoxWorld/')
-# from environments.box import BoxWorldEnv
-sys.path.insert(0, '/home/utke_s@WMGDS.WMG.WARWICK.AC.UK/github/MABoxWorld')
-sys.path.insert(0, '/home/utke_s@WMGDS.WMG.WARWICK.AC.UK/github/MABoxWorld/environments')
-
 import numpy as np
 from enum import Enum
 import yaml
-from lbforaging.foraging import ForagingEnv
 class Action(Enum):
     NONE = 0
     NORTH = 1
@@ -96,17 +88,30 @@ def run(config):
                        debug_mode=False)
         env = GridObs(env)
         attr_mapping = config.pp['attr_mapping']
+    elif 'MAPE' in config.env_id:
+        from multiagent.MPE_env import MPEEnv, GraphMPEEnv
+        env = GraphMPEEnv(config)
     else:
         raise ValueError(f'Cannot cater for the environment {config.env_id}')
 
     from utils.rel_wrapper2 import AbsoluteVKBWrapper
+    if 'MAPE' in config.env_id:
+        config.grid_observation = False
+        # env.grid_observation = False
+        env.agents = [None] * len(env.action_space)
+        env.n_agents = len(env.action_space)
+        env.n_rel_rules = 5
+        obs, agent_id, node_obs, adj = env.reset()
 
-    env = AbsoluteVKBWrapper(env,
-                             attr_mapping=attr_mapping,
-                             dense=config.marc['dense'],
-                             background_id=config.marc['background_id'],
-                             abs_id=config.marc['abs_id']
-                             )
+        # env.n_attr = node_obs.shape[3]
+
+    else:
+        env = AbsoluteVKBWrapper(env,
+                                 attr_mapping=attr_mapping,
+                                 dense=config.marc['dense'],
+                                 background_id=config.marc['background_id'],
+                                 abs_id=config.marc['abs_id']
+                                 )
     model.prep_rollouts(device='cpu')
     ifi = 1 / config.fps  # inter-frame interval
     collect_data = {}
@@ -125,10 +130,12 @@ def run(config):
         # l_rewards = []
         ep_rew = 0
 
-
-        obs = env.reset()
+        if 'MAPE' in config.env_id:
+            obs, agent_id, node_obs, adj = env.reset()
+        else:
+            obs = env.reset()
         if config.render:
-            env.render(save=config.save)
+            env.render()
 
         for t_i in range(config.eval_episode_length):
             calc_start = time.time()
@@ -136,20 +143,29 @@ def run(config):
             # rearrange observations to be per agent, and convert to torch Variable
             if config.grid_observation:
                 obs = [np.expand_dims(ob['image'].flatten(), axis=0) for ob in obs]
+            # if 'MAPE' in config.env_id:
+            #     torch_obs = [Variable(torch.Tensor(np.vstack(obs[:, i])),
+            #                           requires_grad=False)
+            #                  for i in range(model.n_agents)]
+            # else:
             torch_obs = [Variable(torch.Tensor(obs[i]).view(1, -1),
                                   requires_grad=False)
                          for i in range(model.n_agents)]
             # get actions as torch Variables
-            torch_actions = model.step(torch_obs,explore=False)
+            torch_actions = model.step(torch_obs, explore=False)
             # convert actions to numpy arrays
             actions = [np.argmax(ac.data.numpy().flatten()) for ac in torch_actions]
             # print('actions', actions)
-            obs, rewards, dones, infos = env.step(actions)
+            if 'MAPE' in config.env_id:
+                actions = [ac.data.numpy().flatten() for ac in torch_actions]
+                obs, agent_id, node_obs, adj, rewards, dones, infos = env.step(actions)
+            else:
+                obs, rewards, dones, infos = env.step(actions)
             if config.render:
                 if 'lbf' in config.env_id:
                     env.render(actions=actions)
                 else:
-                    env.render(save=config.save)
+                    env.render()
                 time.sleep(0.5)
             collect_item['l_infos'].append(infos)
 
