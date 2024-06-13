@@ -214,7 +214,9 @@ def run(config):
         df_graph['steps'] = graph_labels
         q_values = q_values_a #+  q_values_b
         agents = [0 for _ in range(len(q_values_a))] # + [1 for _ in range(len(q_values_b))]
+        # df['q_values'] = q_values
         df_graph['q_values'] = q_values
+
         df_graph['agent'] = agents
         df['label'] = fin_labels
         df['steps'] = steps
@@ -315,7 +317,7 @@ def run(config):
                              x='x',
                              y='y',
                              z='z',
-                             color=config.hue,
+                             color='label',
                              # size = 'steps',
                              hover_data=
                              {'x': False,

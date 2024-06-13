@@ -6,6 +6,7 @@ import torch
 from pathlib import Path
 from torch.autograd import Variable
 from algorithms.attention_sac import RelationalSAC
+from sklearn.cluster import KMeans
 import os
 import gym
 import macpp
@@ -73,9 +74,7 @@ def run(config):
         ValueError
 
     model.prep_rollouts(device='cpu')
-    ifi = 1 / config.fps  # inter-frame interval
     l_ep_rew = []
-    embeddings = ['node_embeddings', 'node_concepts', 'graph_embeddings']
     df_full = pd.DataFrame()
     df_full_graph = pd.DataFrame()
     try:
@@ -97,13 +96,13 @@ def run(config):
         print("Episode %i of %i" % (ep_i + 1, config.eval_n_episodes))
         ep_rew = 0
         obs = env.reset(seed=ep_i)
-
+        print(env.seed())
         if config.marc['graph_layer'] == 'GAT':
             labels_1 = torch.empty((0,8))
             labels_2 = torch.empty((0,8))
         else:
             labels_1 = torch.empty((0,6))
-            labels_2 = torch.empty((0,6))
+            labels_2 = torch.empty((0,6)) # TODO hard coding needs to change
 
         q_values_a = []
         q_values_b = []
@@ -159,19 +158,6 @@ def run(config):
             # print(state_label)
             obs, rewards, dones, infos = env.step(actions)
 
-            # # import time.sleep(1)
-            # if sum(rewards) == -0.2:
-            #     state_label.append(0)
-            # elif rewards[0] == 0.4:
-            #     state_label.append(2)
-            # elif sum(rewards) == 0.8:
-            #     state_label.append(1)
-            # elif sum(rewards) == 2.8:
-            #     state_label.append(3)
-            # else:
-            #     print(f'rewards are not categorised with  {rewards}')
-            # print(state_label)
-
             # if config.save:
             #     env.save(f"{directory}/step_{t_i}.png")
             ep_rew += sum(rewards)
@@ -203,6 +189,7 @@ def run(config):
         # activation = torch.vstack([temp1, temp2]).detach().numpy()
         activation = temp1.detach().numpy()
         graph_activation = graph_plots_a.detach().numpy()
+        print('graph_activation' , graph_activation.shape)
         # graph_activation = torch.vstack([graph_plots_a, graph_plots_b]).detach().numpy()
         graph_labels = [i for i in range(len(graph_plots_a))]
         graph_labels =  graph_labels
@@ -288,63 +275,47 @@ def run(config):
 
         min_ax = min(min(df['x']), min(df['y']), min(df['z']))
         max_ax = max(max(df['x']), max(df['y']), max(df['z']))
-        fig = px.scatter_3d(df,
-                            x='x',
-                            y='y',
-                            z='z',
-                            animation_frame='steps',
-                            color='label',
-                            range_x=[min_ax, max_ax],
-                            range_y=[min_ax, max_ax],
-                            range_z=[min_ax, max_ax],
-                            )
-
-        fig.update_scenes(aspectmode='cube')
-        # fig.show()
-        fig.write_html(f"plots/pp/episode_{ep_i}/node_embeddings.html")
-
-        fig_full = px.scatter_3d(df,
-                                 x='x',
-                                 y='y',
-                                 z='z',
-                                 color='label',
-                                 )
+        # fig = px.scatter_3d(df,
+        #                     x='x',
+        #                     y='y',
+        #                     z='z',
+        #                     animation_frame='steps',
+        #                     color='label',
+        #                     range_x=[min_ax, max_ax],
+        #                     range_y=[min_ax, max_ax],
+        #                     range_z=[min_ax, max_ax],
+        #                     )
+        #
+        # fig.update_scenes(aspectmode='cube')
+        # # fig.show()
+        # fig.write_html(f"plots/pp/episode_{ep_i}/node_embeddings.html")
+        #
+        # fig_full = px.scatter_3d(df,
+        #                          x='x',
+        #                          y='y',
+        #                          z='z',
+        #                          color='label',
+        #                          )
         # fig_full.show()
-        fig_full.write_html(f"plots/pp/episode_{ep_i}/full_node_embeddings.html")
+        # fig_full.write_html(f"plots/pp/episode_{ep_i}/full_node_embeddings.html")
 
-        fig_graph = px.scatter_3d(df_graph,
-                                  x='x',
-                                  y='y',
-                                  z='z',
-                                  color=config.hue,
-                                  hover_name="q_values",
-                                  hover_data=
-                                  {'x': False,
-                                   'y': False,
-                                   'z': False,
-                                   'agent': True,
-                                   'q_values': False,
-                                   'steps': True}
-                                  )
-        # fig_graph.show()
-        fig_graph.write_html(f"plots/pp/episode_{ep_i}/q_embeddings.html")
-
-        fig_graph = px.scatter_3d(df_graph,
-                                  x='x',
-                                  y='y',
-                                  z='z',
-                                  color=config.hue,
-                                  hover_name="steps",
-                                  hover_data=
-                                  {'x':False,
-                                   'y': False,
-                                   'z': False,
-                                   'agent':True,
-                                   'q_values':True,
-                                   'steps':False}
-                                  )
-        # fig_graph.show()
-        fig_graph.write_html(f"plots/pp/episode_{ep_i}/graph_embeddings.html")
+        # fig_graph = px.scatter_3d(df_graph,
+        #                           x='x',
+        #                           y='y',
+        #                           z='z',
+        #                           color=config.hue,
+        #                           hover_name="q_values",
+        #                           hover_data=
+        #                           {'x': False,
+        #                            'y': False,
+        #                            'z': False,
+        #                            'agent': True,
+        #                            'q_values': False,
+        #                            'steps': True,
+        #                            'success': True,}
+        #                           )
+        # # fig_graph.show()
+        # fig_graph.write_html(f"plots/pp/episode_{ep_i}/graph_embeddings.html")
         df['episode'] = ep_i
         df_graph['episode'] = ep_i
         df_full = pd.concat([df_full, df])
@@ -354,9 +325,12 @@ def run(config):
     env.close()
 
     model = umap.UMAP(n_components=3)
+    # model = TSNE(n_components=3)
+    kmeans_model = KMeans(n_clusters=3, random_state=0)
+    kmeans_model = kmeans_model.fit(graph_embedds.detach().numpy())
 
-    # input needs to be (n_samples, n_features)
-    # d = tsne_model.fit_transform(activation)
+    pred_labels = kmeans_model.predict(graph_embedds.detach().numpy())
+
     d_graph = model.fit_transform(graph_embedds.detach().numpy())
     d_node = model.fit_transform(node_embedds.detach().numpy())
     d_linear = model.fit_transform(linear_embedds.detach().numpy())
@@ -366,6 +340,7 @@ def run(config):
     df_full_graph['linear_x'] = d_linear[:, 0]
     df_full_graph['linear_y'] = d_linear[:, 1]
     df_full_graph['linear_z'] = d_linear[:, 2]
+    df_full_graph['k_label'] = pred_labels
 
     df_full['x'] = d_node[:, 0]
     df_full['y'] = d_node[:, 1]
@@ -390,7 +365,7 @@ def run(config):
                               'episode': True},
                              custom_data = ["images"]
                              )
-    fig_full.write_html(f"plots/pp/all_node_embeddings.html")
+    # fig_full.write_html(f"plots/pp/all_node_embeddings.html")
     # fig_full.update_layout(clickmode='event+select')
 
     fig_full_graph = px.scatter_3d(df_full_graph,
@@ -405,10 +380,13 @@ def run(config):
                                     'q_values': True,
                                     'agent': True,
                                     'steps': True,
-                                    'episode': True},
+                                    'episode': True,
+                                    'success': True,
+                                    'state': True,
+                                    'k_label': True},
                                    custom_data = ["images"]
                                    )
-    fig_full.write_html(f"plots/pp/all_node_embeddings.html")
+    # fig_full.write_html(f"plots/pp/all_node_embeddings.html")
     # fig_full.update_layout(clickmode='event+select')
 
     # fig_full_linear = px.scatter_3d(df_full_graph,
@@ -446,7 +424,7 @@ def run(config):
                                     'episode': True},
                                    custom_data=["images"]
                                    )
-    fig_full_linear.write_html(f"plots/lbf/all_linear_embeddings.html")
+    # fig_full_linear.write_html(f"plots/lbf/all_linear_embeddings.html")
     if config.plot_type=='nodes':
         fig = fig_full
     elif config.plot_type=='graph':
