@@ -460,7 +460,8 @@ class AttentionSAC(object):
 
     def critic_embeds(self, obs, acs):
         critic_in = list(zip(obs, acs))
-        critic_rets = self.critic(critic_in, regularize=True, niter=self.niter)
+        self.critic.eval()
+        critic_rets = self.critic(critic_in, regularize=False, niter=self.niter)
         return critic_rets
 
 
@@ -478,6 +479,16 @@ class AttentionSAC(object):
             next_log_pis.append(curr_next_log_pi)
         trgt_critic_in = list(zip(next_obs, next_acs))
         critic_in = list(zip(obs, acs))
+
+        # for n,p in self.critic.named_parameters():
+        #     if 'gnn_layers' in n:
+        #         print(n)
+        #         p.requires_grad = False
+        #
+        # for n,p in self.target_critic.named_parameters():
+        #     if 'gnn_layers' in n:
+        #         p.requires_grad = False
+
         next_qs = self.target_critic(trgt_critic_in) # gives us the single q-value given observation and action of agent
         critic_rets = self.critic(critic_in, regularize=True,
                                   niter=self.niter)
@@ -493,6 +504,7 @@ class AttentionSAC(object):
             # print(q_loss.grad_fb)
             for reg in regs:
                 q_loss += reg  # regularizing attention
+
         q_loss.backward()
         self.critic.scale_shared_grads()
 
