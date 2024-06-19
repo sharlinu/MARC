@@ -31,7 +31,7 @@ def to_gd(data: torch.Tensor, unary_t) -> GeometricData:
     # nb_objects = nb_objects
     # x = torch.arange(nb_objects).view(-1, 1) #
     unary_t = torch.tensor(unary_t, dtype=torch.float32)
-    data = torch.tensor(data)
+    data = data.clone().detach()
     nz = torch.nonzero(data)
 
     # list of all edges and what relationtype they have
@@ -576,6 +576,101 @@ class Scenario(BaseScenario):
         # TODO adj needs to be a list of adj-matrices
         return node_obs, spatial_tensors
 
+    def count_graph_observation(self, agent: Agent, world: World) -> Tuple[arr, arr]:
+        """
+        FIXME: Take care of the case where edge_list is empty
+        Returns: [node features, adjacency matrix]
+        • Node features (num_entities, num_node_feats):
+            If `global`:
+                • node features are global [pos, vel, goal, entity-type]
+                • edge features are relative distances (just magnitude)
+                NOTE: for `landmarks` and `obstacles` the `goal` is
+                        the same as its position
+            If `relative`:
+                • node features are relative [pos, vel, goal, entity-type] to ego agents
+                • edge features are relative distances (just magnitude)
+                NOTE: for `landmarks` and `obstacles` the `goal` is
+                        the same as its position
+        • Adjacency Matrix (num_entities, num_entities)
+            NOTE: using the distance matrix, need to do some post-processing
+            If `global`:
+                • All close-by entities are connectd together
+            If `relative`:
+                • Only entities close to the ego-agent are connected
+
+        """
+        num_entities = len(world.entities)
+        # node observations
+        node_obs = []
+        if world.graph_feat_type in ["global", 'rgcn']:
+            dists = world.cached_dist_vect
+            spatial_tensors = [np.zeros([len(world.entities), len(world.entities)]) for _ in range(9)]
+            for i, entity in enumerate(world.entities):
+                # node_obs_i = self._get_entity_feat_global(entity, world)
+                node_obs_i = self._get_entity_feat_RGCN(agent, entity, world)
+                # TODO add identity layer for agent
+                node_obs.append(node_obs_i)
+                right = False
+                top = False
+                for j, entity in enumerate(world.entities):
+                    # right
+                    # top
+                    count = 0
+                    if dists[i,j,1] > 0:
+                        top = True
+                    if dists[i, j, 0] > 0:
+                        if top is True:
+                            if dists[i,j,1] > dists[i,j,0]:
+                                spatial_tensors[0][i,j] = 1
+                                count += 1
+                            elif dists[i,j,1] < dists[i,j,0]:
+                                spatial_tensors[1][i,j] = 1
+                                count += 1
+                        else:
+                            if dists[i,j,1] > - dists[i,j,0]:
+                                spatial_tensors[2][i,j] = 1
+                                count += 1
+                            elif dists[i,j,1] < - dists[i,j,0]:
+                                spatial_tensors[3][i,j] = 1
+                                count += 1
+                    else:
+                        if top is True:
+                            if dists[i,j,1] > - dists[i,j,0]:
+                                spatial_tensors[4][i,j] = 1
+                                count += 1
+                            elif dists[i,j,1] < - dists[i,j,0]:
+                                spatial_tensors[5][i,j] = 1
+                                count +=1
+                        else:
+                            if dists[i,j,1] > dists[i,j,0]:
+                                spatial_tensors[6][i,j] = 1
+                                count += 1
+                            elif dists[i,j,1] < dists[i,j,0]:
+                                spatial_tensors[7][i,j] = 1
+                                count += 1
+                    if i == j:
+                        count += 1
+
+                    assert count != 0, 'error'
+                    # adj
+                    if (np.linalg.norm(dists[i,j,:]) < self.min_dist_thresh ) and (np.linalg.norm(dists[i,j,:]) !=0) :
+                        spatial_tensors[8][i, j] = 1
+
+
+                        # print('error')
+
+        elif world.graph_feat_type == "relative":
+            for i, entity in enumerate(world.entities):
+                node_obs_i = self._get_entity_feat_relative(agent, entity, world)
+                node_obs.append(node_obs_i)
+
+        node_obs = np.array(node_obs)
+
+
+
+        # TODO adj needs to be a list of adj-matrices
+        return node_obs, spatial_tensors
+
 
     def update_graph(self, world: World):
         """
@@ -680,22 +775,22 @@ if __name__ == "__main__":
     # from multiagent.policy import InteractivePolicy
 
     # makeshift argparser
-    # class Args:
-    #     def __init__(self):
-    #         self.num_agents: int = 2
-    #         self.world_size = 2
-    #         self.num_scripted_agents = 0
-    #         self.num_obstacles: int = 0
-    #         self.collaborative: bool = False
-    #         self.max_speed: Optional[float] = 2
-    #         self.collision_rew: float = 5
-    #         self.goal_rew: float = 5
-    #         self.min_dist_thresh: float = 0.1
-    #         self.use_dones: bool = False
-    #         self.episode_length: int = 25
-    #         self.max_edge_dist: float = 1
-    #         # self.graph_feat_type: str = "global"
-    #         self.graph_feat_type: str = 'rgcn'
+    class Args:
+        def __init__(self):
+            self.num_agents: int = 3
+            self.world_size = 2
+            self.num_scripted_agents = 0
+            self.num_obstacles: int = 3
+            self.collaborative: bool = False
+            self.max_speed: Optional[float] = 2
+            self.collision_rew: float = 5
+            self.goal_rew: float = 5
+            self.min_dist_thresh: float = 0.1
+            self.use_dones: bool = False
+            self.episode_length: int = 25
+            self.max_edge_dist: float = 1
+            # self.graph_feat_type: str = "global"
+            self.graph_feat_type: str = 'rgcn'
 
     args = Args()
 
@@ -736,7 +831,7 @@ if __name__ == "__main__":
         act_n = [[0,0,0,1,0],[0,0,0,1,0], [0,0,0,1,0]]
         obs_n, agent_id_n, node_obs_n, adj_n, reward_n, done_n, info_n = env.step(act_n)
         # print(obs_n[0].shape, node_obs_n[0].shape, adj_n[0].shape)
-        adj = [torch.tensor(adj_n[i], dtype=torch.int64) for i in range(2)]
+        adj = [torch.tensor(np.array(adj_n[i]), dtype=torch.int64) for i in range(2)]
 
         graph = [to_gd(adj[agent], node_obs_n[agent]) for agent in range(2)]
 
