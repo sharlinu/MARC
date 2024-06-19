@@ -125,9 +125,11 @@ def run(config):
             'ep': ep_i,
             'final_reward': 0,
             'l_infos': [],
-            'l_rewards': []
+            'l_rewards': [],
+            'agent_collisions': 0,
+            'obst_collisions': 0,
         }
-        # l_rewards = []
+        l_rewards = []
         ep_rew = 0
 
         if 'MAPE' in config.env_id:
@@ -161,6 +163,7 @@ def run(config):
                 obs, agent_id, node_obs, adj, rewards, dones, infos = env.step(actions)
             else:
                 obs, rewards, dones, infos = env.step(actions)
+
             if config.render:
                 if 'lbf' in config.env_id:
                     env.render(actions=actions)
@@ -174,18 +177,22 @@ def run(config):
             if config.render and (elapsed < ifi):
                 time.sleep(ifi - elapsed)
             ep_rew += sum(rewards)
-
+            # print('rewards', rewards, ep_rew)
+            l_rewards.append(sum(rewards))
             if all(dones):
                 collect_item['finished'] = 1
                 break
 
-
+        print(f"obst coll: {sum([d['Num_obst_collisions'] for d in infos])}, a coll: {sum([d['Num_agent_collisions'] for d in infos])}")
         l_ep_rew.append(ep_rew)
-        print("Reward: {}".format(ep_rew))
-
+        # print("Reward: {} for {} steps".format(ep_rew, t_i))
+        collect_item['l_rewards'] = l_rewards
+        collect_item['obst_collisions'] = sum([d['Num_obst_collisions'] for d in infos])
+        collect_item['agent_collisions'] = sum([d['Num_agent_collisions'] for d in infos])
         collect_data[ep_i] = collect_item
 
         with open('{}/collected_data.json'.format(eval_path), 'w') as outfile:
+           # print(f'dumped eval dict at {eval_path}')
             json.dump(collect_data, outfile,indent=4)
 
     print("Average reward: {}".format(sum(l_ep_rew)/config.eval_n_episodes))
