@@ -291,7 +291,7 @@ class Scenario(BaseScenario):
         if dist_to_goal < self.min_dist_thresh:
             rew += self.goal_rew
         else:
-            rew -= dist_to_goal
+            rew -= 0.25 * dist_to_goal
         if agent.collide:
             for a in world.agents:
                 # do not consider collision with itself
