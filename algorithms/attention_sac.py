@@ -175,12 +175,6 @@ class RelationalSAC(object):
 
         q_loss.backward()
 
-        for n, p in self.critic.named_parameters():
-            # if 'gnn_layers' in n:
-                # print(p.grad.view(-1))
-            if p.grad is not None:
-                wandb.log({f'{n}': abs(p.grad).sum()})
-
 
         self.critic.scale_shared_grads()
         grad_norm = torch.nn.utils.clip_grad_norm_(

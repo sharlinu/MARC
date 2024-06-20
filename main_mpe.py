@@ -211,7 +211,14 @@ def run(config):
                 break
         steps += et_i
         try:
-            wandb.log({"rew": episode_reward_total, "steps": et_i})
+            wandb.log({
+                "rew": episode_reward_total,
+                "obst_collisions": sum([infos[0,i]['Num_obst_collisions'] for i in range(infos.shape[1])]),
+                "agent_collisions": sum([infos[0,i]['Num_agent_collisions'] for i in range(infos.shape[1])]),
+                "success": np.mean([1 if infos[0,i]['individual_reward']== 5 else 0 for i in range(infos.shape[1])]),
+                'time_to_goal': np.mean([infos[0,i]['Time_req_to_goal'] for i in range(infos.shape[1])]),
+                "steps": et_i})
+
         except:
             pass
         print("%s - %s - Episodes %i (%is) of %i - Reward %.2f" % (config.env_id, config.random_seed, ep_i + 1, steps,
