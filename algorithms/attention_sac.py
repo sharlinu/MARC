@@ -180,7 +180,10 @@ class RelationalSAC(object):
         grad_norm = torch.nn.utils.clip_grad_norm_(
             self.critic.parameters(), 10 * self.n_agents)
 
-        wandb.log({'grad_norm': grad_norm, 'q_loss': q_loss})
+        try:
+            wandb.log({'grad_norm': grad_norm, 'q_loss': q_loss})
+        except:
+            print('wandb not Implemented')
         self.critic_optimizer.step()
         self.critic_optimizer.zero_grad()
 

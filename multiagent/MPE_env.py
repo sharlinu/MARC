@@ -70,6 +70,15 @@ def GraphMPEEnv(args):
     # create world
     world = scenario.make_world(args=args)
     from multiagent.environment import MultiAgentGraphEnv
+    if args.graph_observation == 'enhanced_spatial':
+        graph_observation_callback = scenario.count_graph_observation
+    elif args.graph_observation == 'basic_spatial':
+        graph_observation_callback = scenario.rel_graph_observation
+    else:
+        raise NotImplementedError
+
+    print(f'Implemented {args.graph_observation} callback')
+
 
     # create multiagent environment
     env = MultiAgentGraphEnv(
@@ -77,7 +86,7 @@ def GraphMPEEnv(args):
         reset_callback=scenario.reset_world,
         reward_callback=scenario.reward,
         observation_callback=scenario.global_observation,
-        graph_observation_callback=scenario.rel_graph_observation,
+        graph_observation_callback=graph_observation_callback,
         update_graph=scenario.update_graph,
         id_callback=scenario.get_id,
         info_callback=scenario.info_callback,
@@ -87,127 +96,102 @@ def GraphMPEEnv(args):
     return env
 
 
-def GPGMPEEnv(args):
-    """
-    MPE env but compatible with the GPG baseline code
-    """
-    # load scenario from script
-    scenario = load("navigation_gpg.py").Scenario()
-    # create world
-    world = scenario.make_world(args=args)
-    from multiagent.environment import MultiAgentGPGEnv
 
-    env = MultiAgentGPGEnv(
-        world=world,
-        reset_callback=scenario.reset_world,
-        reward_callback=scenario.reward,
-        observation_callback=scenario.observation,
-        graph_observation_callback=scenario.graph_observation,
-        info_callback=scenario.info_callback,
-        id_callback=scenario.get_id,
-        update_graph=scenario.update_graph,
-        shared_viewer=False,
-        scenario_name=args.scenario_name,
-    )
-
-    return env
-
-
-def CADRLMPEEnv(args, phase):
-    """
-    MPE env but compatible with the CADRL baseline code
-    """
-    # load scenario from script
-    scenario = load("navigation_cadrl.py").Scenario()
-    # create world
-    world = scenario.make_world(args=args)
-    from multiagent.environment import MultiAgentCADRLEnv
-
-    env = MultiAgentCADRLEnv(
-        config_args=args,
-        phase=phase,
-        world=world,
-        reset_callback=scenario.reset_world,
-        reward_callback=scenario.reward,
-        observation_callback=scenario.observation,
-        info_callback=scenario.info_callback
-        if hasattr(scenario, "info_callback")
-        else None,
-        shared_viewer=False,
-        scenario_name=args.scenario_name,
-    )
-
-    return env
+# def CADRLMPEEnv(args, phase):
+#     """
+#     MPE env but compatible with the CADRL baseline code
+#     """
+#     # load scenario from script
+#     scenario = load("navigation_cadrl.py").Scenario()
+#     # create world
+#     world = scenario.make_world(args=args)
+#     from multiagent.environment import MultiAgentCADRLEnv
+#
+#     env = MultiAgentCADRLEnv(
+#         config_args=args,
+#         phase=phase,
+#         world=world,
+#         reset_callback=scenario.reset_world,
+#         reward_callback=scenario.reward,
+#         observation_callback=scenario.observation,
+#         info_callback=scenario.info_callback
+#         if hasattr(scenario, "info_callback")
+#         else None,
+#         shared_viewer=False,
+#         scenario_name=args.scenario_name,
+#     )
+#
+#     return env
 
 
-def AttentionMPEEnv(args):
-    """
-    MPE env compatible with the Attention baseline code
-    """
-    # load scenario from script
-    scenario = load("navigation_attention.py").Scenario()
-    # create world
-    world = scenario.make_world(args=args)
-    from multiagent.environment import MultiAgentAttentionEnv
-
-    env = MultiAgentAttentionEnv(
-        world=world,
-        reset_callback=scenario.reset_world,
-        reward_callback=scenario.reward,
-        observation_callback=scenario.observation,
-        graph_observation_callback=scenario.graph_observation,
-        info_callback=scenario.info_callback,
-        id_callback=scenario.get_id,
-        update_graph=scenario.update_graph,
-        shared_viewer=False,
-        scenario_name=args.scenario_name,
-    )
-
-    return env
-
-
-def DGNMPEEnv(args):
-    """
-    MPE env compatible with the DGN baseline code
-    """
-    # load scenario from script
-    scenario = load("navigation_dgn.py").Scenario()
-    # create world
-    world = scenario.make_world(args=args)
-    from multiagent.environment import MultiAgentDGNEnv, MultiAgentDGN_ATOCEnv
-
-    if args.model_name == "dgn":
-        env = MultiAgentDGNEnv(
-            world=world,
-            reset_callback=scenario.reset_world,
-            reward_callback=scenario.reward,
-            observation_callback=scenario.observation,
-            graph_observation_callback=scenario.graph_observation,
-            info_callback=scenario.info_callback
-            if hasattr(scenario, "info_callback")
-            else None,
-            id_callback=scenario.get_id,
-            update_graph=scenario.update_graph,
-            shared_viewer=False,
-            scenario_name=args.scenario_name,
-        )
-    else:
-        env = MultiAgentDGN_ATOCEnv(
-            world=world,
-            reset_callback=scenario.reset_world,
-            reward_callback=scenario.reward,
-            observation_callback=scenario.observation,
-            graph_observation_callback=scenario.graph_observation,
-            info_callback=scenario.info_callback
-            if hasattr(scenario, "info_callback")
-            else None,
-            id_callback=scenario.get_id,
-            update_graph=scenario.update_graph,
-            shared_viewer=False,
-            scenario_name=args.scenario_name,
-        )
-
-    return env
+# def AttentionMPEEnv(args):
+#     """
+#     MPE env compatible with the Attention baseline code
+#     """
+#     # load scenario from script
+#     scenario = load("navigation_attention.py").Scenario()
+#     # create world
+#     world = scenario.make_world(args=args)
+#     from multiagent.environment import MultiAgentAttentionEnv
+#
+#     env = MultiAgentAttentionEnv(
+#         world=world,
+#         reset_callback=scenario.reset_world,
+#         reward_callback=scenario.reward,
+#         observation_callback=scenario.observation,
+#         graph_observation_callback=scenario.graph_observation,
+#         info_callback=scenario.info_callback,
+#         id_callback=scenario.get_id,
+#         update_graph=scenario.update_graph,
+#         shared_viewer=False,
+#         scenario_name=args.scenario_name,
+#     )
+#
+#     return env
+#
+#
+# def DGNMPEEnv(args):
+#     """
+#     MPE env compatible with the DGN baseline code
+#     """
+#     # load scenario from script
+#     scenario = load("navigation_dgn.py").Scenario()
+#     # create world
+#     world = scenario.make_world(args=args)
+#     from multiagent.environment import MultiAgentDGNEnv, MultiAgentDGN_ATOCEnv
+#
+#     if args.model_name == "dgn":
+#         env = MultiAgentDGNEnv(
+#             world=world,
+#             reset_callback=scenario.reset_world,
+#             reward_callback=scenario.reward,
+#             observation_callback=scenario.observation,
+#             graph_observation_callback=scenario.graph_observation,
+#             info_callback=scenario.info_callback
+#             if hasattr(scenario, "info_callback")
+#             else None,
+#             id_callback=scenario.get_id,
+#             update_graph=scenario.update_graph,
+#             shared_viewer=False,
+#             scenario_name=args.scenario_name,
+#         )
+#     else:
+#         env = MultiAgentDGN_ATOCEnv(
+#             world=world,
+#             reset_callback=scenario.reset_world,
+#             reward_callback=scenario.reward,
+#             observation_callback=scenario.observation,
+#             graph_observation_callback=scenario.graph_observation,
+#             info_callback=scenario.info_callback
+#             if hasattr(scenario, "info_callback")
+#             else None,
+#             id_callback=scenario.get_id,
+#             update_graph=scenario.update_graph,
+#             shared_viewer=False,
+#             scenario_name=args.scenario_name,
+#         )
+#
+#     return env
 
 
 def make_parallel_env(args: argparse.Namespace):

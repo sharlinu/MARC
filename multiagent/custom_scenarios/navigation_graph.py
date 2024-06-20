@@ -100,6 +100,7 @@ class Scenario(BaseScenario):
         self.min_dist_thresh = args.min_dist_thresh
         self.use_dones = args.use_dones
         self.episode_length = args.episode_length
+        self.reward_scale = args.reward_scale
         if not hasattr(args, "max_edge_dist"):
             self.max_edge_dist = 1
             print("_" * 60)
@@ -405,7 +406,7 @@ class Scenario(BaseScenario):
         if dist_to_goal < self.min_dist_thresh:
             rew += self.goal_rew
         else:
-            rew -= dist_to_goal
+            rew -= self.reward_scale * dist_to_goal
         if agent.collide:
             for a in world.agents:
                 # do not consider collision with itself
@@ -655,8 +656,6 @@ class Scenario(BaseScenario):
                     # adj
                     if (np.linalg.norm(dists[i,j,:]) < self.min_dist_thresh ) and (np.linalg.norm(dists[i,j,:]) !=0) :
                         spatial_tensors[8][i, j] = 1
-
-
                         # print('error')
 
         elif world.graph_feat_type == "relative":

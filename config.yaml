@@ -1,16 +1,16 @@
-env_name: 'pp'
+env_name: 'MAPE'
 exp_id : 'std'
-other: '_freeze'
+other: '_9_relations'
 
-player: 2
+player: 3
 field: 10
 grid_observation: True
 
 alg: 'MARC'
-n_episodes: 250000
+n_episodes: 300000
 episode_length: 25
 test_n_episodes: 10
-device: 'cuda:1'
+device: 'cuda:3'
 
 pp:
   n_picker: 1
@@ -85,14 +85,14 @@ goal_rew:  5
 min_dist_thresh: 0.1
 use_dones: False
 max_edge_dist: 1
-# obs_type : 'global'
-# num_nbd_entities : 3
+obs_type : 'global'
+num_nbd_entities : 3
 # share_env : False
 use_comm : False
 graph_feat_type: "rgcn"
-#algorithm_name : 'MAAC'
-# env_name : 'GraphMPE'
+env_name : 'GraphMPE'
+graph_observation: 'basic_spatial'
 
 norm_rews : True
 batch_size : 1024
-seeds: [4001]
+seeds: [6001]

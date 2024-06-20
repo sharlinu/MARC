@@ -21,11 +21,12 @@ from multiagent.MPE_env import MPEEnv, GraphMPEEnv
 def make_train_env(all_args: argparse.Namespace, n_rollout_threads):
     def get_env_fn(rank: int):
         def init_env():
-            if all_args.env_name == "MPE":
+            if all_args.alg == "MARC":
+                env = GraphMPEEnv(all_args)
+            elif all_args.env_name == "MPE":
                 env = MPEEnv(all_args)
                 print('crated standard MPE env')
-            elif all_args.alg == "MARC":
-                env = GraphMPEEnv(all_args)
+
             else:
                 print(f"Can not support the {all_args.env_name} environment")
                 raise NotImplementedError
@@ -109,8 +110,8 @@ def run(config):
 
     env.n_attr = node_obs.shape[3]
     adj = torch.tensor(adj)
-    env.n_rel_rules = 9
-    # graph = to_gd(node_obs, adj)
+    env.n_rel_rules = adj.shape[-1]
+
     start_episode = 0
     # env.spatial_tensors = graph
     model = RelationalSAC.init_from_env(env,
