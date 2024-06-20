@@ -23,7 +23,8 @@ def make_train_env(all_args: argparse.Namespace, n_rollout_threads):
         def init_env():
             if all_args.env_name == "MPE":
                 env = MPEEnv(all_args)
-            elif all_args.env_name == "GraphMPE":
+                print('crated standard MPE env')
+            elif all_args.alg == "MARC":
                 env = GraphMPEEnv(all_args)
             else:
                 print(f"Can not support the {all_args.env_name} environment")
@@ -103,11 +104,12 @@ def run(config):
     env.agents = [None] * len(env.action_space)
     env.n_agents = len(env.action_space)
 
-    env.n_rel_rules = 5
+
     obs, agent_id, node_obs, adj = env.reset()
 
     env.n_attr = node_obs.shape[3]
     adj = torch.tensor(adj)
+    env.n_rel_rules = 9
     # graph = to_gd(node_obs, adj)
     start_episode = 0
     # env.spatial_tensors = graph
