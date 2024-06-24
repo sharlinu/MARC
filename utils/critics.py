@@ -53,9 +53,10 @@ class RelationalCritic(nn.Module):
 
         self.nb_graph_layers, self.nb_iterations, self.nb_dense_layers = parse_code(net_code)
         self.graph_layer = graph_layer
-        self.spatial_tensors = np.array(spatial_tensors)
-        self.binary_batch = torch.tensor([self.spatial_tensors for _ in range(self.batch_size)])
-        self.gd, self.slices = batch_to_gd(self.binary_batch, self.device)  # makes adjs geometric data usable for torch geometric
+        if not self.dense:
+            self.spatial_tensors = np.array(spatial_tensors)
+            self.binary_batch = torch.tensor([self.spatial_tensors for _ in range(self.batch_size)])
+            self.gd, self.slices = batch_to_gd(self.binary_batch, self.device)  # makes adjs geometric data usable for torch geometric
         self.nb_edge_types = len(spatial_tensors)
         self.embedder = nn.Linear(input_dims[0], self.embed_size)
         if self.graph_layer == 'RGCN':

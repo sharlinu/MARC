@@ -325,10 +325,10 @@ class ReplayBufferMPE(object):
                 self.next_obs_binary_buffs[agent_i][self.curr_i] = next_graph[agent_i]
 
             self.ac_buffs[agent_i][self.curr_i:self.curr_i + nentries] = actions[agent_i]
-            self.rew_buffs[agent_i][self.curr_i:self.curr_i + nentries] = rewards[:, agent_i]
+            self.rew_buffs[agent_i][self.curr_i:self.curr_i + nentries] = rewards[agent_i]
             # self.next_obs_buffs[agent_i][self.curr_i:self.curr_i + nentries] = next_observation[agent_i]
             self.next_obs_buffs[agent_i][self.curr_i:self.curr_i + nentries] = np.vstack(next_observation[:, agent_i])  # np.vstack not needed with just one enviro
-            self.done_buffs[agent_i][self.curr_i:self.curr_i + nentries] = dones[:, agent_i]
+            self.done_buffs[agent_i][self.curr_i:self.curr_i + nentries] = dones[agent_i]
 
         self.curr_i += nentries
         if self.filled_i < self.max_steps:

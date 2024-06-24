@@ -150,14 +150,16 @@ def run(config):
     path_ckpt_best_avg = '' # TODO could be altered with resume
     for ep_i in range(start_episode, config.n_episodes):
         obs, agent_id, node_obs, adj = env.reset()
+        obs = np.expand_dims(obs, axis=0)
         adj = torch.tensor(adj)
-        graph = [to_gd(adj[0, agent], node_obs[0, agent]) for agent in range(env.n_agents)]
+        # node_obs = np.array(node_obs)
+        graph = [to_gd(adj[agent], node_obs[agent]) for agent in range(env.n_agents)]
         model.prep_rollouts(device='cpu')
         episode_reward_total = 0
         is_best_avg = False
 
         for et_i in range(1, config.episode_length + 1):
-            torch_obs = [Variable(torch.Tensor(np.vstack(obs[:, i])),
+            torch_obs = [Variable(torch.Tensor((obs[:,i])),
                                       requires_grad=False)
                              for i in range(model.n_agents)]
 
@@ -175,11 +177,12 @@ def run(config):
             #     actions = [np.argmax(ac) for ac in agent_actions]
             # else:
             # print('agent_actions', agent_actions)
-            actions = [[np.argmax(ac[0]) for ac in agent_actions]]
+            actions = [np.argmax(ac[0]) for ac in agent_actions]
             next_obs, agent_id, node_obs, adj, rewards, dones, infos = env.step(actions)
-
+            next_obs = np.expand_dims(next_obs, axis=0)
+            rewards, dones = np.array(rewards), np.array(dones)
             adj = torch.tensor(adj)
-            next_graph = [to_gd(adj[0,agent], node_obs[0,agent]) for agent in range(env.n_agents)]
+            next_graph = [to_gd(adj[agent], node_obs[agent]) for agent in range(env.n_agents)]
 
             # obs_n, agent_id_n, node_obs_n, adj_n, reward_n, done_n, info_n
             # rewards, dones = np.array(rewards), np.array(dones)
