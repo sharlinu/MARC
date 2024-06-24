@@ -8,13 +8,16 @@ archive/
 node_modules/
 archive/
 dist/
-./config.yaml
+#./config.yaml
 wandb/
 model.pt
 nohup.out
 experiments/*/*/*TEST*
 nohup.out
+old_multiagent/
 .ipynb_checkpoints/
+.pytest_cache/
+.idea/
 # Compiled Java class files
 *.class
 

@@ -15,34 +15,36 @@ from utils.misc import Agent
 from utils.plotting import plot_fig
 from torch_geometric.data import Data as GeometricData
 import wandb
-from envs.env_wrappers import GraphDummyVecEnv, GraphSubprocVecEnv
-from multiagent.MPE_env import MPEEnv, GraphMPEEnv
 
+# from multiagent.MPE_env import MPEEnv, GraphMPEEnv
+import multiagent as mpe
+from multiagent.MPE_env import GraphMPEEnv, MPEEnv
+# from multiagent.env_wrappers import GraphDummyVecEnv, GraphSubprocVecEnv
 def make_train_env(all_args: argparse.Namespace, n_rollout_threads):
-    def get_env_fn(rank: int):
-        def init_env():
-            if all_args.env_name == "MPE":
-                env = MPEEnv(all_args)
-            elif all_args.env_name == "GraphMPE":
-                env = GraphMPEEnv(all_args)
-            else:
-                print(f"Can not support the {all_args.env_name} environment")
-                raise NotImplementedError
-            env.seed(all_args.random_seed + rank * 1000)
-            return env
-
-        return init_env
-
-    if n_rollout_threads == 1:
-        if all_args.env_name == "GraphMPE":
-            return GraphDummyVecEnv([get_env_fn(0)])
-        return DummyVecEnv([get_env_fn(0)])
+    # def get_env_fn(rank: int):
+    #     def init_env():
+    if all_args.env_name == "MPE":
+        env = mpe.multiagent.MPE_env.MPEEnv(all_args)
+    elif all_args.env_name == "GraphMPE":
+        env = GraphMPEEnv(all_args)
     else:
-        if all_args.env_name == "GraphMPE":
-            return GraphSubprocVecEnv(
-                [get_env_fn(i) for i in range(n_rollout_threads)]
-            )
-        return SubprocVecEnv([get_env_fn(i) for i in range(n_rollout_threads)])
+        print(f"Can not support the {all_args.env_name} environment")
+        raise NotImplementedError
+    env.seed(all_args.random_seed * 1000)
+    return env
+
+        # return init_env
+
+    # if n_rollout_threads == 1:
+    #     if all_args.env_name == "GraphMPE":
+    #         return GraphDummyVecEnv([get_env_fn(0)])
+    #     return DummyVecEnv([get_env_fn(0)])
+    # else:
+    #     if all_args.env_name == "GraphMPE":
+    #         return GraphSubprocVecEnv(
+    #             [get_env_fn(i) for i in range(n_rollout_threads)]
+    #         )
+    #     return SubprocVecEnv([get_env_fn(i) for i in range(n_rollout_threads)])
 
 
 
@@ -87,7 +89,7 @@ def run(config):
 
     # run_num = 1
     run_dir = config.dir_exp
-    log_dir = config.dir_summary
+    # log_dir = config.dir_summary
 
 
     torch.manual_seed(config.random_seed)
@@ -106,7 +108,7 @@ def run(config):
     env.n_rel_rules = 5
     obs, agent_id, node_obs, adj = env.reset()
 
-    env.n_attr = node_obs.shape[3]
+    env.n_attr = np.array(node_obs).shape[2]
     adj = torch.tensor(adj)
     # graph = to_gd(node_obs, adj)
     start_episode = 0
@@ -167,12 +169,13 @@ def run(config):
                 continue
             # convert actions to numpy arrays
             agent_actions = [ac.data.numpy() for ac in torch_agent_actions]
-            actions = [[ac[i] for ac in agent_actions] for i in range(config.n_rollout_threads)]
+            # actions = [[ac[i] for ac in agent_actions] for i in range(config.n_rollout_threads)]
             # rearrange actions to be per environment
             # if config.alg == 'MARC':
             #     actions = [np.argmax(ac) for ac in agent_actions]
             # else:
-            #     actions = [[np.argmax(ac[0]) for ac in agent_actions]]
+            # print('agent_actions', agent_actions)
+            actions = [[np.argmax(ac[0]) for ac in agent_actions]]
             next_obs, agent_id, node_obs, adj, rewards, dones, infos = env.step(actions)
 
             adj = torch.tensor(adj)
@@ -184,7 +187,6 @@ def run(config):
             # next_obs = tuple([next_obs[:,i][0] for i in range(model.n_agents)])
             # next_obs = np.vstack(next_obs)
             # next_obs = np.expand_dims(next_obs, axis=0)
-
 
             replay_buffer.push(obs, graph, agent_actions, rewards, next_obs, next_graph, dones)
 

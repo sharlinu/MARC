@@ -183,13 +183,14 @@ def run(config):
                 collect_item['finished'] = 1
                 break
 
-        print(f"obst coll: {sum([d['Num_obst_collisions'] for d in infos])}, a coll: {sum([d['Num_agent_collisions'] for d in infos])}")
+        # print(f"obst coll: {sum([d['Num_obst_collisions'] for d in infos])}, a coll: {sum([d['Num_agent_collisions'] for d in infos])}")
         l_ep_rew.append(ep_rew)
         # print("Reward: {} for {} steps".format(ep_rew, t_i))
         collect_item['l_rewards'] = l_rewards
         collect_item['obst_collisions'] = sum([d['Num_obst_collisions'] for d in infos])
         collect_item['agent_collisions'] = sum([d['Num_agent_collisions'] for d in infos])
         collect_data[ep_i] = collect_item
+        collect_item['final_reward'] = np.sum(l_rewards)
 
         with open('{}/collected_data.json'.format(eval_path), 'w') as outfile:
            # print(f'dumped eval dict at {eval_path}')
