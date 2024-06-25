@@ -5,7 +5,7 @@ from utils.misc import soft_update, hard_update, enable_gradients, disable_gradi
 from utils.agents import AttentionAgent
 from utils.critics import RelationalCritic, AttentionCritic
 import numpy as np
-
+from gym.spaces import Dict
 
 MSELoss = torch.nn.MSELoss()
 
@@ -324,12 +324,12 @@ class RelationalSAC(object):
         for acsp, obsp in zip(env.action_space,
                               env.observation_space):
             print(type(obsp))
-            #if isinstance(obsp, dict):
-            agent_init_params.append({'num_in_pol': np.ones(shape=obsp['image'].shape).flatten().shape[0],
-                                      'num_out_pol': acsp.n})
-            #else:
-             #   agent_init_params.append({'num_in_pol': np.ones(shape=obsp.shape).shape[0],
-                                       #   'num_out_pol': acsp.n})
+            if isinstance(obsp, dict) or isinstance(obsp, Dict):
+                agent_init_params.append({'num_in_pol': np.ones(shape=obsp['image'].shape).flatten().shape[0],
+                                          'num_out_pol': acsp.n})
+            else:
+               agent_init_params.append({'num_in_pol': np.ones(shape=obsp.shape).shape[0],
+                                         'num_out_pol': acsp.n})
             a_size.append(acsp.n)
 
         init_dict = {'gamma': gamma,
