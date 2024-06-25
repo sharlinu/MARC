@@ -100,7 +100,7 @@ class Scenario(BaseScenario):
         self.min_dist_thresh = args.min_dist_thresh
         self.use_dones = args.use_dones
         self.episode_length = args.episode_length
-        self.reward_scale = args.reward_scale
+        self.reward_sparsity = args.reward_sparsity
         if not hasattr(args, "max_edge_dist"):
             self.max_edge_dist = 1
             print("_" * 60)
@@ -406,7 +406,7 @@ class Scenario(BaseScenario):
         if dist_to_goal < self.min_dist_thresh:
             rew += self.goal_rew
         else:
-            rew -= self.reward_scale * dist_to_goal
+            rew -= self.reward_sparsity * dist_to_goal
         if agent.collide:
             for a in world.agents:
                 # do not consider collision with itself
