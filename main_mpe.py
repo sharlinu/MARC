@@ -18,7 +18,7 @@ import wandb
 
 # from multiagent.MPE_env import MPEEnv, GraphMPEEnv
 import multiagent as mpe
-from multiagent.MPE_env import GraphMPEEnv, MPEEnv
+from multiagent.MPE_env import RelGraphMPEEnv, MPEEnv
 # from multiagent.env_wrappers import GraphDummyVecEnv, GraphSubprocVecEnv
 def make_train_env(all_args: argparse.Namespace, n_rollout_threads):
     # def get_env_fn(rank: int):
@@ -26,7 +26,7 @@ def make_train_env(all_args: argparse.Namespace, n_rollout_threads):
     if all_args.env_name == "MPE":
         env = mpe.multiagent.MPE_env.MPEEnv(all_args)
     elif all_args.env_name == "GraphMPE":
-        env = GraphMPEEnv(all_args)
+        env = RelGraphMPEEnv(all_args)
     else:
         print(f"Can not support the {all_args.env_name} environment")
         raise NotImplementedError
@@ -105,11 +105,11 @@ def run(config):
     env.agents = [None] * len(env.action_space)
     env.n_agents = len(env.action_space)
 
-    env.n_rel_rules = 5
     obs, agent_id, node_obs, adj = env.reset()
 
     env.n_attr = np.array(node_obs).shape[2]
     adj = torch.tensor(adj)
+    env.n_rel_rules = adj.shape[-1]
     # graph = to_gd(node_obs, adj)
     start_episode = 0
     # env.spatial_tensors = graph
@@ -123,6 +123,7 @@ def run(config):
                                        pol_hidden_dim=config.pol_hidden_dim,
                                        critic_hidden_dim=config.critic_hidden_dim,
                                        graph_layer = config.marc['graph_layer'],
+                                       embed_size = config.marc['embed_size'],
                                        device=config.device,
                                        reward_scale=config.reward_scale,
                                        dense=config.marc['dense'],
@@ -221,8 +222,8 @@ def run(config):
                 "success": np.mean([1 if infos[0,i]['individual_reward']== 5 else 0 for i in range(infos.shape[1])]),
                 'time_to_goal': np.mean([infos[0,i]['Time_req_to_goal'] for i in range(infos.shape[1])]),
                 "steps": et_i})
-
-        except:
+        except Exception as e :
+            print(e)
             pass
         print("%s - %s - Episodes %i (%is) of %i - Reward %.2f" % (config.env_id, config.random_seed, ep_i + 1, steps,
                                         config.n_episodes,  episode_reward_total))
@@ -387,7 +388,7 @@ if __name__ == '__main__':
     parser.add_argument("--tau", default=0.001, type=float) # soft update rate
     parser.add_argument("--gamma", default=0.99, type=float)
     parser.add_argument("--reward_scale", default=100., type=float) # temperature parameter alpha = 1/reward_scale = 0.01 in this case
-    # parser.add_argument("--device",default='cuda:0', type=str)
+    parser.add_argument("--device",default='cuda:0', type=str)
     parser.add_argument('--dir_base', default='./experiments',
                         help='path of the experiment directory')
     config = parser.parse_args()

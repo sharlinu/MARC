@@ -89,7 +89,6 @@ def run(config):
                                          ac_dims=[acsp.shape[0] if isinstance(acsp, Box) else acsp.n
                                                   for acsp in env.action_space],
                                          dense=config.marc['dense'])
-
     elif config.alg == 'MAAC':
         env = make_parallel_MAAC_env(config,seed=1)
         # env = FlatObs(env)
@@ -171,7 +170,7 @@ def run(config):
             try:
                 torch_agent_actions = model.step(torch_obs, explore=True)
             except Exception as e:
-                print(e)
+                print(f'torch_obs error: {e}')
                 continue
             # convert actions to numpy arrays
             agent_actions = [ac.data.numpy() for ac in torch_agent_actions]
@@ -218,8 +217,15 @@ def run(config):
                 break
         steps += et_i
         try:
-            wandb.log({"rew": episode_reward_total, "steps": et_i})
-        except:
+            wandb.log({
+                "rew": episode_reward_total,
+                "obst_collisions": sum([infos[0][k]['Num_obst_collisions'] for k in infos[0].keys()]),
+                "agent_collisions": sum([infos[0][k]['Num_agent_collisions'] for k in infos[0].keys()]),
+                "success": np.mean([1 if infos[0][k]['individual_reward']== 5 else 0 for k in infos[0].keys()]),
+                'time_to_goal': np.mean([infos[0][k]['Time_req_to_goal'] for k in infos[0].keys()]),
+                "steps": et_i})
+        except Exception as e:
+            print(f'wandb logging error{e}')
             pass
         l_rewards.append(episode_reward_total)
         epymarl_rewards.append(episode_reward_total)
@@ -370,6 +376,14 @@ def make_env(config):
             env = gym.make(f"rware-{config.rware['size']}-{config.player}ag-{config.rware['difficulty']}v1")
     elif config.env_name == 'pp':
         env = gym.make(f"macpp-{config.field}x{config.field}-{config.player}a-{config.pp['n_picker']}p-{config.pp['n_objects']}o-{config.pp['version']}", debug_mode=False)
+    elif 'MPE' in config.env_name:
+        import multiagent as mpe
+        if config.player ==3:
+            env = gym.make(f"Navigation-v0")
+        elif config.player == 7:
+            env = gym.make(f"Navigation-7a-v0")
+        else:
+            raise ValueError(f'Not set up for {config.player} agents')
     else:
         raise ValueError(f'Cannot identify environment {config.env_name}')
     # env = FlatObs(env)
@@ -472,7 +486,9 @@ if __name__ == '__main__':
                             f"_{args['player']}a" \
                             f"-{args['rware']['difficulty']}"
             del args['bpush'], args['lbf'], args['wolfpack'], args['pp']
-
+        elif 'MPE' in args['env_name']:
+            args['env_id'] = f"{args['env_name']}" \
+                            f"_{args['field']}x{args['field']}"
         if params['exp_id'] == 'try':
             args['env_id'] = 'TEST'
             args['n_episodes']= 30000
