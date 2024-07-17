@@ -88,9 +88,8 @@ def run(config):
                        debug_mode=False)
         env = FlatObs(env)
     elif 'MAPE' in config.env_id:
-        # config.env_id =
-        env = GraphMPEEnv(config)
-
+        import mpe
+        env = gym.make('Navigation-7a-v0')
     else:
         raise ValueError(f'Cannot cater for the environment {config.env_id}')
 
@@ -169,6 +168,12 @@ def run(config):
 
         l_ep_rew.append(ep_rew)
         print("Reward: {}".format(ep_rew))
+        collect_item['l_rewards'] = l_rewards
+        collect_item['obst_collisions'] = sum([d['Num_obst_collisions'] for d in infos])
+        collect_item['agent_collisions'] = sum([d['Num_agent_collisions'] for d in infos])
+        collect_data[ep_i] = collect_item
+        collect_item['final_reward'] = np.sum(l_rewards)
+
 
         collect_data[ep_i] = collect_item
         with open('{}/collected_data.json'.format(eval_path), 'w') as outfile:

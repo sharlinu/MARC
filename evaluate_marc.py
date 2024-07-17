@@ -11,6 +11,7 @@ import gym
 import numpy as np
 from enum import Enum
 import yaml
+import matplotlib.pyplot as plt
 class Action(Enum):
     NONE = 0
     NORTH = 1
@@ -46,6 +47,7 @@ def run(config):
             deterministic=config.deterministic,
         )
     elif 'lbf' in  config.env_id:
+        from lbforaging.foraging import ForagingEnv
         env = ForagingEnv(
             players=config.player,
             max_player_level=config.lbf['max_player_level'],
@@ -56,7 +58,7 @@ def run(config):
             sight=config.field,
             max_episode_steps=config.episode_length,
             force_coop=config.lbf['force_coop'],
-            keep_food = config.lbf['keep_food'],
+            keep_food = True,
             # simple=config.simple,
         )
         attr_mapping = config.lbf['attr_mapping']
@@ -165,10 +167,21 @@ def run(config):
                 obs, rewards, dones, infos = env.step(actions)
 
             if config.render:
-                if 'lbf' in config.env_id:
-                    env.render(actions=actions)
+                if config.save:
+                    arr = env.render(mode='rgb_array', actions=actions)
+                    img = f'step_{t_i}.pdf'
+                    plt.xticks([])
+                    plt.yticks([])
+                    plt.imshow(arr)
+                    # plt.axis('off')
+                    plt.savefig(img, format='pdf', bbox_inches='tight')
+                    # images.append(Image.open(img))
+                    plt.close()
+                # if 'lbf' in config.env_id:
+                #     env.render(actions=actions)
                 else:
                     env.render()
+
                 time.sleep(0.5)
             collect_item['l_infos'].append(infos)
 
