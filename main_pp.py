@@ -378,7 +378,10 @@ def make_env(config):
         env = gym.make(f"macpp-{config.field}x{config.field}-{config.player}a-{config.pp['n_picker']}p-{config.pp['n_objects']}o-{config.pp['version']}", debug_mode=False)
     elif 'MPE' in config.env_name:
         import multiagent as mpe
-        if config.player ==3:
+        if config.reward_sparsity==0.25:
+            print('using sparse environment')
+            env = gym.make('Navigation-rew0.25-v0')
+        elif config.player ==3:
             env = gym.make(f"Navigation-v0")
         elif config.player == 7:
             env = gym.make(f"Navigation-7a-v0")
@@ -488,7 +491,9 @@ if __name__ == '__main__':
             del args['bpush'], args['lbf'], args['wolfpack'], args['pp']
         elif 'MPE' in args['env_name']:
             args['env_id'] = f"{args['env_name']}" \
-                            f"_{args['field']}x{args['field']}"
+                            f"_{args['field']}x{args['field']}_"\
+                             f"-{args['player']}a_"\
+                             f"-{args['other']}"
         if params['exp_id'] == 'try':
             args['env_id'] = 'TEST'
             args['n_episodes']= 30000

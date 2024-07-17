@@ -261,9 +261,9 @@ def run(config):
                 with open('{}/summary/reward_total.txt'.format(run_dir), 'w') as fp:
                     for el in l_rewards:
                         fp.write("{}\n".format(round(el, 2)))
-                if ep_i % 5000 == 0:
-                    path_ckpt_eps_tmp = os.path.join(config.dir_saved_models, 'ckpt_ep{}_{}.pth.tar'.format(ep_i, avg_reward))
-                    model.save(filename=path_ckpt_eps_tmp, episode=ep_i)
+            #    if ep_i % 5000 == 0:
+            #        path_ckpt_eps_tmp = os.path.join(config.dir_saved_models, 'ckpt_ep{}_{}.pth.tar'.format(ep_i, avg_reward))
+            #        model.save(filename=path_ckpt_eps_tmp, episode=ep_i)
             if is_best_avg:
                 path_ckpt_best_avg_tmp = os.path.join(config.dir_saved_models,
                                                       'ckpt_best_avg_r{}.pth.tar'.format(avg_reward_best))
