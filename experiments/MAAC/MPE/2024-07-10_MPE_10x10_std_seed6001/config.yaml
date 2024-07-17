@@ -1,0 +1,104 @@
+alg: MAAC
+batch_size: 1024
+bpush:
+  attr_mapping:
+    agent: 0
+    boulder: 1
+    goal: 2
+    id: 3
+  penalty: 0.01
+  sensor_range: 4
+buffer_length: 1000000
+collaborative: false
+collision_rew: 5
+critic_hidden_dim: 128
+device: cuda:3
+dir_base: ./experiments
+dir_exp: ./experiments/MAAC/MPE/2024-07-10_MPE_10x10_std_seed6001
+dir_monitor: ./experiments/MAAC/MPE/2024-07-10_MPE_10x10_std_seed6001/monitor
+dir_saved_models: ./experiments/MAAC/MPE/2024-07-10_MPE_10x10_std_seed6001/saved_models
+dir_summary: ./experiments/MAAC/MPE/2024-07-10_MPE_10x10_std_seed6001/summary
+env_id: MPE_10x10
+env_name: MPE
+episode_length: 25
+exp_id: std
+field: 10
+gamma: 0.99
+goal_rew: 5
+graph_feat_type: rgcn
+grid_observation: false
+lbf:
+  attr_mapping:
+    agent: 0
+    food: 2
+    id: 1
+  force_coop: true
+  keep_food: true
+  max_food: 4
+  max_player_level: 2
+maac:
+  attend_heads: 4
+  buffer_length: 1000000
+  hard: false
+max_edge_dist: 1
+max_speed: 2
+min_dist_thresh: 0.1
+n_episodes: 160000
+norm_rews: true
+num_obstacles: 3
+num_scripted_agents: 0
+num_updates: 4
+obs_type: global
+other: _sparse
+pi_lr: 0.001
+player: 3
+pol_hidden_dim: 128
+pp:
+  attr_mapping:
+    agent: 0
+    carrying: 4
+    goals: 2
+    id: 3
+    objects: 1
+    picker: 5
+  n_objects: 2
+  n_picker: 1
+  version: v3
+q_lr: 0.001
+random_seed: 6001
+resume: null
+resume_episodes: null
+reward_scale: 100.0
+reward_sparsity: 0.25
+rware:
+  attr_mapping:
+    accessible: 4
+    agents: 2
+    goals: 3
+    requests: 1
+    shelves: 0
+  difficulty: easy-
+  size: tiny
+save_interval_log: 100
+scenario_name: navigation
+seeds:
+- 4001
+standard_relations: true
+step_interval_log: 10000
+steps_per_update: 100
+tau: 0.001
+test_interval: 1000
+test_n_episodes: 10
+use_comm: false
+use_dones: false
+use_gpu: true
+wolfpack:
+  attr_mapping:
+    id: 2
+    sheep: 1
+    wolf: 0
+  close_penalty: 0.0
+  max_food_num: 2
+  obs_type: grid
+  sparse: true
+world_size: 2
