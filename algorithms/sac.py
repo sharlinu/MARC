@@ -4,6 +4,7 @@ from torch.optim import Adam
 from utils.misc import soft_update, hard_update, enable_gradients, disable_gradients
 from utils.agents import AttentionAgent
 from utils.critics import RelationalCritic, AttentionCritic
+from utils.base_critic import BaseCritic
 import numpy as np
 from gym.spaces import Dict
 
@@ -97,7 +98,7 @@ class RelationalSAC(object):
         self.critic_dev = 'cpu'  # device for critics
         self.trgt_pol_dev = 'cpu'  # device for target policies
         self.trgt_critic_dev = 'cpu'  # device for target critics
-        self.niter = 0
+
 
     @property
     def policies(self):
@@ -160,8 +161,7 @@ class RelationalSAC(object):
             if 'gnn_layers' in n:
                 p.requires_grad = False
 
-        critic_rets = self.critic(obs=obs, unary_tensors=unary, binary_tensors=binary, actions=acs,
-                                  logger=logger, niter=self.niter)
+        critic_rets = self.critic(obs=obs, unary_tensors=unary, binary_tensors=binary, actions=acs)
         next_qs = self.target_critic(obs=next_obs, unary_tensors=next_unary, binary_tensors=next_binary, actions=next_acs)
         q_loss = 0
         for a_i, nq, log_pi, pq in zip(range(self.n_agents), next_qs,
@@ -183,11 +183,6 @@ class RelationalSAC(object):
         wandb.log({'grad_norm': grad_norm, 'q_loss': q_loss})
         self.critic_optimizer.step()
         self.critic_optimizer.zero_grad()
-
-        if logger is not None:
-            logger.add_scalar('losses/q_loss', q_loss, self.niter)
-            logger.add_scalar('grad_norms/q', grad_norm, self.niter)
-        self.niter += 1
 
     def update_policies(self, sample, soft=True, logger=None, **kwargs):
         obs, unary, binary, acs, rews, next_obs, next_unary, next_binary,  dones = sample
@@ -231,11 +226,7 @@ class RelationalSAC(object):
             curr_agent.policy_optimizer.step()
             curr_agent.policy_optimizer.zero_grad()
 
-            if logger is not None:
-                logger.add_scalar('agent%i/losses/pol_loss' % a_i,
-                                  pol_loss, self.niter)
-                logger.add_scalar('agent%i/grad_norms/pi' % a_i,
-                                  grad_norm, self.niter)
+
 
 
     def update_all_targets(self):
@@ -405,7 +396,8 @@ class AttentionSAC(object):
                  reward_scale=10.,
                  pol_hidden_dim=128,
                  critic_hidden_dim=128, attend_heads=4,
-                 hard=True, 
+                 hard=True,
+                 base =True,
                  **kwargs):
         """
         Inputs:
@@ -423,16 +415,22 @@ class AttentionSAC(object):
                                   policy entropy)
             hidden_dim (int): Number of hidden dimensions for networks
         """
+        self.base = base
         self.n_agents = len(sa_size)
         self.nobjects = None
         self.agents = [AttentionAgent(lr=pi_lr,
                                       hidden_dim=pol_hidden_dim,
                                       **params)
                          for params in agent_init_params]
-        self.critic = AttentionCritic(sa_size, hidden_dim=critic_hidden_dim,
-                                      attend_heads=attend_heads, hard=hard)
-        self.target_critic = AttentionCritic(sa_size, hidden_dim=critic_hidden_dim,
-                                             attend_heads=attend_heads, hard=hard)
+        if self.base:
+            self.critic = BaseCritic(sa_size, hidden_dim=critic_hidden_dim)
+            self.target_critic = BaseCritic(sa_size, hidden_dim=critic_hidden_dim)
+        else:
+            self.critic = AttentionCritic(sa_size, hidden_dim=critic_hidden_dim,
+                                          attend_heads=attend_heads, hard=hard)
+            self.target_critic = AttentionCritic(sa_size, hidden_dim=critic_hidden_dim,
+                                                 attend_heads=attend_heads, hard=hard)
+
         hard_update(self.target_critic, self.critic)
         self.critic_optimizer = Adam(self.critic.parameters(), lr=q_lr,
                                      weight_decay=1e-3)
@@ -446,7 +444,6 @@ class AttentionSAC(object):
         self.critic_dev = 'cpu'  # device for critics
         self.trgt_pol_dev = 'cpu'  # device for target policies
         self.trgt_critic_dev = 'cpu'  # device for target critics
-        self.niter = 0
 
     @property
     def policies(self):
@@ -479,7 +476,7 @@ class AttentionSAC(object):
 
     def critic_embeds(self, obs, acs):
         critic_in = list(zip(obs, acs))
-        critic_rets = self.critic(critic_in, regularize=True, niter=self.niter)
+        critic_rets = self.critic(critic_in, regularize=True)
         return critic_rets
 
 
@@ -498,32 +495,38 @@ class AttentionSAC(object):
         trgt_critic_in = list(zip(next_obs, next_acs))
         critic_in = list(zip(obs, acs))
         next_qs = self.target_critic(trgt_critic_in) # gives us the single q-value given observation and action of agent
-        critic_rets = self.critic(critic_in, regularize=True,
-                                  niter=self.niter)
+        critic_rets = self.critic(critic_in, regularize=True)
         q_loss = 0
-        for a_i, nq, log_pi, (pq, regs) in zip(range(self.n_agents), next_qs,
-                                               next_log_pis, critic_rets):
-            target_q = (rews[a_i].view(-1, 1) +
-                        self.gamma * nq *
-                        (1 - dones[a_i].view(-1, 1)))
-            if soft:
-                target_q -= log_pi / self.reward_scale # reward scale is the alpha!
-            q_loss += MSELoss(pq, target_q.detach())
-            # print(q_loss.grad_fb)
-            for reg in regs:
-                q_loss += reg  # regularizing attention
-        q_loss.backward()
-        self.critic.scale_shared_grads()
+        if self.base:
+            for a_i, nq, log_pi, pq in zip(range(self.n_agents), next_qs,
+                                                   next_log_pis, critic_rets):
+                target_q = (rews[a_i].view(-1, 1) +
+                            self.gamma * nq *
+                            (1 - dones[a_i].view(-1, 1)))
+                if soft:
+                    target_q -= log_pi / self.reward_scale # reward scale is the alpha!
+                q_loss += MSELoss(pq, target_q.detach())
+            q_loss.backward()
+        else:
+            for a_i, nq, log_pi, (pq, regs) in zip(range(self.n_agents), next_qs,
+                                                   next_log_pis, critic_rets):
+                target_q = (rews[a_i].view(-1, 1) +
+                            self.gamma * nq *
+                            (1 - dones[a_i].view(-1, 1)))
+                if soft:
+                    target_q -= log_pi / self.reward_scale # reward scale is the alpha!
+                q_loss += MSELoss(pq, target_q.detach())
+                # print(q_loss.grad_fb)
+                for reg in regs:
+                    q_loss += reg  # regularizing attention
+            q_loss.backward()
+            self.critic.scale_shared_grads()
 
         grad_norm = torch.nn.utils.clip_grad_norm_(
             self.critic.parameters(), 10 * self.n_agents)
         self.critic_optimizer.step()
         self.critic_optimizer.zero_grad()
 
-        # if logger is not None:
-        #     logger.add_scalar('losses/q_loss', q_loss, self.niter)
-        #     logger.add_scalar('grad_norms/q', grad_norm, self.niter)
-        self.niter += 1
 
     def update_policies(self, sample, soft=True, logger=None, **kwargs):
         obs, acs, rews, next_obs, dones = sample
@@ -536,8 +539,6 @@ class AttentionSAC(object):
             curr_ac, probs, log_pi, pol_regs, ent = pi(
                 ob, return_all_probs=True, return_log_pi=True,
                 regularize=True, return_entropy=True)
-            # logger.add_scalar('agent%i/policy_entropy' % a_i, ent,
-            #                   self.niter)
             samp_acs.append(curr_ac)
             all_probs.append(probs)
             all_log_pis.append(log_pi)
@@ -567,11 +568,6 @@ class AttentionSAC(object):
             curr_agent.policy_optimizer.step()
             curr_agent.policy_optimizer.zero_grad()
 
-            # if logger is not None:
-            #     logger.add_scalar('agent%i/losses/pol_loss' % a_i,
-            #                       pol_loss, self.niter)
-            #     logger.add_scalar('agent%i/grad_norms/pi' % a_i,
-            #                       grad_norm, self.niter)
 
 
     def update_all_targets(self):

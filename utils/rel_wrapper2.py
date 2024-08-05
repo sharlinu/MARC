@@ -51,8 +51,6 @@ class BPushWrapper(gym.ObservationWrapper):
             ob['image'] = np.append(grid_transformed, id_layer, axis=2)
             obs.append(ob)
         return obs
-
-
 class AbsoluteVKBWrapper(gym.ObservationWrapper):
     """
     Add a vkb key-value pair, which represents the state as a vectorised knowledge base.
@@ -369,8 +367,6 @@ def to_gd(data: torch.Tensor, unary_t, GAT = False) -> GeometricData:
         edge_attr = nz[:, 0]
         return GeometricData(x=unary_t, edge_index=edge_index, edge_attr=edge_attr)
 
-
-
 def rotate_vec2d(vec, degrees):
     """
     rotate a vector anti-clockwise
@@ -505,46 +501,4 @@ def is_other_player(obj1, obj2, mapping)->bool:
     This rule only goes from the observing agent to the other agents
     """
     return obj1[mapping['id']] !=0 and obj2.attr[mapping['agent']] !=0
-
-
-if __name__ == "__main__":
-    from lbforaging.foraging import ForagingEnv
-    env = ForagingEnv(
-        players=2,
-        max_food=1,
-        field_size=(5,5),
-        sight=5,
-        max_episode_steps=500,
-        grid_observation=True,
-        max_player_level=2,
-        force_coop=True,
-        simple=False,
-    )
-    env = AbsoluteVKBWrapper(env, dense=True,  background_id='b0')
-    obs = env.reset()
-    render = False
-    done = False
-    if render:
-        env.render()
-        # pygame.display.update()  # update window
-        time.sleep(0.5)
-
-    while not done:
-        # for i in range(100):
-        actions = env.action_space.sample()
-        nobs, nreward, ndone, _ = env.step(actions)
-
-        print('obs', nobs)
-        # print('player pos', env.players[0].position, '----', env.players[1].position )
-        # nobs, nreward, ndone, _ = env.step((1,1))
-        if sum(nreward) != 0:
-            print(nreward)
-
-        if render:
-            env.render()
-            # pygame.display.update()  # update window
-            time.sleep(0.5)
-
-        done = np.all(ndone)
-
 

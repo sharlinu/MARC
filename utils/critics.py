@@ -139,9 +139,7 @@ class RelationalCritic(nn.Module):
                 binary_tensors = None,
                 agents=None,
                 return_q=True,
-                return_all_q=False,
-                logger = None,
-                niter = 1):
+                return_all_q=False):
         """
         Inputs:
             inps (list of PyTorch Matrices): Inputs to each agents' encoder
@@ -292,7 +290,7 @@ class AttentionCritic(nn.Module):
             p.grad.data.mul_(1. / self.n_agents)
 
     def forward(self, inps, agents=None, return_q=True, return_all_q=False,
-                regularize=False, return_attend=False, logger=None, niter=0):
+                regularize=False, return_attend=False):
         """
         Inputs:
             inps (list of PyTorch Matrices): Inputs to each agents' encoder

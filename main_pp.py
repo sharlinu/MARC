@@ -7,7 +7,7 @@ from torch.autograd import Variable
 from warnings import filterwarnings  # noqa
 import macpp
 from utils.buffer import ReplayBufferMARC, ReplayBufferMAAC
-from algorithms.attention_sac import AttentionSAC, RelationalSAC
+from algorithms.sac import AttentionSAC, RelationalSAC
 from utils.rel_wrapper2 import AbsoluteVKBWrapper, GATWrapper
 from utils.env_wrappers import DummyVecEnv, FlatObs, GridObs, PartialGridObs
 import yaml
